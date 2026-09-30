@@ -3,6 +3,10 @@ enum AppTab: String, CaseIterable, Identifiable {
 
     var id: Self { self }
 
+    static var visible: [AppTab] {
+        allCases.filter { $0 != .create || FeatureFlags.aiGeneration }
+    }
+
     var title: String {
         switch self {
         case .explore: "Explore"

@@ -118,7 +118,9 @@ private struct WelcomePage: View {
 
             FeatureList(rows: [
                 .init(symbol: "livephoto", title: "Video to Live Wallpaper", detail: "Trim any video into a Lock Screen wallpaper in seconds.", badge: "FREE"),
-                .init(symbol: "wand.and.stars", title: "AI Generator", detail: "Describe a scene or animate a photo, and AI brings it to life.", badge: "SOON"),
+                FeatureFlags.aiGeneration
+                    ? .init(symbol: "wand.and.stars", title: "AI Generator", detail: "Describe a scene or animate a photo, and AI brings it to life.", badge: "SOON")
+                    : .init(symbol: "sparkles", title: "Curated Wallpapers", detail: "Browse hand-picked live wallpapers and save one in a tap.", badge: "FREE"),
             ])
         }
     }
@@ -192,7 +194,11 @@ private struct SetupPage: View {
                     .foregroundStyle(Theme.textPrimary)
                 IncludedRow(symbol: "infinity", title: "Unlimited conversions", detail: "Turn as many videos into live wallpapers as you like.")
                 IncludedRow(symbol: "photo.on.rectangle.angled", title: "Your Library", detail: "Every wallpaper you make is kept, ready to save or set again.")
-                IncludedRow(symbol: "wand.and.stars", title: "AI Generator, coming soon", detail: "Free to use, supported by short ads.")
+                if FeatureFlags.aiGeneration {
+                    IncludedRow(symbol: "wand.and.stars", title: "AI Generator, coming soon", detail: "Free to use, supported by short ads.")
+                } else {
+                    IncludedRow(symbol: "sparkles", title: "Curated wallpapers", detail: "Hand-picked live wallpapers in Explore, saved in one tap.")
+                }
             }
             .padding(18)
             .frame(maxWidth: .infinity, alignment: .leading)
