@@ -33,3 +33,30 @@ struct CreationLibraryTests {
         #expect(try container.mainContext.fetchCount(FetchDescriptor<Creation>()) == 0)
     }
 }
+
+struct OrphanCleanupTests {
+    @Test func removesOnlyFoldersWithoutALibraryEntry() throws {
+        let container = try ModelContainer(for: Creation.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let library = CreationLibrary(context: container.mainContext)
+        let root = URL.temporaryDirectory.appending(path: "OrphanTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+        let kept = Creation(id: UUID(), pairingIdentifier: "p", imageFileName: "a.heic", videoFileName: "a.mov", duration: 2)
+        container.mainContext.insert(kept)
+        for id in [kept.id, UUID()] {
+            try FileManager.default.createDirectory(at: root.appending(path: id.uuidString), withIntermediateDirectories: true)
+        }
+
+        library.removeOrphanedFiles(in: root)
+
+        let remaining = try FileManager.default.contentsOfDirectory(atPath: root.path(percentEncoded: false))
+        #expect(remaining == [kept.id.uuidString])
+    }
+
+    @Test func leavesTheRealLibraryAloneWithAnInMemoryStore() throws {
+        let container = try ModelContainer(for: Creation.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let root = CreationLibrary.rootDirectory
+        let before = (try? FileManager.default.contentsOfDirectory(atPath: root.path(percentEncoded: false))) ?? []
+        CreationLibrary(context: container.mainContext).removeOrphanedFiles()
+        let after = (try? FileManager.default.contentsOfDirectory(atPath: root.path(percentEncoded: false))) ?? []
+        #expect(Set(before) == Set(after))
+    }
+}

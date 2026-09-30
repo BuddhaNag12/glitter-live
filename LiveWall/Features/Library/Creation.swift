@@ -38,7 +38,11 @@ struct CreationLibrary {
     let context: ModelContext
 
     nonisolated static var rootDirectory: URL {
-        URL.applicationSupportDirectory.appending(path: "Creations", directoryHint: .isDirectory)
+        #if DEBUG
+        // Demo runs use an in-memory store, so their files go somewhere temporary too.
+        if DemoLaunch.isDemo { return URL.temporaryDirectory.appending(path: "DemoCreations", directoryHint: .isDirectory) }
+        #endif
+        return URL.applicationSupportDirectory.appending(path: "Creations", directoryHint: .isDirectory)
     }
 
     nonisolated static func directory(for id: UUID) -> URL {
@@ -60,6 +64,19 @@ struct CreationLibrary {
         context.insert(creation)
         try context.save()
         return creation
+    }
+
+    /// Deletes folders that no Library entry points to, such as leftovers from an interrupted save.
+    /// Skips entirely if the Library can't be read or isn't the persistent one, so a failed fetch or an
+    /// in-memory fallback store never looks like an empty Library.
+    func removeOrphanedFiles(in root: URL = Self.rootDirectory) {
+        guard context.container.configurations.allSatisfy({ !$0.isStoredInMemoryOnly }) || root != Self.rootDirectory,
+              let creations = try? context.fetch(FetchDescriptor<Creation>()) else { return }
+        let known = Set(creations.map(\.id.uuidString))
+        let folders = (try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)) ?? []
+        for folder in folders where !known.contains(folder.lastPathComponent) {
+            try? FileManager.default.removeItem(at: folder)
+        }
     }
 
     /// Removes the app's copy only; anything already saved to Photos stays there.

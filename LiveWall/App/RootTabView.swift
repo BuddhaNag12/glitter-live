@@ -1,8 +1,10 @@
+import SwiftData
 import SwiftUI
 
 struct RootTabView: View {
     @State private var selection: AppTab = Self.initialTab
     @State private var showsSettings = false
+    @Environment(\.modelContext) private var modelContext
     @AppStorage(OnboardingState.completedKey) private var hasCompletedOnboarding = false
 
     private static var initialTab: AppTab {
@@ -25,6 +27,7 @@ struct RootTabView: View {
         .tint(Theme.accent)
         .modifier(MinimizingTabBar())
         .sensoryFeedback(.selection, trigger: selection)
+        .task { CreationLibrary(context: modelContext).removeOrphanedFiles() }
         .environment(\.showSettings, SettingsAction { showsSettings = true })
         .sheet(isPresented: $showsSettings) {
             SettingsView()
