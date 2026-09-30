@@ -1,9 +1,10 @@
 import SwiftUI
 
 struct SettingsView: View {
+    var onShowIntro: () -> Void = {}
+
     @Environment(\.dismiss) private var dismiss
     @State private var showsGuide = false
-    @AppStorage(OnboardingState.completedKey) private var hasCompletedOnboarding = true
 
     private var version: String {
         let info = Bundle.main.infoDictionary
@@ -16,33 +17,12 @@ struct SettingsView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
-                    HStack(spacing: 14) {
-                        Image(systemName: "livephoto")
-                            .font(.system(size: 22, weight: .medium))
-                            .foregroundStyle(Theme.accent)
-                            .frame(width: 50, height: 50)
-                            .liquidGlass(in: Circle(), tint: Theme.accent.opacity(0.2))
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Converting is free").font(.titleMedium).foregroundStyle(Theme.textPrimary)
-                            Text("Turn as many videos into live wallpapers as you like. No watermark, no account.")
-                                .font(.labelMedium)
-                                .foregroundStyle(Theme.textSecondary)
-                        }
-                    }
-                    .padding(18)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .glass(.floating, cornerRadius: 24)
-
                     VStack(spacing: 0) {
                         row("How to set a live wallpaper", symbol: "iphone.gen3") { showsGuide = true }
                         Divider().overlay(Theme.stroke)
                         row("Show intro again", symbol: "sparkles.rectangle.stack") {
+                            onShowIntro()
                             dismiss()
-                            // The intro is a full-screen cover, which can't appear until this sheet has gone.
-                            Task {
-                                try? await Task.sleep(for: .milliseconds(450))
-                                hasCompletedOnboarding = false
-                            }
                         }
                         Divider().overlay(Theme.stroke)
                         NavigationLink {

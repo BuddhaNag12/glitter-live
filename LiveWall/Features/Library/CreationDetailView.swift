@@ -62,6 +62,8 @@ struct CreationDetailView: View {
         .sheet(isPresented: $showsGuide) {
             SetWallpaperGuideView().presentationDetents([.medium, .large])
         }
+        .sensoryFeedback(.success, trigger: creation.savedToPhotos) { _, saved in saved }
+        .sensoryFeedback(.error, trigger: errorMessage) { _, message in message != nil }
         .confirmationDialog("Delete this wallpaper from Glitter Live?", isPresented: $confirmsDelete, titleVisibility: .visible) {
             Button("Delete", role: .destructive, action: delete)
         } message: {
@@ -88,21 +90,19 @@ struct CreationDetailView: View {
                 .buttonStyle(KineticButtonStyle())
                 .disabled(isSaving || filesMissing)
             }
-            GlassGroup(spacing: 12) {
-                HStack(spacing: 12) {
-                    if creation.savedToPhotos {
-                        Button(action: save) {
-                            Label(isSaving ? "Saving…" : "Save Again", systemImage: "square.and.arrow.down").frame(maxWidth: .infinity)
-                        }
-                        .disabled(isSaving || filesMissing)
+            HStack(spacing: 12) {
+                if creation.savedToPhotos {
+                    Button(action: save) {
+                        Label(isSaving ? "Saving…" : "Save Again", systemImage: "square.and.arrow.down").frame(maxWidth: .infinity)
                     }
-                    Button { confirmsDelete = true } label: {
-                        Label("Delete", systemImage: "trash").frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(GlassPillButtonStyle(tint: Theme.danger))
+                    .disabled(isSaving || filesMissing)
                 }
-                .buttonStyle(GlassPillButtonStyle())
+                Button { confirmsDelete = true } label: {
+                    Label("Delete", systemImage: "trash").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(GlassPillButtonStyle(tint: Theme.danger))
             }
+            .buttonStyle(GlassPillButtonStyle())
         }
         .padding(18)
         .glass(.floating, cornerRadius: 30)

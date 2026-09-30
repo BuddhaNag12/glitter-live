@@ -4,7 +4,6 @@ struct TrimStudioView: View {
     @Bindable var editor: ConvertEditor
     var onClose: () -> Void
 
-    @State private var isPickingCover = false
     /// Pan and pinch only reframe while this is on, so the page can scroll the rest of the time.
     @State private var isFraming = false
 
@@ -27,7 +26,7 @@ struct TrimStudioView: View {
             if editor.phase == .exporting { exportingOverlay }
         }
         .animation(.spring(duration: 0.3), value: isFraming)
-        .animation(.spring(duration: 0.3), value: isPickingCover)
+        .animation(.easeOut(duration: 0.2), value: editor.phase == .exporting)
         .alert("Something went wrong", isPresented: .constant(editor.errorMessage != nil)) {
             Button("OK") { editor.errorMessage = nil }
         } message: {
@@ -87,56 +86,36 @@ struct TrimStudioView: View {
             .buttonStyle(KineticButtonStyle())
             .disabled(editor.phase != .editing)
             .padding(.top, 4)
-
-            Label("Free, no watermark. Saves a HEIC cover photo paired with an HEVC video.", systemImage: "checkmark.seal")
-                .font(.labelMedium)
-                .foregroundStyle(Theme.textSecondary)
-                .frame(maxWidth: .infinity)
-                .multilineTextAlignment(.center)
         }
         .padding(20)
         .glass(.floating, cornerRadius: 30)
     }
 
     private var keyFrameRow: some View {
-        VStack(spacing: 14) {
-            HStack(spacing: 12) {
-                Image(systemName: "photo")
-                    .font(.system(size: 17))
-                    .foregroundStyle(Theme.slate)
-                    .frame(width: 42, height: 42)
-                    .background(Theme.slate.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                VStack(alignment: .leading, spacing: 4) {
+        HStack(spacing: 12) {
+            Image(systemName: "photo")
+                .font(.system(size: 17))
+                .foregroundStyle(Theme.slate)
+                .frame(width: 42, height: 42)
+                .background(Theme.slate.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
                     Text("Key Frame")
                         .font(.titleMedium)
                         .foregroundStyle(Theme.textPrimary)
                         .lineLimit(1)
-                    HStack(spacing: 6) {
-                        Text(Self.timestamp(editor.coverOffset))
-                            .font(.labelMedium.monospaced())
-                            .foregroundStyle(Theme.accent)
-                            .padding(.horizontal, 7)
-                            .frame(height: 22)
-                            .background(Theme.accent.opacity(0.12), in: Capsule())
-                        Text("Cover photo")
-                            .font(.labelMedium)
-                            .foregroundStyle(Theme.textSecondary)
-                            .lineLimit(1)
-                    }
+                    Text(Self.timestamp(editor.coverOffset))
+                        .font(.labelMedium.monospaced())
+                        .foregroundStyle(Theme.accent)
+                        .padding(.horizontal, 7)
+                        .frame(height: 22)
+                        .background(Theme.accent.opacity(0.12), in: Capsule())
                 }
-                Spacer(minLength: 0)
-                Button(isPickingCover ? "Done" : "Change") {
-                    isPickingCover.toggle()
-                    isPickingCover ? editor.showCoverFrame() : editor.resumePreview()
-                }
-                .buttonStyle(GlassPillButtonStyle(tint: isPickingCover ? Theme.accent : nil))
+                Text("Drag the blue marker to choose the cover photo.")
+                    .font(.labelMedium)
+                    .foregroundStyle(Theme.textSecondary)
             }
-            if isPickingCover {
-                Slider(value: $editor.coverOffset, in: editor.coverRange)
-                    .tint(Theme.accent)
-                    .onChange(of: editor.coverOffset) { editor.showCoverFrame() }
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-            }
+            Spacer(minLength: 0)
         }
         .padding(14)
         .glass(.surface, cornerRadius: 22)
@@ -196,7 +175,6 @@ struct TrimStudioView: View {
 
     private func convert() {
         isFraming = false
-        isPickingCover = false
         Task { await editor.export() }
     }
 
@@ -269,12 +247,21 @@ private struct TrailingIconLabelStyle: LabelStyle {
     }
 }
 
-/// Lock-screen preview. In framing mode, drag and pinch reposition the video.
+/// Lock-screen preview. Pinching reframes at any time; dragging reframes in framing mode, so the page can scroll otherwise.
 private struct CropPreview: View {
     @Bindable var editor: ConvertEditor
     @Binding var isFraming: Bool
-    @GestureState private var dragTranslation: CGSize = .zero
-    @GestureState private var magnification: CGFloat = 1
+
+    // Live gesture values stay until both gestures end, so the settle starts from what's on screen.
+    @State private var dragTranslation: CGSize = .zero
+    @State private var dragBase: CGSize?
+    @State private var releaseVelocity: CGSize = .zero
+    @State private var pinchScale: CGFloat = 1
+    @State private var pinchBase: CGFloat?
+    /// Where the pinch started, from the canvas center.
+    @State private var pinchAnchor: CGSize = .zero
+    @GestureState private var isDragging = false
+    @GestureState private var isPinching = false
 
     var body: some View {
         DeviceFrame(highlighted: isFraming) {
@@ -283,11 +270,8 @@ private struct CropPreview: View {
     }
 
     private var canvas: some View {
-        let zoom = min(max(editor.zoom * magnification, 1), 4)
-        let pan = editor.clampedPan(
-            CGSize(width: editor.panOffset.width + dragTranslation.width, height: editor.panOffset.height + dragTranslation.height),
-            zoom: zoom
-        )
+        let zoom = ConvertEditor.rubberBandedZoom(editor.zoom * pinchScale)
+        let pan = editor.rubberBandedPan(proposedPan(zoom: zoom), zoom: zoom)
         let videoSize = editor.displayedVideoSize(zoom: zoom)
 
         return Color.black
@@ -304,7 +288,20 @@ private struct CropPreview: View {
             .clipped()
             .contentShape(Rectangle())
             .onGeometryChange(for: CGSize.self) { $0.size } action: { editor.canvasSize = $0 }
-            .gesture(dragGesture.simultaneously(with: magnifyGesture), including: isFraming ? .all : .subviews)
+            .gesture(dragGesture, including: isFraming ? .all : .subviews)
+            .simultaneousGesture(magnifyGesture)
+            .onChange(of: isDragging || isPinching) { _, isActive in
+                if !isActive { settle() }
+            }
+    }
+
+    /// The pan that keeps the point under the pinch still at this zoom, plus the drag.
+    private func proposedPan(zoom: CGFloat) -> CGSize {
+        let ratio = zoom / editor.zoom
+        return CGSize(
+            width: pinchAnchor.width - (pinchAnchor.width - editor.panOffset.width) * ratio + dragTranslation.width,
+            height: pinchAnchor.height - (pinchAnchor.height - editor.panOffset.height) * ratio + dragTranslation.height
+        )
     }
 
     private var framingGuide: some View {
@@ -330,9 +327,13 @@ private struct CropPreview: View {
                 if isFraming {
                     Button { isFraming = false } label: { Image(systemName: "checkmark") }
                         .accessibilityLabel("Done framing")
-                    Button(action: editor.resetFraming) { Image(systemName: "arrow.counterclockwise") }
+                    Button {
+                        withAnimation(.spring(duration: 0.4)) { editor.resetFraming() }
+                    } label: { Image(systemName: "arrow.counterclockwise") }
                         .accessibilityLabel("Reset framing")
                 } else {
+                    Button { isFraming = true } label: { Image(systemName: "viewfinder") }
+                        .accessibilityLabel("Reframe video")
                     Button { editor.showsLockScreen.toggle() } label: {
                         Image(systemName: editor.showsLockScreen ? "eye" : "eye.slash")
                     }
@@ -348,23 +349,68 @@ private struct CropPreview: View {
 
     private var dragGesture: some Gesture {
         DragGesture()
-            .updating($dragTranslation) { value, state, _ in state = value.translation }
+            .updating($isDragging) { _, state, _ in state = true }
+            .onChanged { value in
+                // A pending translation stays in place if a new drag starts before the pinch ends.
+                let base = dragBase ?? dragTranslation
+                dragBase = base
+                dragTranslation = CGSize(width: base.width + value.translation.width, height: base.height + value.translation.height)
+                releaseVelocity = value.velocity
+            }
             .onEnded { value in
-                let proposed = CGSize(
-                    width: editor.panOffset.width + value.translation.width,
-                    height: editor.panOffset.height + value.translation.height
-                )
-                editor.panOffset = editor.clampedPan(proposed, zoom: editor.zoom)
+                dragBase = nil
+                releaseVelocity = value.velocity
             }
     }
 
     private var magnifyGesture: some Gesture {
         MagnifyGesture()
-            .updating($magnification) { value, state, _ in state = value.magnification }
-            .onEnded { value in
-                editor.zoom = min(max(editor.zoom * value.magnification, 1), 4)
-                editor.panOffset = editor.clampedPan(editor.panOffset, zoom: editor.zoom)
+            .updating($isPinching) { _, state, _ in state = true }
+            .onChanged { value in
+                if !isFraming { isFraming = true }
+                if pinchBase == nil {
+                    pinchBase = pinchScale
+                    if pinchScale == 1 {
+                        let canvas = editor.canvasSize
+                        pinchAnchor = CGSize(
+                            width: (value.startAnchor.x - 0.5) * canvas.width,
+                            height: (value.startAnchor.y - 0.5) * canvas.height
+                        )
+                    }
+                }
+                pinchScale = (pinchBase ?? 1) * value.magnification
             }
+            .onEnded { _ in
+                pinchBase = nil
+                // Only a drag that ends last throws the video.
+                releaseVelocity = .zero
+            }
+    }
+
+    /// Springs back inside the limits, carrying a flick on to where it was heading.
+    private func settle() {
+        let range = ConvertEditor.zoomRange
+        let liveZoom = ConvertEditor.rubberBandedZoom(editor.zoom * pinchScale)
+        let zoom = min(max(editor.zoom * pinchScale, range.lowerBound), range.upperBound)
+        let current = editor.rubberBandedPan(proposedPan(zoom: liveZoom), zoom: liveZoom)
+        let proposed = proposedPan(zoom: zoom)
+        let projected = CGSize(
+            width: proposed.width + Motion.projection(of: releaseVelocity.width),
+            height: proposed.height + Motion.projection(of: releaseVelocity.height)
+        )
+        let target = editor.clampedPan(projected, zoom: zoom)
+        let velocity = Motion.relativeVelocity(releaseVelocity, from: current, to: target)
+
+        withAnimation(.interpolatingSpring(duration: 0.4, bounce: 0, initialVelocity: velocity)) {
+            editor.zoom = zoom
+            editor.panOffset = target
+            pinchScale = 1
+            pinchAnchor = .zero
+            dragTranslation = .zero
+        }
+        dragBase = nil
+        pinchBase = nil
+        releaseVelocity = .zero
     }
 }
 

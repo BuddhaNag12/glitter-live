@@ -65,6 +65,8 @@ struct OnboardingView: View {
         .padding(.horizontal, 20)
         .padding(.top, 8)
         .padding(.bottom, 4)
+        // Swiping between pages changes the step without an animation, so the header animates itself.
+        .animation(.spring(duration: 0.35), value: step)
     }
 
     private var footer: some View {
@@ -117,10 +119,10 @@ private struct WelcomePage: View {
             }
 
             FeatureList(rows: [
-                .init(symbol: "livephoto", title: "Video to Live Wallpaper", detail: "Trim any video into a Lock Screen wallpaper in seconds.", badge: "FREE"),
+                .init(symbol: "livephoto", title: "Video to Live Wallpaper", detail: "Trim any video into a Lock Screen wallpaper in seconds."),
                 FeatureFlags.aiGeneration
                     ? .init(symbol: "wand.and.stars", title: "AI Generator", detail: "Describe a scene or animate a photo, and AI brings it to life.", badge: "SOON")
-                    : .init(symbol: "sparkles", title: "Curated Wallpapers", detail: "Browse hand-picked live wallpapers and save one in a tap.", badge: "FREE"),
+                    : .init(symbol: "sparkles", title: "Curated Wallpapers", detail: "Browse hand-picked live wallpapers and save one in a tap."),
             ])
         }
     }
@@ -176,12 +178,11 @@ private struct SetupPage: View {
             }
             .padding(.top, 8)
 
-            StatusPill(text: "FREE FOREVER · NO WATERMARK")
             Text("You're All Set")
                 .font(.displayLarge)
                 .tracking(-0.8)
                 .foregroundStyle(Theme.textPrimary)
-            Text("One permission and you're ready to make your first live wallpaper.")
+            Text("Pick any video and make your first live wallpaper in seconds.")
                 .font(.bodyLarge)
                 .foregroundStyle(Theme.textSecondary)
                 .multilineTextAlignment(.center)
@@ -189,7 +190,7 @@ private struct SetupPage: View {
             permissionCard
 
             VStack(alignment: .leading, spacing: 14) {
-                Label("Included for free", systemImage: "star")
+                Label("What's included", systemImage: "star")
                     .font(.headlineSmall)
                     .foregroundStyle(Theme.textPrimary)
                 IncludedRow(symbol: "infinity", title: "Unlimited conversions", detail: "Turn as many videos into live wallpapers as you like.")
@@ -216,7 +217,9 @@ private struct SetupPage: View {
                 .liquidGlass(in: Circle(), tint: Theme.accent.opacity(0.18))
             VStack(alignment: .leading, spacing: 3) {
                 Text("Save to Photos").font(.titleMedium).foregroundStyle(Theme.textPrimary)
-                Text("Needed to add your wallpapers to Photos. Glitter Live can't see your other photos.")
+                Text(status == .notDetermined
+                     ? "Asked the first time you save a wallpaper. Glitter Live can't see your other photos."
+                     : "Needed to add your wallpapers to Photos. Glitter Live can't see your other photos.")
                     .font(.labelMedium)
                     .foregroundStyle(Theme.textSecondary)
             }
@@ -229,12 +232,7 @@ private struct SetupPage: View {
                     .frame(width: 34, height: 34)
                     .background(Theme.accentFill, in: Circle())
                     .accessibilityLabel("Allowed")
-            } else if status == .notDetermined {
-                Button("Allow") {
-                    Task { status = await PHPhotoLibrary.requestAuthorization(for: .addOnly) }
-                }
-                .buttonStyle(GlassPillButtonStyle(tint: Theme.accent))
-            } else {
+            } else if status != .notDetermined {
                 Button("Settings") {
                     if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
                 }
@@ -293,10 +291,10 @@ private struct FeatureList: View {
                                 Text(badge)
                                     .font(.labelSmall)
                                     .tracking(0.8)
-                                    .foregroundStyle(badge == "FREE" ? Theme.accent : Theme.signalYellow)
+                                    .foregroundStyle(Theme.signalYellow)
                                     .padding(.horizontal, 8)
                                     .frame(height: 22)
-                                    .background((badge == "FREE" ? Theme.accent : Theme.signalYellow).opacity(0.14), in: Capsule())
+                                    .background(Theme.signalYellow.opacity(0.14), in: Capsule())
                             }
                         }
                         Text(row.detail).font(.bodyMedium).foregroundStyle(Theme.textSecondary)

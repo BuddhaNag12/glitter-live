@@ -12,6 +12,7 @@ final class ConvertEditor {
     }
 
     static let speeds: [Double] = [0.5, 1, 1.5, 2]
+    static let zoomRange: ClosedRange<CGFloat> = 1...4
     private static let outputDurationRange = 1.0...3.0
 
     let sourceURL: URL
@@ -44,6 +45,8 @@ final class ConvertEditor {
     @ObservationIgnored private var looper: AVPlayerLooper?
     @ObservationIgnored private let library: CreationLibrary?
     @ObservationIgnored private var creation: Creation?
+    @ObservationIgnored private var scrubTarget: CMTime?
+    @ObservationIgnored private var isSeeking = false
 
     init(sourceURL: URL, library: CreationLibrary? = nil) {
         self.sourceURL = sourceURL
@@ -119,11 +122,29 @@ final class ConvertEditor {
 
     /// Keeps the video covering the whole canvas.
     func clampedPan(_ pan: CGSize, zoom: CGFloat) -> CGSize {
+        let limit = panLimit(zoom: zoom)
+        return CGSize(width: min(max(pan.width, -limit.width), limit.width), height: min(max(pan.height, -limit.height), limit.height))
+    }
+
+    /// Mid-gesture pan: resists past the video's edges instead of stopping there.
+    func rubberBandedPan(_ pan: CGSize, zoom: CGFloat) -> CGSize {
+        let limit = panLimit(zoom: zoom)
+        let canvas = effectiveCanvas
+        return CGSize(
+            width: Motion.rubberBand(pan.width, in: -limit.width...limit.width, dimension: canvas.width),
+            height: Motion.rubberBand(pan.height, in: -limit.height...limit.height, dimension: canvas.height)
+        )
+    }
+
+    /// Mid-gesture zoom: resists past 1× and 4× instead of stopping there.
+    static func rubberBandedZoom(_ zoom: CGFloat) -> CGFloat {
+        Motion.rubberBand(zoom, in: zoomRange, dimension: zoom < zoomRange.lowerBound ? 0.5 : 2)
+    }
+
+    private func panLimit(zoom: CGFloat) -> CGSize {
         let canvas = effectiveCanvas
         let displayed = displayedVideoSize(zoom: zoom)
-        let maxX = max(0, (displayed.width - canvas.width) / 2)
-        let maxY = max(0, (displayed.height - canvas.height) / 2)
-        return CGSize(width: min(max(pan.width, -maxX), maxX), height: min(max(pan.height, -maxY), maxY))
+        return CGSize(width: max(0, (displayed.width - canvas.width) / 2), height: max(0, (displayed.height - canvas.height) / 2))
     }
 
     func resetFraming() {
@@ -153,6 +174,7 @@ final class ConvertEditor {
 
     func restartLoop() {
         guard duration > 0, clipLength > 0 else { return }
+        scrubTarget = nil
         looper?.disableLooping()
         player.removeAllItems()
         looper = AVPlayerLooper(player: player, templateItem: AVPlayerItem(url: sourceURL), timeRange: clipRange)
@@ -160,12 +182,30 @@ final class ConvertEditor {
     }
 
     func showCoverFrame() {
+        scrub(to: clipStart + coverOffset)
+    }
+
+    /// Pauses on an exact frame. Seeks wait for the previous one, so a fast drag doesn't queue up stale frames.
+    func scrub(to seconds: Double) {
         player.pause()
-        let time = CMTime(seconds: clipStart + coverOffset, preferredTimescale: 600)
-        player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
+        scrubTarget = CMTime(seconds: seconds, preferredTimescale: 600)
+        seekToScrubTarget()
+    }
+
+    private func seekToScrubTarget() {
+        guard !isSeeking, let target = scrubTarget else { return }
+        scrubTarget = nil
+        isSeeking = true
+        player.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero) { _ in
+            Task { @MainActor in
+                self.isSeeking = false
+                self.seekToScrubTarget()
+            }
+        }
     }
 
     func resumePreview() {
+        scrubTarget = nil
         player.defaultRate = Float(speed)
         player.play()
     }

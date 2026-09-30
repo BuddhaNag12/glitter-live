@@ -88,7 +88,13 @@ struct WallpaperDetailView: View {
         .sheet(isPresented: $showsGuide) {
             SetWallpaperGuideView().presentationDetents([.medium, .large])
         }
-        .sensoryFeedback(.success, trigger: saver.phase == .saved)
+        .sensoryFeedback(trigger: saver.phase) { _, phase in
+            switch phase {
+            case .saved: .success
+            case .failed: .error
+            default: nil
+            }
+        }
     }
 
     private var actions: some View {

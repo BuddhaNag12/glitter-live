@@ -7,6 +7,8 @@ enum Theme {
     static let surface = Color(light: 0xFFFFFF, dark: 0x121722)
     static let elevated = Color(light: 0xF1F5F9, dark: 0x1A202B)
     static let border = Color(light: 0xE2E8F0, dark: 0xFFFFFF, darkOpacity: 0.10)
+    /// Controls and rows sitting on a glass panel.
+    static let fill = Color(light: 0x0F172A, lightOpacity: 0.05, dark: 0xFFFFFF, darkOpacity: 0.07)
 
     /// Background light leaks: brand blue top-left, silver slate bottom-right.
     static let glowPrimary = Color(light: 0x3B82F6, lightOpacity: 0.10, dark: 0x3B82F6, darkOpacity: 0.40)

@@ -56,17 +56,15 @@ struct LivePhotoResultView: View {
                         .buttonStyle(KineticButtonStyle())
                         .disabled(isSaving)
                     }
-                    GlassGroup(spacing: 12) {
-                        HStack(spacing: 12) {
-                            Button(action: editor.returnToEditing) {
-                                Label("Edit Again", systemImage: "slider.horizontal.3").frame(maxWidth: .infinity)
-                            }
-                            Button(action: onNewVideo) {
-                                Label("New Video", systemImage: "plus").frame(maxWidth: .infinity)
-                            }
+                    HStack(spacing: 12) {
+                        Button(action: editor.returnToEditing) {
+                            Label("Edit Again", systemImage: "slider.horizontal.3").frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(GlassPillButtonStyle())
+                        Button(action: onNewVideo) {
+                            Label("New Video", systemImage: "plus").frame(maxWidth: .infinity)
+                        }
                     }
+                    .buttonStyle(GlassPillButtonStyle())
                 }
                 .padding(18)
                 .glass(.floating, cornerRadius: 30)

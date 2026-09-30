@@ -1,10 +1,13 @@
 import SwiftUI
 
-/// Filmstrip with a draggable trim window. Long videos scroll so short clips stay easy to grab.
+/// Filmstrip with a draggable trim window and cover marker. Long videos scroll so short clips stay easy to grab.
 struct TimelineStrip: View {
     @Bindable var editor: ConvertEditor
 
     @State private var dragOrigin: (start: Double, length: Double)?
+    @State private var coverDragOrigin: Double?
+    /// True while a drag pushes past the shortest or longest clip, or an end of the video.
+    @State private var isAtLimit = false
 
     private let height: CGFloat = 64
     private let handleWidth: CGFloat = 16
@@ -30,6 +33,7 @@ struct TimelineStrip: View {
         .frame(height: height)
         .background(.black.opacity(0.4), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .sensoryFeedback(.impact(weight: .light), trigger: isAtLimit) { _, atLimit in atLimit }
     }
 
     private func filmstrip(width: CGFloat) -> some View {
@@ -60,11 +64,12 @@ struct TimelineStrip: View {
     private func trimWindow(pointsPerSecond: CGFloat) -> some View {
         let width = max(editor.clipLength * pointsPerSecond, handleWidth * 2 + 8)
         return HStack(spacing: 0) {
-            handle.highPriorityGesture(resizeGesture(pointsPerSecond: pointsPerSecond, leading: true))
+            // Handles sit above the middle so their enlarged hit areas win where they overlap it.
+            handle(leading: true).highPriorityGesture(resizeGesture(pointsPerSecond: pointsPerSecond, leading: true)).zIndex(1)
             Color.clear
                 .contentShape(Rectangle())
                 .highPriorityGesture(moveGesture(pointsPerSecond: pointsPerSecond))
-            handle.highPriorityGesture(resizeGesture(pointsPerSecond: pointsPerSecond, leading: false))
+            handle(leading: false).highPriorityGesture(resizeGesture(pointsPerSecond: pointsPerSecond, leading: false)).zIndex(1)
         }
         .frame(width: width, height: height)
         .overlay {
@@ -83,43 +88,83 @@ struct TimelineStrip: View {
         }
     }
 
-    private var handle: some View {
+    /// The hit area grows mostly outwards, leaving the inside of the window for moving it and the cover marker.
+    private func handle(leading: Bool) -> some View {
         RoundedRectangle(cornerRadius: 8, style: .continuous)
             .fill(Theme.trimHandle)
             .frame(width: handleWidth, height: height)
             .overlay(Capsule().fill(.black.opacity(0.55)).frame(width: 3, height: 18))
-            .contentShape(Rectangle().inset(by: -8))
+            .contentShape(OutsetRectangle(leading: leading ? 14 : 4, trailing: leading ? 4 : 14))
     }
 
     private func coverMarker(pointsPerSecond: CGFloat) -> some View {
         let x = (editor.clipStart + editor.coverOffset) * pointsPerSecond
+        let hitWidth: CGFloat = 28
         return VStack(spacing: 0) {
-            Circle().fill(Theme.accent).frame(width: 10, height: 10)
+            Circle().fill(Theme.accent).frame(width: 12, height: 12)
             Rectangle().fill(.white).frame(width: 2)
         }
-        .frame(width: 10, height: height)
-        .offset(x: x - 5)
-        .allowsHitTesting(false)
+        .frame(width: hitWidth, height: height)
+        .contentShape(Rectangle())
+        .offset(x: x - hitWidth / 2)
+        .highPriorityGesture(coverGesture(pointsPerSecond: pointsPerSecond))
+        .accessibilityElement()
+        .accessibilityLabel("Cover photo")
+        .accessibilityValue("\(editor.coverOffset.formatted(.number.precision(.fractionLength(1)))) seconds into the clip")
+        .accessibilityAdjustableAction { direction in
+            moveCover(to: editor.coverOffset + (direction == .increment ? 0.1 : -0.1))
+            editor.resumePreview()
+        }
+    }
+
+    private func coverGesture(pointsPerSecond: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .named("timeline"))
+            .onChanged { value in
+                let origin = coverDragOrigin ?? editor.coverOffset
+                coverDragOrigin = origin
+                moveCover(to: origin + value.translation.width / pointsPerSecond)
+            }
+            .onEnded { _ in
+                coverDragOrigin = nil
+                editor.resumePreview()
+            }
+    }
+
+    private func moveCover(to offset: Double) {
+        let range = editor.coverRange
+        editor.coverOffset = min(max(offset, range.lowerBound), range.upperBound)
+        editor.showCoverFrame()
     }
 
     private func moveGesture(pointsPerSecond: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 2, coordinateSpace: .named("timeline"))
             .onChanged { value in
                 let origin = beginDrag()
-                editor.moveClip(to: origin.start + value.translation.width / pointsPerSecond)
+                let proposed = origin.start + value.translation.width / pointsPerSecond
+                editor.moveClip(to: proposed)
+                isAtLimit = abs(editor.clipStart - proposed) > 0.001
+                editor.scrub(to: editor.clipStart)
             }
             .onEnded { _ in endDrag() }
     }
 
+    /// Shows the frame under the dragged handle, so trimming shows exactly where the clip starts or ends.
     private func resizeGesture(pointsPerSecond: CGFloat, leading: Bool) -> some Gesture {
         DragGesture(minimumDistance: 1, coordinateSpace: .named("timeline"))
             .onChanged { value in
                 let origin = beginDrag()
                 let delta = value.translation.width / pointsPerSecond
                 if leading {
-                    editor.setClipStart(origin.start + delta)
+                    let proposed = origin.start + delta
+                    editor.setClipStart(proposed)
+                    isAtLimit = abs(editor.clipStart - proposed) > 0.001
+                    editor.scrub(to: editor.clipStart)
                 } else {
-                    editor.setClipEnd(origin.start + origin.length + delta)
+                    let proposed = origin.start + origin.length + delta
+                    editor.setClipEnd(proposed)
+                    let end = editor.clipStart + editor.clipLength
+                    isAtLimit = abs(end - proposed) > 0.001
+                    editor.scrub(to: end)
                 }
             }
             .onEnded { _ in endDrag() }
@@ -134,6 +179,16 @@ struct TimelineStrip: View {
 
     private func endDrag() {
         dragOrigin = nil
+        isAtLimit = false
         editor.restartLoop()
+    }
+}
+
+nonisolated private struct OutsetRectangle: Shape {
+    var leading: CGFloat
+    var trailing: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        Path(CGRect(x: rect.minX - leading, y: rect.minY, width: rect.width + leading + trailing, height: rect.height))
     }
 }

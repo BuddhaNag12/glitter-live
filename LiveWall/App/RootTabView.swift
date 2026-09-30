@@ -4,6 +4,7 @@ import SwiftUI
 struct RootTabView: View {
     @State private var selection: AppTab = Self.initialTab
     @State private var showsSettings = false
+    @State private var showsIntroAfterSettings = false
     @Environment(\.modelContext) private var modelContext
     @AppStorage(OnboardingState.completedKey) private var hasCompletedOnboarding = false
 
@@ -26,15 +27,21 @@ struct RootTabView: View {
         }
         .tint(Theme.accent)
         .modifier(MinimizingTabBar())
-        .sensoryFeedback(.selection, trigger: selection)
         .task { CreationLibrary(context: modelContext).removeOrphanedFiles() }
         .environment(\.showSettings, SettingsAction { showsSettings = true })
-        .sheet(isPresented: $showsSettings) {
-            SettingsView()
+        // The intro is a full-screen cover, which can only appear once the Settings sheet has gone.
+        .sheet(isPresented: $showsSettings, onDismiss: showIntroIfRequested) {
+            SettingsView { showsIntroAfterSettings = true }
         }
         .fullScreenCover(isPresented: Binding(get: { !hasCompletedOnboarding }, set: { hasCompletedOnboarding = !$0 })) {
             OnboardingView { hasCompletedOnboarding = true }
         }
+    }
+
+    private func showIntroIfRequested() {
+        guard showsIntroAfterSettings else { return }
+        showsIntroAfterSettings = false
+        hasCompletedOnboarding = false
     }
 
     @ViewBuilder

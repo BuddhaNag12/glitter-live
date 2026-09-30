@@ -32,25 +32,25 @@ final class ExploreModel {
 struct ExploreView: View {
     @State private var model = ExploreModel()
     @State private var selection: Wallpaper?
+    @Namespace private var zoom
 
     private let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
 
     var body: some View {
-        VStack(spacing: 0) {
-            ScreenHeader(title: "Explore")
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    content
-                }
-                .padding(16)
-                .padding(.bottom, 24)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                content
             }
-            .scrollIndicators(.hidden)
-            .refreshable { await model.load() }
+            .padding(16)
+            .padding(.bottom, 24)
         }
+        .scrollIndicators(.hidden)
+        .refreshable { await model.load() }
+        .screenHeader("Explore")
         .task { await model.load() }
         .sheet(item: $selection) { wallpaper in
             WallpaperDetailView(wallpaper: wallpaper)
+                .zoomTransition(from: wallpaper.id, in: zoom)
         }
     }
 
@@ -88,6 +88,7 @@ struct ExploreView: View {
                         CatalogCard(wallpaper: wallpaper)
                     }
                     .buttonStyle(.plain)
+                    .zoomSource(id: wallpaper.id, in: zoom, cornerRadius: 24)
                     .accessibilityIdentifier("catalog-card")
                 }
             }
@@ -106,6 +107,11 @@ struct ExploreView: View {
             }
         }
         .scrollIndicators(.hidden)
+        // A scroll view clips to its frame, which would cut off the glass rim and its press effect.
+        .scrollClipDisabled()
+        // Full bleed, so chips scroll off the screen edge instead of stopping at the page margin.
+        .contentMargins(.horizontal, 16, for: .scrollContent)
+        .padding(.horizontal, -16)
     }
 
     private func chip(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
@@ -126,7 +132,7 @@ private struct CatalogCard: View {
                     if let image = phase.image {
                         image.resizable().scaledToFill()
                     } else {
-                        AuroraView().opacity(0.35)
+                        AuroraView(isAnimated: false).opacity(0.35)
                     }
                 }
             }
@@ -134,20 +140,17 @@ private struct CatalogCard: View {
                 StatusPill(text: "\(wallpaper.durationSeconds.formatted(.number.precision(.fractionLength(1))))s", dot: Theme.signalYellow)
                     .padding(10)
             }
-            .overlay(alignment: .bottomLeading) {
+            .overlay(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(wallpaper.title).font(.titleMedium).foregroundStyle(.white).lineLimit(1)
-                    Text(wallpaper.category).font(.labelMedium).foregroundStyle(.white.opacity(0.7)).lineLimit(1)
+                    Text(wallpaper.category).font(.labelMedium.weight(.semibold)).foregroundStyle(.white.opacity(0.8)).lineLimit(1)
                 }
-                .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .liquidGlass(in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .padding(8)
+                .mediaCaption()
             }
             .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Theme.specularRim, lineWidth: 1))
             .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            // Wallpaper tiles are dark media, so their glass captions stay dark too.
+            // Wallpaper tiles are dark media, so their glass pills stay dark too.
             .environment(\.colorScheme, .dark)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("\(wallpaper.title), \(wallpaper.category)")

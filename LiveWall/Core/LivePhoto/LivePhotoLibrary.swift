@@ -69,7 +69,8 @@ struct LivePhotoView: UIViewRepresentable {
     func updateUIView(_ view: PHLivePhotoView, context: Context) {
         guard view.livePhoto !== livePhoto else { return }
         view.livePhoto = livePhoto
-        if livePhoto != nil { view.startPlayback(with: .full) }
+        // Plays once on arrival, unless the person has turned off Auto-Play Video Previews.
+        if livePhoto != nil, UIAccessibility.isVideoAutoplayEnabled { view.startPlayback(with: .full) }
     }
 }
 

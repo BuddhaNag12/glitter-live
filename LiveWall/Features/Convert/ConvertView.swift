@@ -8,16 +8,35 @@ struct ConvertView: View {
     @State private var isImporting = false
     @State private var importError: String?
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private enum Stage { case pick, edit, result, unavailable }
+
+    private var stage: Stage {
+        switch editor?.phase {
+        case nil: .pick
+        case .finished: .result
+        case .unavailable: .unavailable
+        default: .edit
+        }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
-            ScreenHeader(title: "Convert")
             if let editor {
                 content(for: editor)
             } else {
-                emptyState
+                emptyState.transition(.screen(reduceMotion: reduceMotion))
             }
         }
+        .animation(.spring(duration: 0.4), value: stage)
+        .screenHeader("Convert")
+        .sensoryFeedback(trigger: editor?.phase) { _, phase in
+            if case .finished(_, saved: true) = phase { .success } else { nil }
+        }
+        // Export and save failures both surface as an error message.
+        .sensoryFeedback(.error, trigger: editor?.errorMessage) { _, message in message != nil }
+        .sensoryFeedback(.error, trigger: importError) { _, message in message != nil }
         #if DEBUG
         .task { await openDemoIfRequested() }
         #endif
@@ -37,6 +56,7 @@ struct ConvertView: View {
         switch editor.phase {
         case .finished(let result, let saved):
             LivePhotoResultView(editor: editor, result: result, saved: saved, onNewVideo: close)
+                .transition(.screen(reduceMotion: reduceMotion))
         case .unavailable(let message):
             ContentUnavailableView {
                 Label("Can't use this video", systemImage: "exclamationmark.triangle")
@@ -46,8 +66,10 @@ struct ConvertView: View {
                 Button("Choose Another", action: close).buttonStyle(GlassPillButtonStyle())
             }
             .frame(maxHeight: .infinity)
+            .transition(.screen(reduceMotion: reduceMotion))
         default:
             TrimStudioView(editor: editor, onClose: close)
+                .transition(.screen(reduceMotion: reduceMotion))
         }
     }
 
@@ -71,12 +93,10 @@ struct ConvertView: View {
                         .multilineTextAlignment(.center)
                 }
 
-                GlassGroup(spacing: 10) {
-                    HStack(spacing: 10) {
-                        StepChip(number: 1, title: "Pick", symbol: "film")
-                        StepChip(number: 2, title: "Trim", symbol: "timeline.selection")
-                        StepChip(number: 3, title: "Set", symbol: "iphone")
-                    }
+                HStack(spacing: 10) {
+                    StepChip(number: 1, title: "Pick", symbol: "film")
+                    StepChip(number: 2, title: "Trim", symbol: "timeline.selection")
+                    StepChip(number: 3, title: "Set", symbol: "iphone")
                 }
 
                 PhotosPicker(selection: $selection, matching: .videos, preferredItemEncoding: .current) {

@@ -3,39 +3,37 @@ import SwiftUI
 /// Create teaser until AI generation is wired up.
 struct CreateComingSoonView: View {
     var body: some View {
-        VStack(spacing: 0) {
-            ScreenHeader(title: "Create")
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    TeaserBanner(
-                        symbol: "wand.and.stars",
-                        title: "AI Live Generator",
-                        message: "Describe a scene or animate a photo, and AI turns it into a live wallpaper. Free to use, supported by ads."
-                    )
-                    VStack(alignment: .leading, spacing: 12) {
-                        Label("Motion Synthesis Prompt", systemImage: "text.bubble")
-                            .font(.titleMedium)
-                            .foregroundStyle(Theme.textPrimary)
-                        Text("Bioluminescent koi fish swimming through liquid starlight, slow shimmering ripples…")
-                            .font(.bodyLarge)
-                            .foregroundStyle(Theme.textTertiary)
-                            .padding(18)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Theme.elevated, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                        HStack(spacing: 10) {
-                            StatusPill(text: "TEXT TO LIVE", symbol: "text.cursor")
-                            StatusPill(text: "ANIMATE PHOTO", dot: Theme.slate, symbol: "photo")
-                        }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                TeaserBanner(
+                    symbol: "wand.and.stars",
+                    title: "AI Live Generator",
+                    message: "Describe a scene or animate a photo, and AI turns it into a live wallpaper. Free to use, supported by ads."
+                )
+                VStack(alignment: .leading, spacing: 12) {
+                    Label("Motion Synthesis Prompt", systemImage: "text.bubble")
+                        .font(.titleMedium)
+                        .foregroundStyle(Theme.textPrimary)
+                    Text("Bioluminescent koi fish swimming through liquid starlight, slow shimmering ripples…")
+                        .font(.bodyLarge)
+                        .foregroundStyle(Theme.textTertiary)
+                        .padding(18)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Theme.elevated, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                    HStack(spacing: 10) {
+                        StatusPill(text: "TEXT TO LIVE", symbol: "text.cursor")
+                        StatusPill(text: "ANIMATE PHOTO", dot: Theme.slate, symbol: "photo")
                     }
-                    .padding(18)
-                    .glass(.floating, cornerRadius: 28)
-                    .opacity(0.8)
                 }
-                .padding(16)
-                .padding(.bottom, 24)
+                .padding(18)
+                .glass(.floating, cornerRadius: 28)
+                .opacity(0.8)
             }
-            .scrollIndicators(.hidden)
+            .padding(16)
+            .padding(.bottom, 24)
         }
+        .scrollIndicators(.hidden)
+        .screenHeader("Create")
     }
 }
 
@@ -44,7 +42,6 @@ struct LibraryEmptyView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ScreenHeader(title: "Library")
             Spacer()
             VStack(spacing: 14) {
                 Image(systemName: "photo.stack")
@@ -67,6 +64,7 @@ struct LibraryEmptyView: View {
             Spacer()
             Spacer()
         }
+        .screenHeader("Library")
     }
 }
 
