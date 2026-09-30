@@ -265,7 +265,7 @@ private struct ScreenHeaderBar: ViewModifier {
 
     func body(content: Content) -> some View {
         if #available(iOS 26, *) {
-            // A safe area bar gets the system's soft scroll edge effect.
+            // A safe area bar gets the system's scroll edge effect under it.
             content.safeAreaBar(edge: .top) { ScreenHeader(title: title) }
         } else {
             content.safeAreaInset(edge: .top, spacing: 0) {

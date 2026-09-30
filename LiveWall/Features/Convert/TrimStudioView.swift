@@ -238,19 +238,20 @@ private struct AttributeCell<Accessory: View>: View {
     @ViewBuilder var accessory: Accessory
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Image(systemName: symbol)
                 .scaledIcon(size: 16, weight: .medium, frame: 22)
                 .foregroundStyle(tint)
             Text(title)
-                .typography(.titleMedium)
+                .typography(.labelLarge)
                 .foregroundStyle(Theme.textPrimary)
                 .lineLimit(1)
-                .minimumScaleFactor(0.8)
-            Spacer(minLength: 2)
-            accessory
+                .minimumScaleFactor(0.9)
+            Spacer(minLength: 0)
+            // The value is what the cell is for, so it keeps its full width and the title gives way.
+            accessory.fixedSize()
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 10)
         .frame(maxWidth: .infinity, minHeight: 60)
         .glass(.surface, cornerRadius: 20)
         .overlay {

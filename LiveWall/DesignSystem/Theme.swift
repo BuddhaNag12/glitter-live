@@ -127,6 +127,7 @@ extension Font {
     static let titleMedium = Typography.titleMedium.font
     static let bodyLarge = Typography.bodyLarge.font
     static let bodyMedium = Typography.bodyMedium.font
+    static let labelLarge = Typography.labelLarge.font
     static let labelMedium = Typography.labelMedium.font
     static let labelSmall = Typography.labelSmall.font
 }
@@ -150,6 +151,8 @@ struct Typography {
     static let titleMedium = Typography(17, .semibold, relativeTo: .headline)
     static let bodyLarge = Typography(17, .regular, relativeTo: .body)
     static let bodyMedium = Typography(15, .regular, relativeTo: .subheadline)
+    /// Labels inside compact controls, where 17 pt titles don't fit beside a value.
+    static let labelLarge = Typography(15, .semibold, relativeTo: .subheadline)
     static let labelMedium = Typography(13, .medium, relativeTo: .footnote)
     static let labelSmall = Typography(11, .semibold, relativeTo: .caption)
 }
