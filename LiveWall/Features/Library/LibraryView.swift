@@ -8,6 +8,7 @@ struct LibraryView: View {
 
     @Query(sort: \Creation.createdAt, order: .reverse) private var creations: [Creation]
     @State private var selection: Creation?
+    @Namespace private var zoom
 
     private let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
 
@@ -17,12 +18,11 @@ struct LibraryView: View {
                 LibraryEmptyView(onConvert: onConvert)
             } else {
                 VStack(spacing: 0) {
-                    ScreenHeader(title: "Library")
                     ScrollView {
                         VStack(alignment: .leading, spacing: 14) {
                             HStack(alignment: .firstTextBaseline) {
                                 Text(creations.count == 1 ? "1 live wallpaper" : "\(creations.count) live wallpapers")
-                                    .font(.headlineSmall)
+                                    .typography(.headlineSmall)
                                     .foregroundStyle(Theme.textPrimary)
                                 Spacer()
                                 Button(action: onConvert) {
@@ -36,6 +36,7 @@ struct LibraryView: View {
                                         CreationCard(creation: creation)
                                     }
                                     .buttonStyle(.plain)
+                                    .zoomSource(id: creation.id, in: zoom, cornerRadius: 24)
                                     .accessibilityIdentifier("creation-card")
                                 }
                             }
@@ -45,10 +46,12 @@ struct LibraryView: View {
                     }
                     .scrollIndicators(.hidden)
                 }
+                .screenHeader("Library")
             }
         }
         .sheet(item: $selection) { creation in
             CreationDetailView(creation: creation)
+                .zoomTransition(from: creation.id, in: zoom)
         }
         #if DEBUG
         .task { await seedDemoLibraryIfRequested() }
@@ -88,7 +91,7 @@ private struct CreationCard: View {
                 if let thumbnail {
                     Image(uiImage: thumbnail).resizable().scaledToFill()
                 } else {
-                    AuroraView().opacity(0.35)
+                    AuroraView(isAnimated: false).opacity(0.35)
                 }
             }
             .overlay(alignment: .topLeading) {
@@ -106,24 +109,21 @@ private struct CreationCard: View {
                         .accessibilityLabel("Saved to Photos")
                 }
             }
-            .overlay(alignment: .bottomLeading) {
+            .overlay(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(creation.createdAt, format: .dateTime.month(.abbreviated).day())
-                        .font(.titleMedium)
+                        .typography(.titleMedium)
                         .foregroundStyle(.white)
                     Text(creation.createdAt, format: .dateTime.hour().minute())
-                        .font(.labelMedium)
-                        .foregroundStyle(.white.opacity(0.7))
+                        .font(.labelMedium.weight(.semibold))
+                        .foregroundStyle(Theme.onMediaSecondary)
                 }
-                .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .liquidGlass(in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .padding(8)
+                .mediaCaption()
             }
             .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Theme.specularRim, lineWidth: 1))
             .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            // Wallpaper tiles are always dark media, so their glass captions stay dark too.
+            // Wallpaper tiles are always dark media, so their glass badges stay dark too.
             .environment(\.colorScheme, .dark)
             .task(id: creation.id) {
                 thumbnail = await Thumbnail.load(creation.livePhoto.imageURL, maxPixelSize: 600)

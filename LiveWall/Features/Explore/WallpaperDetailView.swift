@@ -54,7 +54,7 @@ struct WallpaperDetailView: View {
                     .containerRelativeFrame(.horizontal) { width, _ in width * 0.56 }
 
                     VStack(spacing: 4) {
-                        Text(wallpaper.title).font(.headlineSmall).foregroundStyle(Theme.textPrimary)
+                        Text(wallpaper.title).typography(.headlineSmall).foregroundStyle(Theme.textPrimary)
                         if let creator = wallpaper.creatorName {
                             Group {
                                 if let url = wallpaper.creatorURL {
@@ -88,7 +88,13 @@ struct WallpaperDetailView: View {
         .sheet(isPresented: $showsGuide) {
             SetWallpaperGuideView().presentationDetents([.medium, .large])
         }
-        .sensoryFeedback(.success, trigger: saver.phase == .saved)
+        .sensoryFeedback(trigger: saver.phase) { _, phase in
+            switch phase {
+            case .saved: .success
+            case .failed: .error
+            default: nil
+            }
+        }
     }
 
     private var actions: some View {
