@@ -143,7 +143,7 @@ private struct CatalogCard: View {
             .overlay(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(wallpaper.title).typography(.titleMedium).foregroundStyle(.white).lineLimit(1)
-                    Text(wallpaper.category).font(.labelMedium.weight(.semibold)).foregroundStyle(.white.opacity(0.8)).lineLimit(1)
+                    Text(wallpaper.category).font(.labelMedium.weight(.semibold)).foregroundStyle(Theme.onMediaSecondary).lineLimit(1)
                 }
                 .mediaCaption()
             }

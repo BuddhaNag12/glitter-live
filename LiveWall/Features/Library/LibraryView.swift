@@ -116,7 +116,7 @@ private struct CreationCard: View {
                         .foregroundStyle(.white)
                     Text(creation.createdAt, format: .dateTime.hour().minute())
                         .font(.labelMedium.weight(.semibold))
-                        .foregroundStyle(.white.opacity(0.8))
+                        .foregroundStyle(Theme.onMediaSecondary)
                 }
                 .mediaCaption()
             }

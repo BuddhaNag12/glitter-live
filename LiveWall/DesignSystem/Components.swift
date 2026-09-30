@@ -5,6 +5,7 @@ import SwiftUI
 extension View {
     /// Apple's Liquid Glass on iOS 26+, frosted material with a specular rim before that.
     /// On top of another glass surface it becomes a tinted fill, because glass on glass loses legibility.
+    /// With Increase Contrast it becomes a near-solid surface with a defined border.
     func liquidGlass<S: InsettableShape>(in shape: S, tint: Color? = nil, interactive: Bool = false) -> some View {
         modifier(LiquidGlass(shape: shape, tint: tint, interactive: interactive))
     }
@@ -39,10 +40,23 @@ private struct LiquidGlass<S: InsettableShape>: ViewModifier {
     let tint: Color?
     let interactive: Bool
     @Environment(\.isOnGlass) private var isOnGlass
+    @Environment(\.colorSchemeContrast) private var contrast
 
     func body(content: Content) -> some View {
+        let increasedContrast = contrast == .increased
         if isOnGlass {
-            content.background(tint ?? Theme.fill, in: shape)
+            content
+                .background(tint ?? Theme.fill, in: shape)
+                .overlay { if increasedContrast { shape.strokeBorder(Theme.border, lineWidth: 1).allowsHitTesting(false) } }
+        } else if increasedContrast {
+            content
+                .environment(\.isOnGlass, true)
+                .background {
+                    shape
+                        .fill(Theme.surface)
+                        .overlay(shape.fill(tint ?? .clear))
+                        .overlay(shape.strokeBorder(Theme.border, lineWidth: 1))
+                }
         } else if #available(iOS 26, *) {
             content
                 .environment(\.isOnGlass, true)
@@ -229,11 +243,20 @@ extension View {
 
     /// Legible text over media: a dark gradient rising from the bottom edge, as in Photos.
     func mediaCaption() -> some View {
-        padding(.horizontal, 14)
+        modifier(MediaCaption())
+    }
+}
+
+private struct MediaCaption: ViewModifier {
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    func body(content: Content) -> some View {
+        content
+            .padding(.horizontal, 14)
             .padding(.top, 40)
             .padding(.bottom, 14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(LinearGradient(colors: [.black.opacity(0), .black.opacity(0.7)], startPoint: .top, endPoint: .bottom))
+            .background(LinearGradient(colors: [.black.opacity(0), .black.opacity(contrast == .increased ? 0.9 : 0.7)], startPoint: .top, endPoint: .bottom))
     }
 }
 

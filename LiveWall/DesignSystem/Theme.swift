@@ -1,44 +1,53 @@
 import SwiftUI
 
 /// "Silver Shimmer" design tokens: an obsidian dark mode lit by brand blue and silver slate, and a
-/// soft slate light mode. Every color adapts to light and dark mode.
+/// soft slate light mode. Every color adapts to light and dark mode, and text, borders and accents
+/// get stronger values when Increase Contrast is on.
 enum Theme {
     static let background = Color(light: 0xF8FAFC, dark: 0x090C12)
     static let surface = Color(light: 0xFFFFFF, dark: 0x121722)
     static let elevated = Color(light: 0xF1F5F9, dark: 0x1A202B)
-    static let border = Color(light: 0xE2E8F0, dark: 0xFFFFFF, darkOpacity: 0.10)
+    static let border = Color(light: 0xE2E8F0, dark: 0xFFFFFF, darkOpacity: 0.10,
+                              increased: .init(light: 0x64748B, dark: 0xFFFFFF, darkOpacity: 0.45))
     /// Controls and rows sitting on a glass panel.
-    static let fill = Color(light: 0x0F172A, lightOpacity: 0.05, dark: 0xFFFFFF, darkOpacity: 0.07)
+    static let fill = Color(light: 0x0F172A, lightOpacity: 0.05, dark: 0xFFFFFF, darkOpacity: 0.07,
+                            increased: .init(light: 0x0F172A, lightOpacity: 0.10, dark: 0xFFFFFF, darkOpacity: 0.14))
 
     /// Background light leaks: brand blue top-left, silver slate bottom-right.
     static let glowPrimary = Color(light: 0x3B82F6, lightOpacity: 0.10, dark: 0x3B82F6, darkOpacity: 0.40)
     static let glowSecondary = Color(light: 0x64748B, lightOpacity: 0.10, dark: 0x94A3B8, darkOpacity: 0.30)
 
     /// Brand blue for text, icons and selection. Lighter in dark mode so small text keeps 4.5:1 contrast.
-    static let accent = Color(light: 0x2563EB, dark: 0x93C5FD)
+    static let accent = Color(light: 0x2563EB, dark: 0x93C5FD, increased: .init(light: 0x1D4ED8, dark: 0xBFDBFE))
     /// Brand blue behind white text: badges, switches, selected states.
-    static let accentFill = Color(light: 0x2563EB, dark: 0x3B82F6)
+    static let accentFill = Color(light: 0x2563EB, dark: 0x3B82F6, increased: .init(light: 0x1D4ED8, dark: 0x2563EB))
     /// Blue fading into slate, like the icon's brush. Both ends keep white text at 3:1 or better for bold labels.
     static let accentGradient = LinearGradient(
-        colors: [Color(light: 0x2563EB, dark: 0x3B82F6), Color(light: 0x64748B, dark: 0x7C8BA1)],
+        colors: [Color(light: 0x2563EB, dark: 0x3B82F6, increased: .init(light: 0x1D4ED8, dark: 0x2563EB)),
+                 Color(light: 0x64748B, dark: 0x7C8BA1, increased: .init(light: 0x475569, dark: 0x64748B))],
         startPoint: .leading, endPoint: .trailing
     )
     static let onAccent = Color.white
-    static let slate = Color(light: 0x64748B, dark: 0x94A3B8)
-    static let danger = Color(light: 0xDC2626, dark: 0xF87171)
+    /// Secondary text on photos and video, such as card subtitles.
+    static let onMediaSecondary = Color(light: 0xFFFFFF, lightOpacity: 0.8, dark: 0xFFFFFF, darkOpacity: 0.8,
+                                        increased: .init(light: 0xFFFFFF, dark: 0xFFFFFF))
+    static let slate = Color(light: 0x64748B, dark: 0x94A3B8, increased: .init(light: 0x475569, dark: 0xCBD5E1))
+    static let danger = Color(light: 0xDC2626, dark: 0xF87171, increased: .init(light: 0xB91C1C, dark: 0xFCA5A5))
     /// The Live Photo indicator, as in Photos.
-    static let signalYellow = Color(light: 0xCA8A04, dark: 0xFACC15)
+    static let signalYellow = Color(light: 0xCA8A04, dark: 0xFACC15, increased: .init(light: 0xA16207, dark: 0xFDE047))
     /// Trim handles sit on the filmstrip, so they stay bright in both modes.
     static let trimHandle = Color(hex: 0xFACC15)
 
     static let textPrimary = Color(light: 0x0F172A, dark: 0xF8FAFC)
-    static let textSecondary = Color(light: 0x475569, dark: 0xA1A9B8)
-    static let textTertiary = Color(light: 0x64748B, dark: 0x7C8698)
+    static let textSecondary = Color(light: 0x475569, dark: 0xA1A9B8, increased: .init(light: 0x334155, dark: 0xCBD5E1))
+    static let textTertiary = Color(light: 0x64748B, dark: 0x7C8698, increased: .init(light: 0x475569, dark: 0xA1A9B8))
 
     static let stroke = border
     static let specularRim = LinearGradient(
-        colors: [Color(light: 0x0F172A, lightOpacity: 0.08, dark: 0xFFFFFF, darkOpacity: 0.16),
-                 Color(light: 0x0F172A, lightOpacity: 0.04, dark: 0xFFFFFF, darkOpacity: 0.05)],
+        colors: [Color(light: 0x0F172A, lightOpacity: 0.08, dark: 0xFFFFFF, darkOpacity: 0.16,
+                       increased: .init(light: 0x0F172A, lightOpacity: 0.30, dark: 0xFFFFFF, darkOpacity: 0.45)),
+                 Color(light: 0x0F172A, lightOpacity: 0.04, dark: 0xFFFFFF, darkOpacity: 0.05,
+                       increased: .init(light: 0x0F172A, lightOpacity: 0.30, dark: 0xFFFFFF, darkOpacity: 0.45))],
         startPoint: .top, endPoint: .bottom
     )
 
@@ -69,13 +78,23 @@ extension Color {
         )
     }
 
-    init(light: UInt32, lightOpacity: Double = 1, dark: UInt32, darkOpacity: Double = 1) {
+    init(light: UInt32, lightOpacity: Double = 1, dark: UInt32, darkOpacity: Double = 1, increased: ContrastVariant? = nil) {
+        let standard = ContrastVariant(light: light, lightOpacity: lightOpacity, dark: dark, darkOpacity: darkOpacity)
         self.init(uiColor: UIColor { traits in
-            traits.userInterfaceStyle == .dark
-                ? UIColor(hex: dark, alpha: darkOpacity)
-                : UIColor(hex: light, alpha: lightOpacity)
+            let variant = traits.accessibilityContrast == .high ? increased ?? standard : standard
+            return traits.userInterfaceStyle == .dark
+                ? UIColor(hex: variant.dark, alpha: variant.darkOpacity)
+                : UIColor(hex: variant.light, alpha: variant.lightOpacity)
         })
     }
+}
+
+/// A color's light and dark values, used for its Increase Contrast version.
+nonisolated struct ContrastVariant: Sendable {
+    var light: UInt32
+    var lightOpacity: Double = 1
+    var dark: UInt32
+    var darkOpacity: Double = 1
 }
 
 extension UIColor {
