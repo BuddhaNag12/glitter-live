@@ -1,21 +1,23 @@
 import SwiftUI
 
 /// Faint specks and a few four-point sparkles that slowly twinkle behind the content.
-/// Holds still with Reduce Motion.
+/// Holds still with Reduce Motion, or on screens that have motion of their own.
 struct GlitterField: View {
+    var isAnimated = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         // Twinkling is slow, so 15 fps looks smooth at a fraction of the cost.
-        TimelineView(.animation(minimumInterval: 1 / 15, paused: reduceMotion)) { context in
+        let holdsStill = reduceMotion || !isAnimated
+        TimelineView(.animation(minimumInterval: 1 / 15, paused: holdsStill)) { context in
             let time = context.date.timeIntervalSinceReferenceDate
             Canvas { canvas, size in
                 let isDark = colorScheme == .dark
                 let tint = isDark ? Color.white : Color(hex: 0x64748B)
                 let strength = isDark ? 0.75 : 0.3
                 for speck in Speck.all {
-                    let twinkle = reduceMotion ? 0.6 : 0.5 + 0.5 * sin(time * speck.speed + speck.phase)
+                    let twinkle = holdsStill ? 0.6 : 0.5 + 0.5 * sin(time * speck.speed + speck.phase)
                     let center = CGPoint(x: speck.x * size.width, y: speck.y * size.height)
                     let path = speck.isSparkle
                         ? Self.sparkle(at: center, radius: speck.size * 3.2)

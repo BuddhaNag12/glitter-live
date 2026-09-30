@@ -166,12 +166,15 @@ extension View {
 
 /// Obsidian base with two soft glows and a slow glitter twinkle, shared by every screen.
 struct AppBackground: View {
+    /// Screens with their own motion, such as a playing wallpaper, hold the glitter still so it doesn't compete.
+    var twinkles = true
+
     var body: some View {
         ZStack {
             Theme.background
             RadialGradient(colors: [Theme.glowPrimary, .clear], center: .topLeading, startRadius: 0, endRadius: 520)
             RadialGradient(colors: [Theme.glowSecondary, .clear], center: .bottomTrailing, startRadius: 0, endRadius: 560)
-            GlitterField()
+            GlitterField(isAnimated: twinkles)
         }
         .ignoresSafeArea()
     }

@@ -74,7 +74,7 @@ struct WallpaperDetailView: View {
                 .padding(.bottom, 24)
             }
             .scrollIndicators(.hidden)
-            .background { AppBackground() }
+            .background { AppBackground(twinkles: false) }
             .navigationTitle(wallpaper.category)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

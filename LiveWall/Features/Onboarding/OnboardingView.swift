@@ -32,7 +32,7 @@ struct OnboardingView: View {
             .scrollIndicators(.hidden)
         }
         .safeAreaInset(edge: .bottom) { footer }
-        .background { AppBackground() }
+        .background { AppBackground(twinkles: false) }
         .sensoryFeedback(.selection, trigger: step)
     }
 
