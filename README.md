@@ -11,35 +11,36 @@
 
 <p align="center">
   <img src="docs/screenshots/onboarding-1-dark.png" width="200" alt="Welcome screen">
+  <img src="docs/screenshots/explore-dark.png" width="200" alt="Explore catalog">
+  <img src="docs/screenshots/explore-detail-dark.png" width="200" alt="Wallpaper detail">
   <img src="docs/screenshots/convert-empty-dark.png" width="200" alt="Convert a video">
-  <img src="docs/screenshots/trim-studio-dark.png" width="200" alt="Trim Studio preview">
-  <img src="docs/screenshots/trim-studio-3-dark.png" width="200" alt="Trim Studio controls">
 </p>
 <p align="center">
+  <img src="docs/screenshots/trim-studio-dark.png" width="200" alt="Trim Studio preview">
+  <img src="docs/screenshots/trim-studio-3-dark.png" width="200" alt="Trim Studio controls">
   <img src="docs/screenshots/result-dark.png" width="200" alt="Saved Live Photo">
   <img src="docs/screenshots/library-grid-dark.png" width="200" alt="Library">
-  <img src="docs/screenshots/library-detail-dark.png" width="200" alt="Library detail">
-  <img src="docs/screenshots/explore-dark.png" width="200" alt="Explore">
 </p>
 
 <details>
 <summary>Light mode</summary>
 <p align="center">
   <img src="docs/screenshots/onboarding-1-light.png" width="200" alt="Welcome screen, light">
-  <img src="docs/screenshots/convert-empty-light.png" width="200" alt="Convert, light">
-  <img src="docs/screenshots/trim-studio-3-light.png" width="200" alt="Trim Studio, light">
-  <img src="docs/screenshots/result-light.png" width="200" alt="Saved Live Photo, light">
+  <img src="docs/screenshots/explore-light.png" width="200" alt="Explore catalog, light">
+  <img src="docs/screenshots/explore-detail-light.png" width="200" alt="Wallpaper detail, light">
+  <img src="docs/screenshots/convert-empty-light.png" width="200" alt="Convert a video, light">
 </p>
 <p align="center">
   <img src="docs/screenshots/trim-studio-light.png" width="200" alt="Trim Studio preview, light">
+  <img src="docs/screenshots/trim-studio-3-light.png" width="200" alt="Trim Studio controls, light">
+  <img src="docs/screenshots/result-light.png" width="200" alt="Saved Live Photo, light">
   <img src="docs/screenshots/library-grid-light.png" width="200" alt="Library, light">
-  <img src="docs/screenshots/library-detail-light.png" width="200" alt="Library detail, light">
-  <img src="docs/screenshots/explore-light.png" width="200" alt="Explore, light">
 </p>
 </details>
 
 ## Features
 
+- **Explore**: a curated catalog of live wallpapers, served from Supabase, that saves to Photos as a Lock Screen-ready Live Photo in one tap.
 - **Video to Live Wallpaper**: pick any video, trim a 1–3 second moment, and save it as a Live Photo that plays on the Lock Screen when the iPhone wakes.
 - **Trim Studio**: filmstrip with trim handles, pinch-and-drag framing inside a Lock Screen preview (clock, widgets and quick actions), cover-frame picker, 0.5×–2× speed and a forward-and-back bounce.
 - **Sharp cover photo**: the still shown while the phone is locked is rendered from the original video at up to 1320 px wide, sharper than the motion clip.
@@ -58,6 +59,17 @@ Photos accepts any still and movie that share a content identifier as a Live Pho
 - a cover photo that shows the same frame as the movie (it may be larger)
 
 See [`LivePhotoBuilder.swift`](LiveWall/Core/LivePhoto/LivePhotoBuilder.swift) and [`LivePhotoMetadata.swift`](LiveWall/Core/LivePhoto/LivePhotoMetadata.swift).
+
+## Catalog backend
+
+Explore reads the `wallpapers` table (read-only for the app's publishable key) and downloads files from a public Supabase Storage bucket. To add a wallpaper:
+
+```bash
+cp scripts/storage.env.example scripts/storage.env   # fill in the S3 and secret keys; this file is git-ignored
+scripts/upload-wallpaper.sh ~/Movies/loop.mp4 --title "Neon Rain" --category "Abstract" --creator "Your Name"
+```
+
+The table is created by [`supabase/migrations/0001_wallpapers.sql`](supabase/migrations/0001_wallpapers.sql).
 
 ## Requirements
 
@@ -92,18 +104,22 @@ LiveWall/
   App/            App entry point and tab bar
   Core/LivePhoto/ Video → Live Photo pipeline, saving and preview
   DesignSystem/   Colors, type, glass components, Lock Screen overlay
-  Features/       Convert, Library, Onboarding, Settings, Explore and Create previews
+  Core/Catalog/   Supabase catalog client and downloads
+  Features/       Explore, Convert, Library, Onboarding, Settings
   Resources/      Assets, fonts, privacy manifest
 LiveWallTests/    Unit tests
 LiveWallUITests/  On-device screenshot tests
 Branding/         Logo files
-scripts/          Icon, logo and app-bar logo renderer (swift scripts/render-icon.swift <dir> [icon|logo|appbar])
+scripts/          Icon and logo renderer, wallpaper upload tools
+supabase/         Database migrations
 ```
 
 ## Roadmap
 
-- Explore: a curated catalog of live wallpapers
-- Create: generate live wallpapers from a text prompt or a photo, free and ad-supported
+- Create: generate live wallpapers from a text prompt or a photo
+  - the first 3 generations are free
+  - after that, each generation unlocks by watching a short ad, or with a one-time **Lifetime** purchase (₹399) for unlimited, ad-free generations
+- Animation and smoothness pass: profile hitches with Instruments, keep scrolling and transitions at 120 Hz on ProMotion, pause background effects when off screen, animate Library cards into their detail view, and tune springs and haptics consistently
 - App Store release
 
 ## Acknowledgements
