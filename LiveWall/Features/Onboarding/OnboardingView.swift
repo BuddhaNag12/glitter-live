@@ -9,29 +9,41 @@ enum OnboardingState {
 struct OnboardingView: View {
     var onFinish: () -> Void
 
-    @State private var step = 0
+    @State private var page: Int? = 0
     private let titles = ["Welcome", "How It Works", "Setup"]
+
+    private var step: Int { page ?? 0 }
 
     var body: some View {
         VStack(spacing: 0) {
             header
-            TabView(selection: $step) {
-                WelcomePage().tag(0)
-                HowItWorksPage().tag(1)
-                SetupPage().tag(2)
+            // A paging scroll view rather than a page-style TabView, which clips its pages at the footer
+            // instead of letting them scroll underneath it.
+            ScrollView(.horizontal) {
+                LazyHStack(spacing: 0) {
+                    WelcomePage().containerRelativeFrame(.horizontal).id(0)
+                    HowItWorksPage().containerRelativeFrame(.horizontal).id(1)
+                    SetupPage().containerRelativeFrame(.horizontal).id(2)
+                }
+                .scrollTargetLayout()
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-            .animation(.spring(duration: 0.35), value: step)
+            .scrollTargetBehavior(.paging)
+            .scrollPosition(id: $page)
+            .scrollIndicators(.hidden)
         }
         .safeAreaInset(edge: .bottom) { footer }
         .background { AppBackground() }
         .sensoryFeedback(.selection, trigger: step)
     }
 
+    private func go(to newStep: Int) {
+        withAnimation(.spring(duration: 0.35)) { page = newStep }
+    }
+
     private var header: some View {
         VStack(spacing: 14) {
             HStack {
-                Button { step -= 1 } label: { Image(systemName: "chevron.left") }
+                Button { go(to: step - 1) } label: { Image(systemName: "chevron.left") }
                     .buttonStyle(CircleIconButtonStyle(size: 40))
                     .opacity(step > 0 ? 1 : 0)
                     .disabled(step == 0)
@@ -72,7 +84,7 @@ struct OnboardingView: View {
     private var footer: some View {
         VStack(spacing: 10) {
             Button {
-                if step < 2 { step += 1 } else { onFinish() }
+                if step < 2 { go(to: step + 1) } else { onFinish() }
             } label: {
                 Label(step < 2 ? "Continue" : "Start Creating", systemImage: "arrow.right")
                     .labelStyle(TrailingIcon())
@@ -83,7 +95,8 @@ struct OnboardingView: View {
         .padding(.top, 12)
         .padding(.bottom, 8)
         .background {
-            LinearGradient(colors: [Theme.background.opacity(0), Theme.background.opacity(0.95)], startPoint: .top, endPoint: .center)
+            // Pages scroll underneath, so the lower half is solid and nothing shows through beside the button.
+            LinearGradient(colors: [Theme.background.opacity(0), Theme.background], startPoint: .top, endPoint: .center)
                 .ignoresSafeArea()
         }
     }

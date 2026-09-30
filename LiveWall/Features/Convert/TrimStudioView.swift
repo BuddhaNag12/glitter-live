@@ -128,38 +128,21 @@ struct TrimStudioView: View {
         .glass(.surface, cornerRadius: 22)
     }
 
+    /// Framing and the Lock Screen overlay are controlled on the preview they change, so this holds only the motion itself.
     /// Two columns, or one at accessibility text sizes so the labels don't truncate.
     @ViewBuilder
     private var attributes: some View {
         if dynamicTypeSize.isAccessibilitySize {
             VStack(spacing: 12) {
-                framingCell
                 speedCell
                 bounceCell
-                clockCell
             }
         } else {
-            Grid(horizontalSpacing: 12, verticalSpacing: 12) {
-                GridRow {
-                    framingCell
-                    speedCell
-                }
-                GridRow {
-                    bounceCell
-                    clockCell
-                }
+            HStack(spacing: 12) {
+                speedCell
+                bounceCell
             }
         }
-    }
-
-    private var framingCell: some View {
-        Button { isFraming.toggle() } label: {
-            AttributeCell(symbol: "viewfinder", title: "Framing", active: isFraming) {
-                ValueChip(text: isFraming ? "Adjusting" : "Fill", tint: Theme.accent)
-            }
-        }
-        .buttonStyle(.plain)
-        .accessibilityHint("Turns on pan and pinch in the preview")
     }
 
     /// A menu shows every speed at once, where tapping to cycle hid them and had no way back.
@@ -183,19 +166,15 @@ struct TrimStudioView: View {
         toggleCell(symbol: "arrow.left.arrow.right", title: "Bounce", tint: Theme.accent, isOn: $editor.bounces)
     }
 
-    private var clockCell: some View {
-        toggleCell(symbol: "lock.rectangle", title: "Clock", accessibilityTitle: "Lock Screen overlay", tint: Theme.accent, isOn: $editor.showsLockScreen)
-    }
-
     /// A chip instead of a system switch, which doesn't fit beside a label in a half-width cell.
-    private func toggleCell(symbol: String, title: String, accessibilityTitle: String? = nil, tint: Color, isOn: Binding<Bool>) -> some View {
+    private func toggleCell(symbol: String, title: String, tint: Color, isOn: Binding<Bool>) -> some View {
         Button { isOn.wrappedValue.toggle() } label: {
             AttributeCell(symbol: symbol, title: title, tint: tint, active: isOn.wrappedValue) {
                 ValueChip(text: isOn.wrappedValue ? "On" : "Off", tint: isOn.wrappedValue ? Theme.accent : Theme.textTertiary)
             }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(accessibilityTitle ?? title)
+        .accessibilityLabel(title)
         .accessibilityValue(isOn.wrappedValue ? "On" : "Off")
         .accessibilityAddTraits(.isToggle)
         .sensoryFeedback(.selection, trigger: isOn.wrappedValue)
@@ -301,23 +280,31 @@ private struct CropPreview: View {
     @State private var pinchAnchor: CGSize = .zero
     @GestureState private var isDragging = false
     @GestureState private var isPinching = false
+    /// The spring back after a gesture, run by hand so a new gesture can catch it where it is on screen.
+    @State private var settling: FramingSettle?
 
     var body: some View {
         DeviceFrame(highlighted: isFraming) {
-            canvas
+            TimelineView(.animation(paused: settling == nil)) { context in
+                canvas(at: context.date)
+            }
+        }
+        .task(id: settling) {
+            guard settling != nil else { return }
+            try? await Task.sleep(for: .seconds(FramingSettle.duration))
+            if !Task.isCancelled { settling = nil }
         }
     }
 
-    private var canvas: some View {
-        let zoom = ConvertEditor.rubberBandedZoom(editor.zoom * pinchScale)
-        let pan = editor.rubberBandedPan(proposedPan(zoom: zoom), zoom: zoom)
-        let videoSize = editor.displayedVideoSize(zoom: zoom)
+    private func canvas(at date: Date) -> some View {
+        let shown = framing(at: date)
+        let videoSize = editor.displayedVideoSize(zoom: shown.zoom)
 
         return Color.black
             .overlay {
                 PlayerLayerView(player: editor.player)
                     .frame(width: videoSize.width, height: videoSize.height)
-                    .offset(pan)
+                    .offset(shown.pan)
             }
             .overlay {
                 if editor.showsLockScreen && !isFraming { LockScreenOverlay(showsMotionBadge: true) }
@@ -334,9 +321,16 @@ private struct CropPreview: View {
             }
     }
 
+    /// What's on screen: the settling spring, or the live gesture resisting past its limits.
+    private func framing(at date: Date) -> (zoom: CGFloat, pan: CGSize) {
+        if let settling { return settling.value(at: date) }
+        let zoom = ConvertEditor.rubberBandedZoom(editor.zoom * pinchScale)
+        return (zoom, editor.rubberBandedPan(proposedPan(zoom: zoom), zoom: zoom))
+    }
+
     /// The pan that keeps the point under the pinch still at this zoom, plus the drag.
     private func proposedPan(zoom: CGFloat) -> CGSize {
-        let ratio = zoom / editor.zoom
+        let ratio = zoom / ConvertEditor.rubberBandedZoom(editor.zoom)
         return CGSize(
             width: pinchAnchor.width - (pinchAnchor.width - editor.panOffset.width) * ratio + dragTranslation.width,
             height: pinchAnchor.height - (pinchAnchor.height - editor.panOffset.height) * ratio + dragTranslation.height
@@ -367,7 +361,7 @@ private struct CropPreview: View {
                     Button { isFraming = false } label: { Image(systemName: "checkmark") }
                         .accessibilityLabel("Done framing")
                     Button {
-                        withAnimation(.spring(duration: 0.4)) { editor.resetFraming() }
+                        springBack(zoom: 1, pan: .zero)
                     } label: { Image(systemName: "arrow.counterclockwise") }
                         .accessibilityLabel("Reset framing")
                 } else {
@@ -390,6 +384,7 @@ private struct CropPreview: View {
         DragGesture()
             .updating($isDragging) { _, state, _ in state = true }
             .onChanged { value in
+                if dragBase == nil { catchSettle() }
                 // A pending translation stays in place if a new drag starts before the pinch ends.
                 let base = dragBase ?? dragTranslation
                 dragBase = base
@@ -408,6 +403,7 @@ private struct CropPreview: View {
             .onChanged { value in
                 if !isFraming { isFraming = true }
                 if pinchBase == nil {
+                    catchSettle()
                     pinchBase = pinchScale
                     if pinchScale == 1 {
                         let canvas = editor.canvasSize
@@ -429,27 +425,58 @@ private struct CropPreview: View {
     /// Springs back inside the limits, carrying a flick on to where it was heading.
     private func settle() {
         let range = ConvertEditor.zoomRange
-        let liveZoom = ConvertEditor.rubberBandedZoom(editor.zoom * pinchScale)
         let zoom = min(max(editor.zoom * pinchScale, range.lowerBound), range.upperBound)
-        let current = editor.rubberBandedPan(proposedPan(zoom: liveZoom), zoom: liveZoom)
         let proposed = proposedPan(zoom: zoom)
         let projected = CGSize(
             width: proposed.width + Motion.projection(of: releaseVelocity.width),
             height: proposed.height + Motion.projection(of: releaseVelocity.height)
         )
-        let target = editor.clampedPan(projected, zoom: zoom)
-        let velocity = Motion.relativeVelocity(releaseVelocity, from: current, to: target)
-
-        withAnimation(.interpolatingSpring(duration: 0.4, bounce: 0, initialVelocity: velocity)) {
-            editor.zoom = zoom
-            editor.panOffset = target
-            pinchScale = 1
-            pinchAnchor = .zero
-            dragTranslation = .zero
-        }
+        springBack(zoom: zoom, pan: editor.clampedPan(projected, zoom: zoom), velocity: releaseVelocity)
         dragBase = nil
         pinchBase = nil
         releaseVelocity = .zero
+    }
+
+    /// Commits the target and springs to it from what's on screen, keeping the finger's speed on each axis.
+    private func springBack(zoom: CGFloat, pan: CGSize, velocity: CGSize = .zero) {
+        let now = Date.now
+        let shown = framing(at: now)
+        editor.zoom = zoom
+        editor.panOffset = pan
+        pinchScale = 1
+        pinchAnchor = .zero
+        dragTranslation = .zero
+        settling = FramingSettle(
+            start: now,
+            zoom: CriticalSpring(from: shown.zoom, to: zoom),
+            x: CriticalSpring(from: shown.pan.width, to: pan.width, velocity: velocity.width),
+            y: CriticalSpring(from: shown.pan.height, to: pan.height, velocity: velocity.height)
+        )
+    }
+
+    /// A new gesture picks the video up exactly where the spring has it, instead of jumping to its target.
+    private func catchSettle() {
+        guard let settling else { return }
+        let shown = settling.value(at: .now)
+        // Stored unresisted, so the live gesture draws it back at exactly the same place.
+        let zoom = ConvertEditor.unrubberBandedZoom(shown.zoom)
+        editor.zoom = zoom
+        editor.panOffset = editor.unrubberBandedPan(shown.pan, zoom: ConvertEditor.rubberBandedZoom(zoom))
+        self.settling = nil
+    }
+}
+
+private struct FramingSettle: Equatable {
+    static let duration: TimeInterval = 0.8
+
+    var start: Date
+    var zoom: CriticalSpring
+    var x: CriticalSpring
+    var y: CriticalSpring
+
+    func value(at date: Date) -> (zoom: CGFloat, pan: CGSize) {
+        let elapsed = min(max(date.timeIntervalSince(start), 0), Self.duration)
+        return (zoom.value(after: elapsed), CGSize(width: x.value(after: elapsed), height: y.value(after: elapsed)))
     }
 }
 

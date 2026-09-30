@@ -8,6 +8,8 @@ struct TimelineStrip: View {
     @State private var coverDragOrigin: Double?
     /// True while a drag pushes past the shortest or longest clip, or an end of the video.
     @State private var isAtLimit = false
+    /// How far each edge of the window is drawn past its limit, so a limit gives way softly instead of stopping dead.
+    @State private var stretch = EdgeStretch()
 
     private let height: CGFloat = 64
     private let handleWidth: CGFloat = 16
@@ -50,8 +52,8 @@ struct TimelineStrip: View {
     }
 
     private func dimming(pointsPerSecond: CGFloat, contentWidth: CGFloat) -> some View {
-        let windowStart = editor.clipStart * pointsPerSecond
-        let windowEnd = (editor.clipStart + editor.clipLength) * pointsPerSecond
+        let windowStart = editor.clipStart * pointsPerSecond + stretch.leading
+        let windowEnd = (editor.clipStart + editor.clipLength) * pointsPerSecond + stretch.trailing
         return ZStack(alignment: .topLeading) {
             Color.black.opacity(0.6).frame(width: max(windowStart, 0), height: height)
             Color.black.opacity(0.6)
@@ -62,7 +64,7 @@ struct TimelineStrip: View {
     }
 
     private func trimWindow(pointsPerSecond: CGFloat) -> some View {
-        let width = max(editor.clipLength * pointsPerSecond, handleWidth * 2 + 8)
+        let width = max(editor.clipLength * pointsPerSecond + stretch.trailing - stretch.leading, handleWidth * 2 + 8)
         return HStack(spacing: 0) {
             // Handles sit above the middle so their enlarged hit areas win where they overlap it.
             handle(leading: true).highPriorityGesture(resizeGesture(pointsPerSecond: pointsPerSecond, leading: true)).zIndex(1)
@@ -77,7 +79,7 @@ struct TimelineStrip: View {
                 .strokeBorder(Theme.trimHandle, lineWidth: 3)
                 .allowsHitTesting(false)
         }
-        .offset(x: editor.clipStart * pointsPerSecond)
+        .offset(x: editor.clipStart * pointsPerSecond + stretch.leading)
         .accessibilityElement()
         .accessibilityLabel("Clip")
         .accessibilityValue("Starts at \(editor.clipStart.formatted(.number.precision(.fractionLength(1)))) seconds")
@@ -88,17 +90,18 @@ struct TimelineStrip: View {
         }
     }
 
-    /// The hit area grows mostly outwards, leaving the inside of the window for moving it and the cover marker.
+    /// A 44 pt hit area that grows mostly outwards, leaving the inside of the window for moving it and the cover marker.
     private func handle(leading: Bool) -> some View {
         RoundedRectangle(cornerRadius: 8, style: .continuous)
             .fill(Theme.trimHandle)
             .frame(width: handleWidth, height: height)
             .overlay(Capsule().fill(.black.opacity(0.55)).frame(width: 3, height: 18))
-            .contentShape(OutsetRectangle(leading: leading ? 14 : 4, trailing: leading ? 4 : 14))
+            .contentShape(OutsetRectangle(leading: leading ? 24 : 4, trailing: leading ? 4 : 24))
     }
 
     private func coverMarker(pointsPerSecond: CGFloat) -> some View {
-        let x = (editor.clipStart + editor.coverOffset) * pointsPerSecond
+        // The marker rides along when the whole window is stretched past an end of the video.
+        let x = (editor.clipStart + editor.coverOffset) * pointsPerSecond + stretch.shift
         let hitWidth: CGFloat = 28
         return VStack(spacing: 0) {
             Circle().fill(Theme.accent).frame(width: 12, height: 12)
@@ -142,7 +145,9 @@ struct TimelineStrip: View {
                 let origin = beginDrag()
                 let proposed = origin.start + value.translation.width / pointsPerSecond
                 editor.moveClip(to: proposed)
-                isAtLimit = abs(editor.clipStart - proposed) > 0.001
+                let overshoot = resisted((proposed - editor.clipStart) * pointsPerSecond)
+                stretch = EdgeStretch(leading: overshoot, trailing: overshoot)
+                isAtLimit = overshoot != 0
                 editor.scrub(to: editor.clipStart)
             }
             .onEnded { _ in endDrag() }
@@ -157,13 +162,15 @@ struct TimelineStrip: View {
                 if leading {
                     let proposed = origin.start + delta
                     editor.setClipStart(proposed)
-                    isAtLimit = abs(editor.clipStart - proposed) > 0.001
+                    stretch = EdgeStretch(leading: resisted((proposed - editor.clipStart) * pointsPerSecond))
+                    isAtLimit = stretch.leading != 0
                     editor.scrub(to: editor.clipStart)
                 } else {
                     let proposed = origin.start + origin.length + delta
                     editor.setClipEnd(proposed)
                     let end = editor.clipStart + editor.clipLength
-                    isAtLimit = abs(end - proposed) > 0.001
+                    stretch = EdgeStretch(trailing: resisted((proposed - end) * pointsPerSecond))
+                    isAtLimit = stretch.trailing != 0
                     editor.scrub(to: end)
                 }
             }
@@ -180,8 +187,22 @@ struct TimelineStrip: View {
     private func endDrag() {
         dragOrigin = nil
         isAtLimit = false
+        withAnimation(.spring(duration: 0.3)) { stretch = EdgeStretch() }
         editor.restartLoop()
     }
+
+    /// Points dragged past a limit, turned into how far the edge follows.
+    private func resisted(_ overshoot: CGFloat) -> CGFloat {
+        abs(overshoot) < 0.5 ? 0 : Motion.rubberBand(overshoot, in: 0...0, dimension: 60)
+    }
+}
+
+private struct EdgeStretch: Equatable {
+    var leading: CGFloat = 0
+    var trailing: CGFloat = 0
+
+    /// Non-zero only when both edges move together, as when the whole window is dragged.
+    var shift: CGFloat { leading == trailing ? leading : 0 }
 }
 
 nonisolated private struct OutsetRectangle: Shape {

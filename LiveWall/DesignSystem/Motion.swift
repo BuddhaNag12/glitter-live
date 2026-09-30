@@ -1,4 +1,4 @@
-import CoreGraphics
+import Foundation
 
 /// Gesture physics from Apple's "Designing Fluid Interfaces".
 nonisolated enum Motion {
@@ -18,12 +18,32 @@ nonisolated enum Motion {
         return value
     }
 
-    /// SwiftUI springs take velocity as a fraction of the distance left, so a release keeps the finger's speed.
-    static func relativeVelocity(_ velocity: CGSize, from start: CGSize, to end: CGSize) -> Double {
-        let dx = end.width - start.width, dy = end.height - start.height
-        let distanceSquared = dx * dx + dy * dy
-        guard distanceSquared > 1 else { return 0 }
-        let relative = (velocity.width * dx + velocity.height * dy) / distanceSquared
-        return min(max(relative, -30), 30)
+    /// The value that `rubberBand` turns into `resisted`, so a gesture can pick up from wherever an edge was drawn.
+    static func unrubberBand(_ resisted: CGFloat, in range: ClosedRange<CGFloat>, dimension: CGFloat) -> CGFloat {
+        func original(_ shown: CGFloat) -> CGFloat {
+            let constant: CGFloat = 0.55
+            let shown = min(shown, dimension * 0.99)
+            return shown * dimension / (constant * (dimension - shown))
+        }
+        if resisted < range.lowerBound { return range.lowerBound - original(range.lowerBound - resisted) }
+        if resisted > range.upperBound { return range.upperBound + original(resisted - range.upperBound) }
+        return resisted
+    }
+}
+
+/// A critically damped spring that can be read at any instant, so a gesture can catch it mid-flight
+/// where SwiftUI's animations never report their on-screen value.
+nonisolated struct CriticalSpring: Equatable {
+    var from: CGFloat
+    var to: CGFloat
+    /// Points per second, straight from the finger at release.
+    var velocity: CGFloat = 0
+    /// Seconds to settle, as in Apple's response parameter.
+    var response: Double = 0.4
+
+    func value(after elapsed: TimeInterval) -> CGFloat {
+        let omega = 2 * .pi / response
+        let offset = from - to
+        return to + (offset + (velocity + omega * offset) * elapsed) * exp(-omega * elapsed)
     }
 }
