@@ -99,7 +99,7 @@ struct CreationDetailView: View {
                     Button { confirmsDelete = true } label: {
                         Label("Delete", systemImage: "trash").frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(GlassPillButtonStyle(tint: Theme.magenta))
+                    .buttonStyle(GlassPillButtonStyle(tint: Theme.danger))
                 }
                 .buttonStyle(GlassPillButtonStyle())
             }

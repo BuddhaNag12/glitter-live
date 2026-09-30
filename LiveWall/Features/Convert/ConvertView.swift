@@ -87,7 +87,7 @@ struct ConvertView: View {
 
                 Label("Free forever · No watermark", systemImage: "checkmark.seal.fill")
                     .font(.labelMedium.weight(.semibold))
-                    .foregroundStyle(Theme.cyan)
+                    .foregroundStyle(Theme.accent)
             }
             .padding(22)
             .glass(.floating, cornerRadius: 34)
@@ -142,7 +142,7 @@ private struct StepChip: View {
         VStack(spacing: 6) {
             Image(systemName: symbol)
                 .font(.system(size: 17, weight: .medium))
-                .foregroundStyle(Theme.cyan)
+                .foregroundStyle(Theme.accent)
             Text("\(number). \(title)")
                 .font(.labelMedium.weight(.semibold))
                 .foregroundStyle(Theme.textPrimary)

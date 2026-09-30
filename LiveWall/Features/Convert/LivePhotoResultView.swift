@@ -16,7 +16,7 @@ struct LivePhotoResultView: View {
             VStack(spacing: 14) {
                 StatusPill(
                     text: saved ? "SAVED TO PHOTOS" : "LIVE PHOTO READY",
-                    dot: saved ? Theme.cyan : Theme.signalYellow,
+                    dot: saved ? Theme.accent : Theme.signalYellow,
                     highlighted: saved,
                     symbol: saved ? "checkmark" : nil
                 )

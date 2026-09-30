@@ -55,10 +55,10 @@ struct TrimStudioView: View {
     private var timelinePanel: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Circle().fill(Theme.cyan).frame(width: 10, height: 10).shadow(color: Theme.cyan, radius: 5)
+                Circle().fill(Theme.accent).frame(width: 10, height: 10)
                 Text("Motion Timeline").font(.headlineSmall).foregroundStyle(Theme.textPrimary)
                 Spacer()
-                Text("Duration: \(Text(editor.outputDuration, format: .number.precision(.fractionLength(1))).foregroundStyle(Theme.cyan))s")
+                Text("Duration: \(Text(editor.outputDuration, format: .number.precision(.fractionLength(1))).foregroundStyle(Theme.accent))s")
                     .font(.labelMedium.weight(.semibold))
                     .monospacedDigit()
                     .foregroundStyle(Theme.textSecondary)
@@ -103,9 +103,9 @@ struct TrimStudioView: View {
             HStack(spacing: 12) {
                 Image(systemName: "photo")
                     .font(.system(size: 17))
-                    .foregroundStyle(Theme.lavender)
+                    .foregroundStyle(Theme.slate)
                     .frame(width: 42, height: 42)
-                    .background(Theme.lavender.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .background(Theme.slate.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Key Frame")
                         .font(.titleMedium)
@@ -114,10 +114,10 @@ struct TrimStudioView: View {
                     HStack(spacing: 6) {
                         Text(Self.timestamp(editor.coverOffset))
                             .font(.labelMedium.monospaced())
-                            .foregroundStyle(Theme.cyan)
+                            .foregroundStyle(Theme.accent)
                             .padding(.horizontal, 7)
                             .frame(height: 22)
-                            .background(Theme.cyan.opacity(0.12), in: Capsule())
+                            .background(Theme.accent.opacity(0.12), in: Capsule())
                         Text("Cover photo")
                             .font(.labelMedium)
                             .foregroundStyle(Theme.textSecondary)
@@ -129,11 +129,11 @@ struct TrimStudioView: View {
                     isPickingCover.toggle()
                     isPickingCover ? editor.showCoverFrame() : editor.resumePreview()
                 }
-                .buttonStyle(GlassPillButtonStyle(tint: isPickingCover ? Theme.cyan : nil))
+                .buttonStyle(GlassPillButtonStyle(tint: isPickingCover ? Theme.accent : nil))
             }
             if isPickingCover {
                 Slider(value: $editor.coverOffset, in: editor.coverRange)
-                    .tint(Theme.cyan)
+                    .tint(Theme.accent)
                     .onChange(of: editor.coverOffset) { editor.showCoverFrame() }
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
@@ -147,7 +147,7 @@ struct TrimStudioView: View {
             GridRow {
                 Button { isFraming.toggle() } label: {
                     AttributeCell(symbol: "viewfinder", title: "Framing", active: isFraming) {
-                        ValueChip(text: isFraming ? "Adjusting" : "Fill", tint: Theme.cyan)
+                        ValueChip(text: isFraming ? "Adjusting" : "Fill", tint: Theme.accent)
                     }
                 }
                 .buttonStyle(.plain)
@@ -155,14 +155,14 @@ struct TrimStudioView: View {
 
                 Button(action: cycleSpeed) {
                     AttributeCell(symbol: "gauge.with.dots.needle.67percent", title: "Speed") {
-                        ValueChip(text: "\(editor.speed.formatted(.number.precision(.fractionLength(0...1))))x", tint: Theme.lavender)
+                        ValueChip(text: "\(editor.speed.formatted(.number.precision(.fractionLength(0...1))))x", tint: Theme.slate)
                     }
                 }
                 .buttonStyle(.plain)
             }
             GridRow {
-                toggleCell(symbol: "arrow.left.arrow.right", title: "Bounce", tint: Theme.magenta, isOn: $editor.bounces)
-                toggleCell(symbol: "lock.rectangle", title: "HUD", tint: Theme.cyan, isOn: $editor.showsLockScreen)
+                toggleCell(symbol: "arrow.left.arrow.right", title: "Bounce", tint: Theme.accent, isOn: $editor.bounces)
+                toggleCell(symbol: "lock.rectangle", title: "HUD", tint: Theme.accent, isOn: $editor.showsLockScreen)
             }
         }
     }
@@ -171,7 +171,7 @@ struct TrimStudioView: View {
     private func toggleCell(symbol: String, title: String, tint: Color, isOn: Binding<Bool>) -> some View {
         Button { isOn.wrappedValue.toggle() } label: {
             AttributeCell(symbol: symbol, title: title, tint: tint, active: isOn.wrappedValue) {
-                ValueChip(text: isOn.wrappedValue ? "On" : "Off", tint: isOn.wrappedValue ? Theme.cyan : Theme.textTertiary)
+                ValueChip(text: isOn.wrappedValue ? "On" : "Off", tint: isOn.wrappedValue ? Theme.accent : Theme.textTertiary)
             }
         }
         .buttonStyle(.plain)
@@ -185,7 +185,7 @@ struct TrimStudioView: View {
         ZStack {
             Color.black.opacity(0.5).ignoresSafeArea()
             VStack(spacing: 14) {
-                ProgressView().controlSize(.large).tint(Theme.cyan)
+                ProgressView().controlSize(.large).tint(Theme.accent)
                 Text("Creating Live Photo…").font(.titleMedium).foregroundStyle(Theme.textPrimary)
             }
             .padding(28)
@@ -216,7 +216,7 @@ struct TrimStudioView: View {
 private struct AttributeCell<Accessory: View>: View {
     let symbol: String
     let title: String
-    var tint: Color = Theme.cyan
+    var tint: Color = Theme.accent
     var active = false
     @ViewBuilder var accessory: Accessory
 
@@ -239,7 +239,7 @@ private struct AttributeCell<Accessory: View>: View {
         .glass(.surface, cornerRadius: 20)
         .overlay {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(Theme.cyan.opacity(active ? 0.8 : 0), lineWidth: 1.5)
+                .strokeBorder(Theme.accent.opacity(active ? 0.8 : 0), lineWidth: 1.5)
         }
         .contentShape(Rectangle())
     }

@@ -28,7 +28,7 @@ struct LibraryView: View {
                                 Button(action: onConvert) {
                                     Label("New", systemImage: "plus")
                                 }
-                                .buttonStyle(GlassPillButtonStyle(tint: Theme.cyan))
+                                .buttonStyle(GlassPillButtonStyle(tint: Theme.accent))
                             }
                             LazyVGrid(columns: columns, spacing: 12) {
                                 ForEach(creations) { creation in
@@ -99,7 +99,7 @@ private struct CreationCard: View {
                 if creation.savedToPhotos {
                     Image(systemName: "checkmark")
                         .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Theme.cyan)
+                        .foregroundStyle(Theme.accent)
                         .frame(width: 28, height: 28)
                         .liquidGlass(in: Circle())
                         .padding(10)
@@ -123,6 +123,8 @@ private struct CreationCard: View {
             .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Theme.specularRim, lineWidth: 1))
             .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            // Wallpaper tiles are always dark media, so their glass captions stay dark too.
+            .environment(\.colorScheme, .dark)
             .task(id: creation.id) {
                 thumbnail = await Thumbnail.load(creation.livePhoto.imageURL, maxPixelSize: 600)
             }

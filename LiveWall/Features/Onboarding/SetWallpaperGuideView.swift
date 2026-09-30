@@ -26,9 +26,9 @@ struct SetWallpaperGuideView: View {
                     HStack(alignment: .top, spacing: 14) {
                         Image(systemName: step.symbol)
                             .font(.system(size: 17, weight: .medium))
-                            .foregroundStyle(Theme.cyan)
+                            .foregroundStyle(Theme.accent)
                             .frame(width: 40, height: 40)
-                            .background(Theme.cyan.opacity(0.12), in: Circle())
+                            .background(Theme.accent.opacity(0.12), in: Circle())
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Step \(index + 1)").font(.labelSmall).tracking(0.6).foregroundStyle(Theme.textTertiary)
                             Text(step.text).font(.bodyMedium).foregroundStyle(Theme.textPrimary)

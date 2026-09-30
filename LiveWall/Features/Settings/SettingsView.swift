@@ -19,9 +19,9 @@ struct SettingsView: View {
                     HStack(spacing: 14) {
                         Image(systemName: "livephoto")
                             .font(.system(size: 22, weight: .medium))
-                            .foregroundStyle(Theme.cyan)
+                            .foregroundStyle(Theme.accent)
                             .frame(width: 50, height: 50)
-                            .liquidGlass(in: Circle(), tint: Theme.cyan.opacity(0.2))
+                            .liquidGlass(in: Circle(), tint: Theme.accent.opacity(0.2))
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Converting is free").font(.titleMedium).foregroundStyle(Theme.textPrimary)
                             Text("Turn as many videos into live wallpapers as you like. No watermark, no account.")
@@ -80,7 +80,7 @@ struct SettingsView: View {
 
     private func rowLabel(_ title: String, symbol: String) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: symbol).foregroundStyle(Theme.cyan).frame(width: 24)
+            Image(systemName: symbol).foregroundStyle(Theme.accent).frame(width: 24)
             Text(title).font(.bodyLarge).foregroundStyle(Theme.textPrimary)
             Spacer()
             Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(Theme.textTertiary)

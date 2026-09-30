@@ -1,6 +1,21 @@
 import SwiftData
 import SwiftUI
 
+/// Lets screenshot tests pin an appearance with `-appearance light|dark`; otherwise the app follows the system.
+enum DemoAppearance {
+    static var override: ColorScheme? {
+        #if DEBUG
+        switch UserDefaults.standard.string(forKey: "appearance") {
+        case "light": return .light
+        case "dark": return .dark
+        default: return nil
+        }
+        #else
+        return nil
+        #endif
+    }
+}
+
 @main
 struct LiveWallApp: App {
     private let modelContainer = Self.makeModelContainer()
@@ -8,8 +23,8 @@ struct LiveWallApp: App {
     var body: some Scene {
         WindowGroup {
             RootTabView()
-                .preferredColorScheme(.dark)
-                .tint(Theme.cyan)
+                .preferredColorScheme(DemoAppearance.override)
+                .tint(Theme.accent)
         }
         .modelContainer(modelContainer)
     }

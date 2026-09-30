@@ -3,10 +3,10 @@ import SwiftUI
 /// Explore teaser until the curated catalog backend exists.
 struct ExploreComingSoonView: View {
     private let categories: [(name: String, colors: [Color])] = [
-        ("Cyberpunk", [Theme.magenta, Theme.violet, Theme.cyan]),
-        ("Anime Glow", [Theme.lavender, Theme.magenta, Theme.gold]),
-        ("Liquid Chrome", [Theme.cyan, .white, Theme.violet]),
-        ("Cosmic", [Theme.violet, Theme.cyan, Theme.magenta]),
+        ("Cyberpunk", [WallpaperPalette.rose, WallpaperPalette.violet, WallpaperPalette.sky]),
+        ("Anime Glow", [WallpaperPalette.violet, WallpaperPalette.rose, WallpaperPalette.amber]),
+        ("Liquid Chrome", [WallpaperPalette.sky, .white, WallpaperPalette.indigo]),
+        ("Cosmic", [WallpaperPalette.indigo, WallpaperPalette.blue, WallpaperPalette.teal]),
     ]
 
     var body: some View {
@@ -57,10 +57,10 @@ struct CreateComingSoonView: View {
                             .foregroundStyle(Theme.textTertiary)
                             .padding(18)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(.black.opacity(0.3), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                            .background(Theme.elevated, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
                         HStack(spacing: 10) {
                             StatusPill(text: "TEXT TO LIVE", symbol: "text.cursor")
-                            StatusPill(text: "ANIMATE PHOTO", dot: Theme.lavender, symbol: "photo")
+                            StatusPill(text: "ANIMATE PHOTO", dot: Theme.slate, symbol: "photo")
                         }
                     }
                     .padding(18)
@@ -85,8 +85,7 @@ struct LibraryEmptyView: View {
             VStack(spacing: 14) {
                 Image(systemName: "photo.stack")
                     .font(.system(size: 46, weight: .light))
-                    .foregroundStyle(Theme.cyan)
-                    .shadow(color: Theme.cyan.opacity(0.6), radius: 14)
+                    .foregroundStyle(Theme.accent)
                 Text("No wallpapers yet").font(.headlineSmall).foregroundStyle(Theme.textPrimary)
                 Text("Every live wallpaper you convert is kept here, so you can preview it, save it again, or set it later.")
                     .font(.bodyMedium)
@@ -95,7 +94,7 @@ struct LibraryEmptyView: View {
                 Button(action: onConvert) {
                     Label("Convert a Video", systemImage: "livephoto")
                 }
-                .buttonStyle(GlassPillButtonStyle(tint: Theme.cyan))
+                .buttonStyle(GlassPillButtonStyle(tint: Theme.accent))
                 .padding(.top, 4)
             }
             .padding(26)
@@ -116,9 +115,9 @@ private struct TeaserBanner: View {
         HStack(alignment: .top, spacing: 14) {
             Image(systemName: symbol)
                 .font(.system(size: 20, weight: .medium))
-                .foregroundStyle(Theme.cyan)
+                .foregroundStyle(Theme.accent)
                 .frame(width: 46, height: 46)
-                .liquidGlass(in: Circle(), tint: Theme.cyan.opacity(0.2))
+                .liquidGlass(in: Circle(), tint: Theme.accent.opacity(0.2))
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
                     Text(title).font(.titleMedium).foregroundStyle(Theme.textPrimary)
@@ -152,5 +151,6 @@ private struct WallpaperTeaserCard: View {
             }
             .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Theme.specularRim, lineWidth: 1))
+            .environment(\.colorScheme, .dark)
     }
 }

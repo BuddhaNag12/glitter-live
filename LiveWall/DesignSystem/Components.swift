@@ -52,15 +52,15 @@ private struct GlassPanel: ViewModifier {
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         content
-            .liquidGlass(in: shape, tint: tier == .surface ? Theme.surface.opacity(0.5) : Theme.card.opacity(0.6))
+            .liquidGlass(in: shape, tint: tier == .surface ? Theme.surface.opacity(0.6) : Theme.elevated.opacity(0.6))
             .overlay(shape.strokeBorder(Theme.specularRim, lineWidth: 0.75).allowsHitTesting(false))
-            .shadow(color: .black.opacity(tier == .floating ? 0.4 : 0), radius: 18, y: 14)
+            .shadow(color: .black.opacity(tier == .floating ? 0.12 : 0), radius: 16, y: 8)
     }
 }
 
 // MARK: - Buttons
 
-/// The gradient call to action. Kept opaque so it reads as the one primary action on a glass screen.
+/// The primary call to action: the blue-to-slate brand gradient with a slow silver shine sweeping across.
 struct KineticButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         KineticButton(configuration: configuration)
@@ -74,18 +74,11 @@ struct KineticButtonStyle: ButtonStyle {
             let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
             configuration.label
                 .font(.inter(18, .semibold, relativeTo: .headline))
-                .foregroundStyle(Theme.base)
+                .foregroundStyle(Theme.onAccent)
                 .frame(maxWidth: .infinity, minHeight: 58)
                 .padding(.horizontal, 16)
-                .background(Theme.action, in: shape)
-                .overlay(alignment: .top) {
-                    // Specular highlight along the top edge.
-                    shape
-                        .fill(LinearGradient(colors: [.white.opacity(0.45), .clear], startPoint: .top, endPoint: .center))
-                        .blendMode(.softLight)
-                }
-                .overlay(shape.strokeBorder(.white.opacity(0.45), lineWidth: 1))
-                .shadow(color: Theme.cyan.opacity(configuration.isPressed ? 0.55 : 0.28), radius: configuration.isPressed ? 24 : 16, y: 6)
+                .background(Theme.accentGradient, in: shape)
+                .overlay { if isEnabled { ShimmerSweep().clipShape(shape) } }
                 .scaleEffect(configuration.isPressed ? 0.97 : 1)
                 .opacity(isEnabled ? 1 : 0.45)
                 .animation(.spring(duration: 0.25), value: configuration.isPressed)
@@ -122,7 +115,7 @@ struct CircleIconButtonStyle: ButtonStyle {
     }
 }
 
-/// Compact cyan capsule, as used for "Save" in the Trim Studio toolbar.
+/// Compact blue capsule, as used for "Save" in the Trim Studio toolbar.
 struct AccentCapsuleButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         AccentCapsule(configuration: configuration)
@@ -135,15 +128,38 @@ struct AccentCapsuleButtonStyle: ButtonStyle {
         var body: some View {
             configuration.label
                 .font(.titleMedium)
-                .foregroundStyle(Theme.base)
+                .foregroundStyle(Theme.onAccent)
                 .padding(.horizontal, 18)
                 .frame(height: 44)
-                .background(Theme.cyan, in: Capsule())
-                .overlay(Capsule().strokeBorder(.white.opacity(0.5), lineWidth: 1))
-                .shadow(color: Theme.cyan.opacity(0.45), radius: 14)
+                .background(Theme.accentGradient, in: Capsule())
                 .scaleEffect(configuration.isPressed ? 0.95 : 1)
                 .opacity(isEnabled ? 1 : 0.45)
                 .animation(.spring(duration: 0.2), value: configuration.isPressed)
+        }
+    }
+}
+
+/// A soft band of light that glides across a surface every few seconds. Hidden with Reduce Motion.
+struct ShimmerSweep: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private let period = 4.5
+    private let travel = 1.2
+
+    var body: some View {
+        if !reduceMotion {
+            TimelineView(.animation(minimumInterval: 1 / 30)) { context in
+                GeometryReader { geometry in
+                    let progress = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: period) / travel
+                    let band = geometry.size.width * 0.35
+                    LinearGradient(colors: [.clear, .white.opacity(0.28), .clear], startPoint: .leading, endPoint: .trailing)
+                        .frame(width: band)
+                        .rotationEffect(.degrees(18))
+                        .offset(x: -band + (geometry.size.width + band * 2) * min(progress, 1))
+                        .opacity(progress <= 1 ? 1 : 0)
+                }
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
         }
     }
 }
@@ -152,7 +168,7 @@ struct AccentCapsuleButtonStyle: ButtonStyle {
 
 struct StatusPill: View {
     let text: String
-    var dot: Color = Theme.cyan
+    var dot: Color = Theme.accent
     var highlighted = false
     var symbol: String?
 
@@ -164,17 +180,16 @@ struct StatusPill: View {
                 Circle()
                     .fill(dot)
                     .frame(width: 7, height: 7)
-                    .shadow(color: dot.opacity(0.9), radius: 4)
             }
             Text(text)
                 .font(.labelSmall)
                 .tracking(0.6)
-                .foregroundStyle(highlighted ? Theme.cyan : Theme.textPrimary)
+                .foregroundStyle(highlighted ? Theme.accent : Theme.textPrimary)
         }
         .padding(.horizontal, 11)
         .frame(height: 28)
-        .liquidGlass(in: Capsule(), tint: highlighted ? Theme.cyan.opacity(0.22) : nil)
-        .overlay(Capsule().strokeBorder(highlighted ? Theme.cyan.opacity(0.4) : .clear, lineWidth: 1))
+        .liquidGlass(in: Capsule(), tint: highlighted ? Theme.accent.opacity(0.22) : nil)
+        .overlay(Capsule().strokeBorder(highlighted ? Theme.accent.opacity(0.4) : .clear, lineWidth: 1))
     }
 }
 
@@ -185,11 +200,14 @@ struct ScreenHeader: View {
     var body: some View {
         VStack(spacing: 12) {
             HStack(spacing: 10) {
-                Text(title)
-                    .font(.displayLarge)
-                    .tracking(-0.8)
-                    .foregroundStyle(Theme.textPrimary)
-                StatusPill(text: "LIVE", highlighted: true)
+                // The tab bar already shows which screen this is, so the header carries the brand.
+                Image("BrandLogo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 30)
+                    .accessibilityElement()
+                    .accessibilityLabel("Glitter Live, \(title)")
+                    .accessibilityAddTraits(.isHeader)
                 Spacer()
                 Button(action: showSettings.callAsFunction) {
                     Image(systemName: "person")
@@ -199,7 +217,7 @@ struct ScreenHeader: View {
             }
             .padding(.horizontal, 16)
             Rectangle()
-                .fill(LinearGradient(colors: [.clear, Theme.strokeHighlight, .clear], startPoint: .leading, endPoint: .trailing))
+                .fill(Theme.border)
                 .frame(height: 1)
         }
         .padding(.top, 8)

@@ -22,7 +22,7 @@ struct RootTabView: View {
                     .tag(tab)
             }
         }
-        .tint(Theme.cyan)
+        .tint(Theme.accent)
         .modifier(MinimizingTabBar())
         .sensoryFeedback(.selection, trigger: selection)
         .environment(\.showSettings, SettingsAction { showsSettings = true })
@@ -31,7 +31,6 @@ struct RootTabView: View {
         }
         .fullScreenCover(isPresented: Binding(get: { !hasCompletedOnboarding }, set: { hasCompletedOnboarding = !$0 })) {
             OnboardingView { hasCompletedOnboarding = true }
-                .preferredColorScheme(.dark)
         }
     }
 

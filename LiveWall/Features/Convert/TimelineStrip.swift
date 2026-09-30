@@ -69,7 +69,7 @@ struct TimelineStrip: View {
         .frame(width: width, height: height)
         .overlay {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(Theme.signalYellow, lineWidth: 3)
+                .strokeBorder(Theme.trimHandle, lineWidth: 3)
                 .allowsHitTesting(false)
         }
         .offset(x: editor.clipStart * pointsPerSecond)
@@ -85,7 +85,7 @@ struct TimelineStrip: View {
 
     private var handle: some View {
         RoundedRectangle(cornerRadius: 8, style: .continuous)
-            .fill(Theme.signalYellow)
+            .fill(Theme.trimHandle)
             .frame(width: handleWidth, height: height)
             .overlay(Capsule().fill(.black.opacity(0.55)).frame(width: 3, height: 18))
             .contentShape(Rectangle().inset(by: -8))
@@ -94,7 +94,7 @@ struct TimelineStrip: View {
     private func coverMarker(pointsPerSecond: CGFloat) -> some View {
         let x = (editor.clipStart + editor.coverOffset) * pointsPerSecond
         return VStack(spacing: 0) {
-            Circle().fill(Theme.cyan).frame(width: 10, height: 10).shadow(color: Theme.cyan, radius: 4)
+            Circle().fill(Theme.accent).frame(width: 10, height: 10)
             Rectangle().fill(.white).frame(width: 2)
         }
         .frame(width: 10, height: height)

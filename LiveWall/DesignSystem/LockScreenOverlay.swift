@@ -27,7 +27,7 @@ struct LockScreenOverlay: View {
                         .padding(.horizontal, 14 * scale)
                         .frame(height: 32 * scale)
                         .background(.black.opacity(0.35), in: Capsule())
-                        .overlay(Capsule().strokeBorder(Theme.cyan.opacity(0.5), lineWidth: 1))
+                        .overlay(Capsule().strokeBorder(Color.white.opacity(0.3), lineWidth: 1))
                         .padding(.bottom, 14 * scale)
                 }
                 HStack {
@@ -95,9 +95,11 @@ struct DeviceFrame<Content: View>: View {
                 .clipShape(RoundedRectangle(cornerRadius: outerRadius - bezel, style: .continuous))
                 .padding(bezel)
                 .background(Color(hex: 0x16171D), in: outer)
-                .overlay(outer.strokeBorder(highlighted ? AnyShapeStyle(Theme.cyan) : AnyShapeStyle(Theme.specularRim), lineWidth: highlighted ? 2 : 1.5))
-                .shadow(color: highlighted ? Theme.cyan.opacity(0.35) : .black.opacity(0.5), radius: 24, y: highlighted ? 0 : 18)
+                .overlay(outer.strokeBorder(highlighted ? AnyShapeStyle(Theme.accentFill) : AnyShapeStyle(Color.white.opacity(0.12)), lineWidth: highlighted ? 2 : 1.5))
+                .shadow(color: .black.opacity(0.25), radius: 20, y: 12)
         }
         .aspectRatio(WallpaperFormat.aspectRatio, contentMode: .fit)
+        // A Lock Screen is dark whatever the app's appearance, and so are the controls drawn on it.
+        .environment(\.colorScheme, .dark)
     }
 }

@@ -44,15 +44,14 @@ struct OnboardingView: View {
                 if step < 2 {
                     Button("Skip", action: onFinish)
                         .font(.titleMedium)
-                        .foregroundStyle(Theme.cyan)
+                        .foregroundStyle(Theme.accent)
                 }
             }
             HStack(spacing: 6) {
                 ForEach(0..<3) { index in
                     Capsule()
-                        .fill(index <= step ? AnyShapeStyle(Theme.cyan) : AnyShapeStyle(.white.opacity(0.18)))
+                        .fill(index <= step ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(Theme.border))
                         .frame(width: index == step ? 28 : 10, height: 6)
-                        .shadow(color: index == step ? Theme.cyan.opacity(0.7) : .clear, radius: 6)
                 }
                 Spacer()
                 Text("STEP \(step + 1) OF 3")
@@ -82,7 +81,7 @@ struct OnboardingView: View {
         .padding(.top, 12)
         .padding(.bottom, 8)
         .background {
-            LinearGradient(colors: [Theme.base.opacity(0), Theme.base.opacity(0.9)], startPoint: .top, endPoint: .center)
+            LinearGradient(colors: [Theme.background.opacity(0), Theme.background.opacity(0.95)], startPoint: .top, endPoint: .center)
                 .ignoresSafeArea()
         }
     }
@@ -138,7 +137,7 @@ private struct HowItWorksPage: View {
                 .multilineTextAlignment(.center)
 
             DeviceFrame {
-                AuroraView(colors: [Theme.cyan, Color(hex: 0x1E3A8A), Theme.violet])
+                AuroraView(colors: [WallpaperPalette.sky, Color(hex: 0x1E3A8A), WallpaperPalette.indigo])
                     .overlay { LockScreenOverlay(showsMotionBadge: true) }
             }
             .frame(width: 170)
@@ -163,15 +162,14 @@ private struct SetupPage: View {
             ZStack(alignment: .topTrailing) {
                 Image(systemName: "checkmark.seal.fill")
                     .font(.system(size: 40))
-                    .foregroundStyle(Theme.cyan)
+                    .foregroundStyle(Theme.accent)
                     .frame(width: 96, height: 96)
-                    .liquidGlass(in: Circle(), tint: Theme.cyan.opacity(0.18))
-                    .shadow(color: Theme.cyan.opacity(0.5), radius: 20)
+                    .liquidGlass(in: Circle(), tint: Theme.accent.opacity(0.18))
                 Image(systemName: "bolt.fill")
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(.white)
                     .frame(width: 30, height: 30)
-                    .background(Theme.violet, in: Circle())
+                    .background(Theme.accentFill, in: Circle())
                     .offset(x: 4, y: -4)
             }
             .padding(.top, 8)
@@ -207,9 +205,9 @@ private struct SetupPage: View {
         return HStack(spacing: 14) {
             Image(systemName: "photo.badge.plus")
                 .font(.system(size: 20))
-                .foregroundStyle(Theme.cyan)
+                .foregroundStyle(Theme.accent)
                 .frame(width: 46, height: 46)
-                .liquidGlass(in: Circle(), tint: Theme.cyan.opacity(0.18))
+                .liquidGlass(in: Circle(), tint: Theme.accent.opacity(0.18))
             VStack(alignment: .leading, spacing: 3) {
                 Text("Save to Photos").font(.titleMedium).foregroundStyle(Theme.textPrimary)
                 Text("Needed to add your wallpapers to Photos. Glitter Live can't see your other photos.")
@@ -221,15 +219,15 @@ private struct SetupPage: View {
                 Label("Allowed", systemImage: "checkmark")
                     .labelStyle(.iconOnly)
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(Theme.base)
+                    .foregroundStyle(Theme.onAccent)
                     .frame(width: 34, height: 34)
-                    .background(Theme.cyan, in: Circle())
+                    .background(Theme.accentFill, in: Circle())
                     .accessibilityLabel("Allowed")
             } else if status == .notDetermined {
                 Button("Allow") {
                     Task { status = await PHPhotoLibrary.requestAuthorization(for: .addOnly) }
                 }
-                .buttonStyle(GlassPillButtonStyle(tint: Theme.cyan))
+                .buttonStyle(GlassPillButtonStyle(tint: Theme.accent))
             } else {
                 Button("Settings") {
                     if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
@@ -279,7 +277,7 @@ private struct FeatureList: View {
                 HStack(alignment: .top, spacing: 14) {
                     Image(systemName: row.symbol)
                         .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(Theme.cyan)
+                        .foregroundStyle(Theme.accent)
                         .frame(width: 44, height: 44)
                         .liquidGlass(in: Circle())
                     VStack(alignment: .leading, spacing: 4) {
@@ -289,10 +287,10 @@ private struct FeatureList: View {
                                 Text(badge)
                                     .font(.labelSmall)
                                     .tracking(0.8)
-                                    .foregroundStyle(badge == "FREE" ? Theme.cyan : Theme.signalYellow)
+                                    .foregroundStyle(badge == "FREE" ? Theme.accent : Theme.signalYellow)
                                     .padding(.horizontal, 8)
                                     .frame(height: 22)
-                                    .background((badge == "FREE" ? Theme.cyan : Theme.signalYellow).opacity(0.14), in: Capsule())
+                                    .background((badge == "FREE" ? Theme.accent : Theme.signalYellow).opacity(0.14), in: Capsule())
                             }
                         }
                         Text(row.detail).font(.bodyMedium).foregroundStyle(Theme.textSecondary)
@@ -344,7 +342,7 @@ private struct TrimPreviewCard: View {
                     .font(.titleMedium)
                     .foregroundStyle(Theme.textPrimary)
                 Spacer()
-                Text("Target: \(Text("2.4 s").foregroundStyle(Theme.cyan))")
+                Text("Target: \(Text("2.4 s").foregroundStyle(Theme.accent))")
                     .font(.labelMedium.weight(.semibold))
                     .foregroundStyle(Theme.textSecondary)
                     .padding(.horizontal, 10)
@@ -354,7 +352,7 @@ private struct TrimPreviewCard: View {
             GeometryReader { geometry in
                 let width = geometry.size.width
                 ZStack(alignment: .leading) {
-                    AuroraView(colors: [Theme.cyan, Theme.violet, Theme.magenta]).opacity(0.5)
+                    AuroraView().opacity(0.5)
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .strokeBorder(Theme.signalYellow, lineWidth: 3)
                         .frame(width: width * 0.62)
@@ -362,7 +360,7 @@ private struct TrimPreviewCard: View {
                         .overlay(alignment: .trailing) { handle }
                         .offset(x: width * 0.12)
                     VStack(spacing: 0) {
-                        Circle().fill(Theme.cyan).frame(width: 10, height: 10)
+                        Circle().fill(Theme.accent).frame(width: 10, height: 10)
                         Rectangle().fill(.white).frame(width: 2)
                     }
                     .offset(x: width * 0.42)
@@ -392,9 +390,9 @@ private struct IncludedRow: View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: symbol)
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Theme.cyan)
+                .foregroundStyle(Theme.accent)
                 .frame(width: 38, height: 38)
-                .background(Theme.cyan.opacity(0.12), in: Circle())
+                .background(Theme.accent.opacity(0.12), in: Circle())
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.titleMedium).foregroundStyle(Theme.textPrimary)
                 Text(detail).font(.labelMedium).foregroundStyle(Theme.textSecondary)
