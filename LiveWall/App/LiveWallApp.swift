@@ -20,6 +20,11 @@ enum DemoAppearance {
 struct LiveWallApp: App {
     private let modelContainer = Self.makeModelContainer()
 
+    init() {
+        // Catalog thumbnails are immutable, so a larger cache means they download once.
+        URLCache.shared = URLCache(memoryCapacity: 32 * 1024 * 1024, diskCapacity: 256 * 1024 * 1024)
+    }
+
     var body: some Scene {
         WindowGroup {
             RootTabView()

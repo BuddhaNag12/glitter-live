@@ -1,41 +1,5 @@
 import SwiftUI
 
-/// Explore teaser until the curated catalog backend exists.
-struct ExploreComingSoonView: View {
-    private let categories: [(name: String, colors: [Color])] = [
-        ("Cyberpunk", [WallpaperPalette.rose, WallpaperPalette.violet, WallpaperPalette.sky]),
-        ("Anime Glow", [WallpaperPalette.violet, WallpaperPalette.rose, WallpaperPalette.amber]),
-        ("Liquid Chrome", [WallpaperPalette.sky, .white, WallpaperPalette.indigo]),
-        ("Cosmic", [WallpaperPalette.indigo, WallpaperPalette.blue, WallpaperPalette.teal]),
-    ]
-
-    var body: some View {
-        VStack(spacing: 0) {
-            ScreenHeader(title: "Explore")
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    TeaserBanner(
-                        symbol: "sparkles",
-                        title: "Curated live wallpapers",
-                        message: "Hand-picked motion wallpapers you can save in one tap are on the way."
-                    )
-                    Text("Coming collections")
-                        .font(.headlineSmall)
-                        .foregroundStyle(Theme.textPrimary)
-                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
-                        ForEach(categories, id: \.name) { category in
-                            WallpaperTeaserCard(title: category.name, colors: category.colors)
-                        }
-                    }
-                }
-                .padding(16)
-                .padding(.bottom, 24)
-            }
-            .scrollIndicators(.hidden)
-        }
-    }
-}
-
 /// Create teaser until AI generation is wired up.
 struct CreateComingSoonView: View {
     var body: some View {
@@ -129,28 +93,5 @@ private struct TeaserBanner: View {
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .glass(.floating, cornerRadius: 26)
-    }
-}
-
-private struct WallpaperTeaserCard: View {
-    let title: String
-    let colors: [Color]
-
-    var body: some View {
-        AuroraView(colors: colors)
-            .aspectRatio(9 / 16, contentMode: .fit)
-            .overlay(alignment: .bottomLeading) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(.titleMedium).foregroundStyle(.white)
-                    Text("Coming soon").font(.labelMedium).foregroundStyle(.white.opacity(0.7))
-                }
-                .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .liquidGlass(in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .padding(8)
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Theme.specularRim, lineWidth: 1))
-            .environment(\.colorScheme, .dark)
     }
 }
