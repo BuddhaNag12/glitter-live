@@ -13,6 +13,8 @@ struct CreationDetailView: View {
     @State private var errorMessage: String?
     @State private var confirmsDelete = false
     @State private var showsGuide = false
+    /// Counts successful saves, so "Save Again" confirms with a haptic too.
+    @State private var saves = 0
 
     var body: some View {
         NavigationStack {
@@ -43,7 +45,7 @@ struct CreationDetailView: View {
                 .padding(.bottom, 24)
             }
             .scrollIndicators(.hidden)
-            .background { AppBackground() }
+            .background { AppBackground(twinkles: false) }
             .navigationTitle(Text(creation.createdAt, format: .dateTime.month(.wide).day().hour().minute()))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -62,7 +64,7 @@ struct CreationDetailView: View {
         .sheet(isPresented: $showsGuide) {
             SetWallpaperGuideView().presentationDetents([.medium, .large])
         }
-        .sensoryFeedback(.success, trigger: creation.savedToPhotos) { _, saved in saved }
+        .sensoryFeedback(.success, trigger: saves)
         .sensoryFeedback(.error, trigger: errorMessage) { _, message in message != nil }
         .confirmationDialog("Delete this wallpaper from Glitter Live?", isPresented: $confirmsDelete, titleVisibility: .visible) {
             Button("Delete", role: .destructive, action: delete)
@@ -115,6 +117,7 @@ struct CreationDetailView: View {
             do {
                 try await LivePhotoSaver.save(creation.livePhoto)
                 creation.savedToPhotos = true
+                saves += 1
                 try? modelContext.save()
             } catch {
                 errorMessage = error.localizedDescription

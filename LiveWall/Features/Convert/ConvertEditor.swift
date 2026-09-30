@@ -157,15 +157,23 @@ final class ConvertEditor {
         Motion.rubberBand(zoom, in: zoomRange, dimension: zoom < zoomRange.lowerBound ? 0.5 : 2)
     }
 
+    static func unrubberBandedZoom(_ shown: CGFloat) -> CGFloat {
+        Motion.unrubberBand(shown, in: zoomRange, dimension: shown < zoomRange.lowerBound ? 0.5 : 2)
+    }
+
+    func unrubberBandedPan(_ shown: CGSize, zoom: CGFloat) -> CGSize {
+        let limit = panLimit(zoom: zoom)
+        let canvas = effectiveCanvas
+        return CGSize(
+            width: Motion.unrubberBand(shown.width, in: -limit.width...limit.width, dimension: canvas.width),
+            height: Motion.unrubberBand(shown.height, in: -limit.height...limit.height, dimension: canvas.height)
+        )
+    }
+
     private func panLimit(zoom: CGFloat) -> CGSize {
         let canvas = effectiveCanvas
         let displayed = displayedVideoSize(zoom: zoom)
         return CGSize(width: max(0, (displayed.width - canvas.width) / 2), height: max(0, (displayed.height - canvas.height) / 2))
-    }
-
-    func resetFraming() {
-        zoom = 1
-        panOffset = .zero
     }
 
     /// The visible part of the video, normalized to its upright frame.

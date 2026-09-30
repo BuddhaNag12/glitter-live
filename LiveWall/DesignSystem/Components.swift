@@ -5,7 +5,7 @@ import SwiftUI
 extension View {
     /// Apple's Liquid Glass on iOS 26+, frosted material with a specular rim before that.
     /// On top of another glass surface it becomes a tinted fill, because glass on glass loses legibility.
-    /// With Increase Contrast it becomes a near-solid surface with a defined border.
+    /// With Reduce Transparency it becomes a solid surface, and with Increase Contrast it also gets a defined border.
     func liquidGlass<S: InsettableShape>(in shape: S, tint: Color? = nil, interactive: Bool = false) -> some View {
         modifier(LiquidGlass(shape: shape, tint: tint, interactive: interactive))
     }
@@ -41,6 +41,7 @@ private struct LiquidGlass<S: InsettableShape>: ViewModifier {
     let interactive: Bool
     @Environment(\.isOnGlass) private var isOnGlass
     @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     func body(content: Content) -> some View {
         let increasedContrast = contrast == .increased
@@ -48,7 +49,7 @@ private struct LiquidGlass<S: InsettableShape>: ViewModifier {
             content
                 .background(tint ?? Theme.fill, in: shape)
                 .overlay { if increasedContrast { shape.strokeBorder(Theme.border, lineWidth: 1).allowsHitTesting(false) } }
-        } else if increasedContrast {
+        } else if increasedContrast || reduceTransparency {
             content
                 .environment(\.isOnGlass, true)
                 .background {

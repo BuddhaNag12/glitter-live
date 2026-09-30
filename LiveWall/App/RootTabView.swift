@@ -20,7 +20,8 @@ struct RootTabView: View {
         TabView(selection: $selection) {
             ForEach(AppTab.visible) { tab in
                 screen(for: tab)
-                    .background { AppBackground() }
+                    // Convert always has a moving preview on screen.
+                    .background { AppBackground(twinkles: tab != .convert) }
                     .tabItem { Label(tab.title, systemImage: tab.symbol) }
                     .tag(tab)
             }
