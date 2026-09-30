@@ -22,7 +22,7 @@ struct LibraryView: View {
                         VStack(alignment: .leading, spacing: 14) {
                             HStack(alignment: .firstTextBaseline) {
                                 Text(creations.count == 1 ? "1 live wallpaper" : "\(creations.count) live wallpapers")
-                                    .font(.headlineSmall)
+                                    .typography(.headlineSmall)
                                     .foregroundStyle(Theme.textPrimary)
                                 Spacer()
                                 Button(action: onConvert) {
@@ -112,7 +112,7 @@ private struct CreationCard: View {
             .overlay(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(creation.createdAt, format: .dateTime.month(.abbreviated).day())
-                        .font(.titleMedium)
+                        .typography(.titleMedium)
                         .foregroundStyle(.white)
                     Text(creation.createdAt, format: .dateTime.hour().minute())
                         .font(.labelMedium.weight(.semibold))

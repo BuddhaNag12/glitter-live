@@ -102,14 +102,44 @@ extension Font {
         .custom(weight.rawValue, size: size, relativeTo: style)
     }
 
-    static let displayLarge = inter(32, .bold, relativeTo: .largeTitle)
-    static let headlineLarge = inter(28, .semibold, relativeTo: .title)
-    static let headlineSmall = inter(20, .semibold, relativeTo: .title3)
-    static let titleMedium = inter(17, .semibold, relativeTo: .headline)
-    static let bodyLarge = inter(17, .regular, relativeTo: .body)
-    static let bodyMedium = inter(15, .regular, relativeTo: .subheadline)
-    static let labelMedium = inter(13, .medium, relativeTo: .footnote)
-    static let labelSmall = inter(11, .semibold, relativeTo: .caption)
+    static let displayLarge = Typography.displayLarge.font
+    static let headlineLarge = Typography.headlineLarge.font
+    static let headlineSmall = Typography.headlineSmall.font
+    static let titleMedium = Typography.titleMedium.font
+    static let bodyLarge = Typography.bodyLarge.font
+    static let bodyMedium = Typography.bodyMedium.font
+    static let labelMedium = Typography.labelMedium.font
+    static let labelSmall = Typography.labelSmall.font
+}
+
+/// A text style's font together with the tracking its size needs, which a `Font` can't carry.
+struct Typography {
+    let size: CGFloat
+    let font: Font
+
+    init(_ size: CGFloat, _ weight: InterWeight, relativeTo style: Font.TextStyle) {
+        self.size = size
+        font = .inter(size, weight, relativeTo: style)
+    }
+
+    /// Inter's dynamic metrics: tighter as text grows, slightly open when small (rsms.me/inter/dynmetrics).
+    var tracking: CGFloat { size * (-0.0223 + 0.185 * exp(-0.1745 * size)) }
+
+    static let displayLarge = Typography(32, .bold, relativeTo: .largeTitle)
+    static let headlineLarge = Typography(28, .semibold, relativeTo: .title)
+    static let headlineSmall = Typography(20, .semibold, relativeTo: .title3)
+    static let titleMedium = Typography(17, .semibold, relativeTo: .headline)
+    static let bodyLarge = Typography(17, .regular, relativeTo: .body)
+    static let bodyMedium = Typography(15, .regular, relativeTo: .subheadline)
+    static let labelMedium = Typography(13, .medium, relativeTo: .footnote)
+    static let labelSmall = Typography(11, .semibold, relativeTo: .caption)
+}
+
+extension View {
+    /// Sets a text style's font and its size-specific tracking. Uppercase labels keep their own wider tracking via `.font`.
+    func typography(_ style: Typography) -> some View {
+        font(style.font).tracking(style.tracking)
+    }
 }
 
 /// Obsidian base with two soft glows and a slow glitter twinkle, shared by every screen.

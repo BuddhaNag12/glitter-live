@@ -6,6 +6,8 @@ struct TrimStudioView: View {
 
     /// Pan and pinch only reframe while this is on, so the page can scroll the rest of the time.
     @State private var isFraming = false
+    @State private var confirmsDiscard = false
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         ScrollView {
@@ -27,6 +29,11 @@ struct TrimStudioView: View {
         }
         .animation(.spring(duration: 0.3), value: isFraming)
         .animation(.easeOut(duration: 0.2), value: editor.phase == .exporting)
+        .confirmationDialog("Discard your edits?", isPresented: $confirmsDiscard, titleVisibility: .visible) {
+            Button("Discard", role: .destructive, action: onClose)
+        } message: {
+            Text("Your trim, framing and cover photo will be lost.")
+        }
         .alert("Something went wrong", isPresented: .constant(editor.errorMessage != nil)) {
             Button("OK") { editor.errorMessage = nil }
         } message: {
@@ -36,7 +43,8 @@ struct TrimStudioView: View {
 
     private var toolbar: some View {
         HStack {
-            Button(action: onClose) { Image(systemName: "xmark") }
+            // Only asks when there's work to lose.
+            Button { editor.hasChanges ? (confirmsDiscard = true) : onClose() } label: { Image(systemName: "xmark") }
                 .buttonStyle(CircleIconButtonStyle())
                 .accessibilityLabel("Discard video")
             Spacer()
@@ -55,7 +63,7 @@ struct TrimStudioView: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Circle().fill(Theme.accent).frame(width: 10, height: 10)
-                Text("Motion Timeline").font(.headlineSmall).foregroundStyle(Theme.textPrimary)
+                Text("Motion Timeline").typography(.headlineSmall).foregroundStyle(Theme.textPrimary)
                 Spacer()
                 Text("Duration: \(Text(editor.outputDuration, format: .number.precision(.fractionLength(1))).foregroundStyle(Theme.accent))s")
                     .font(.labelMedium.weight(.semibold))
@@ -81,7 +89,7 @@ struct TrimStudioView: View {
             attributes
 
             Button(action: convert) {
-                Label("Convert to Live Photo & Save", systemImage: "livephoto")
+                Label("Save Live Photo", systemImage: "livephoto")
             }
             .buttonStyle(KineticButtonStyle())
             .disabled(editor.phase != .editing)
@@ -94,14 +102,13 @@ struct TrimStudioView: View {
     private var keyFrameRow: some View {
         HStack(spacing: 12) {
             Image(systemName: "photo")
-                .font(.system(size: 17))
+                .scaledIcon(size: 17, frame: 42)
                 .foregroundStyle(Theme.slate)
-                .frame(width: 42, height: 42)
                 .background(Theme.slate.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
                     Text("Key Frame")
-                        .font(.titleMedium)
+                        .typography(.titleMedium)
                         .foregroundStyle(Theme.textPrimary)
                         .lineLimit(1)
                     Text(Self.timestamp(editor.coverOffset))
@@ -121,40 +128,74 @@ struct TrimStudioView: View {
         .glass(.surface, cornerRadius: 22)
     }
 
+    /// Two columns, or one at accessibility text sizes so the labels don't truncate.
+    @ViewBuilder
     private var attributes: some View {
-        Grid(horizontalSpacing: 12, verticalSpacing: 12) {
-            GridRow {
-                Button { isFraming.toggle() } label: {
-                    AttributeCell(symbol: "viewfinder", title: "Framing", active: isFraming) {
-                        ValueChip(text: isFraming ? "Adjusting" : "Fill", tint: Theme.accent)
-                    }
-                }
-                .buttonStyle(.plain)
-                .accessibilityHint("Turns on pan and pinch in the preview")
-
-                Button(action: cycleSpeed) {
-                    AttributeCell(symbol: "gauge.with.dots.needle.67percent", title: "Speed") {
-                        ValueChip(text: "\(editor.speed.formatted(.number.precision(.fractionLength(0...1))))x", tint: Theme.slate)
-                    }
-                }
-                .buttonStyle(.plain)
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(spacing: 12) {
+                framingCell
+                speedCell
+                bounceCell
+                clockCell
             }
-            GridRow {
-                toggleCell(symbol: "arrow.left.arrow.right", title: "Bounce", tint: Theme.accent, isOn: $editor.bounces)
-                toggleCell(symbol: "lock.rectangle", title: "HUD", tint: Theme.accent, isOn: $editor.showsLockScreen)
+        } else {
+            Grid(horizontalSpacing: 12, verticalSpacing: 12) {
+                GridRow {
+                    framingCell
+                    speedCell
+                }
+                GridRow {
+                    bounceCell
+                    clockCell
+                }
             }
         }
     }
 
+    private var framingCell: some View {
+        Button { isFraming.toggle() } label: {
+            AttributeCell(symbol: "viewfinder", title: "Framing", active: isFraming) {
+                ValueChip(text: isFraming ? "Adjusting" : "Fill", tint: Theme.accent)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("Turns on pan and pinch in the preview")
+    }
+
+    /// A menu shows every speed at once, where tapping to cycle hid them and had no way back.
+    private var speedCell: some View {
+        Menu {
+            Picker("Speed", selection: $editor.speed) {
+                ForEach(ConvertEditor.speeds, id: \.self) { speed in
+                    Text(Self.speedLabel(speed)).tag(speed)
+                }
+            }
+        } label: {
+            AttributeCell(symbol: "gauge.with.dots.needle.67percent", title: "Speed") {
+                ValueChip(text: Self.speedLabel(editor.speed), tint: Theme.slate)
+            }
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+    }
+
+    private var bounceCell: some View {
+        toggleCell(symbol: "arrow.left.arrow.right", title: "Bounce", tint: Theme.accent, isOn: $editor.bounces)
+    }
+
+    private var clockCell: some View {
+        toggleCell(symbol: "lock.rectangle", title: "Clock", accessibilityTitle: "Lock Screen overlay", tint: Theme.accent, isOn: $editor.showsLockScreen)
+    }
+
     /// A chip instead of a system switch, which doesn't fit beside a label in a half-width cell.
-    private func toggleCell(symbol: String, title: String, tint: Color, isOn: Binding<Bool>) -> some View {
+    private func toggleCell(symbol: String, title: String, accessibilityTitle: String? = nil, tint: Color, isOn: Binding<Bool>) -> some View {
         Button { isOn.wrappedValue.toggle() } label: {
             AttributeCell(symbol: symbol, title: title, tint: tint, active: isOn.wrappedValue) {
                 ValueChip(text: isOn.wrappedValue ? "On" : "Off", tint: isOn.wrappedValue ? Theme.accent : Theme.textTertiary)
             }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(title)
+        .accessibilityLabel(accessibilityTitle ?? title)
         .accessibilityValue(isOn.wrappedValue ? "On" : "Off")
         .accessibilityAddTraits(.isToggle)
         .sensoryFeedback(.selection, trigger: isOn.wrappedValue)
@@ -165,7 +206,7 @@ struct TrimStudioView: View {
             Color.black.opacity(0.5).ignoresSafeArea()
             VStack(spacing: 14) {
                 ProgressView().controlSize(.large).tint(Theme.accent)
-                Text("Creating Live Photo…").font(.titleMedium).foregroundStyle(Theme.textPrimary)
+                Text("Creating Live Photo…").typography(.titleMedium).foregroundStyle(Theme.textPrimary)
             }
             .padding(28)
             .glass(.floating, cornerRadius: 26)
@@ -178,10 +219,8 @@ struct TrimStudioView: View {
         Task { await editor.export() }
     }
 
-    private func cycleSpeed() {
-        let speeds = ConvertEditor.speeds
-        let index = speeds.firstIndex(of: editor.speed) ?? 0
-        editor.speed = speeds[(index + 1) % speeds.count]
+    static func speedLabel(_ speed: Double) -> String {
+        "\(speed.formatted(.number.precision(.fractionLength(0...1))))×"
     }
 
     static func timestamp(_ seconds: Double) -> String {
@@ -201,11 +240,10 @@ private struct AttributeCell<Accessory: View>: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: symbol)
-                .font(.system(size: 16, weight: .medium))
+                .scaledIcon(size: 16, weight: .medium, frame: 22)
                 .foregroundStyle(tint)
-                .frame(width: 22)
             Text(title)
-                .font(.titleMedium)
+                .typography(.titleMedium)
                 .foregroundStyle(Theme.textPrimary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)

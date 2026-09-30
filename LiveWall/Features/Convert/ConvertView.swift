@@ -85,10 +85,10 @@ struct ConvertView: View {
 
                 VStack(spacing: 8) {
                     Text("Video to Live Wallpaper")
-                        .font(.headlineSmall)
+                        .typography(.headlineSmall)
                         .foregroundStyle(Theme.textPrimary)
                     Text("Trim a short moment from any video and set it as a Lock Screen wallpaper that moves when you wake your iPhone.")
-                        .font(.bodyMedium)
+                        .typography(.bodyMedium)
                         .foregroundStyle(Theme.textSecondary)
                         .multilineTextAlignment(.center)
                 }
@@ -161,7 +161,7 @@ private struct StepChip: View {
     var body: some View {
         VStack(spacing: 6) {
             Image(systemName: symbol)
-                .font(.system(size: 17, weight: .medium))
+                .scaledIcon(size: 17, weight: .medium)
                 .foregroundStyle(Theme.accent)
             Text("\(number). \(title)")
                 .font(.labelMedium.weight(.semibold))

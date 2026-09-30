@@ -54,7 +54,7 @@ struct WallpaperDetailView: View {
                     .containerRelativeFrame(.horizontal) { width, _ in width * 0.56 }
 
                     VStack(spacing: 4) {
-                        Text(wallpaper.title).font(.headlineSmall).foregroundStyle(Theme.textPrimary)
+                        Text(wallpaper.title).typography(.headlineSmall).foregroundStyle(Theme.textPrimary)
                         if let creator = wallpaper.creatorName {
                             Group {
                                 if let url = wallpaper.creatorURL {

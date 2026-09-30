@@ -61,7 +61,7 @@ struct SettingsView: View {
     private func rowLabel(_ title: String, symbol: String) -> some View {
         HStack(spacing: 12) {
             Image(systemName: symbol).foregroundStyle(Theme.accent).frame(width: 24)
-            Text(title).font(.bodyLarge).foregroundStyle(Theme.textPrimary)
+            Text(title).typography(.bodyLarge).foregroundStyle(Theme.textPrimary)
             Spacer()
             Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(Theme.textTertiary)
         }

@@ -37,13 +37,13 @@ struct OnboardingView: View {
                     .disabled(step == 0)
                     .accessibilityLabel("Back")
                 Text(titles[step])
-                    .font(.headlineSmall)
+                    .typography(.headlineSmall)
                     .foregroundStyle(Theme.textPrimary)
                     .contentTransition(.opacity)
                 Spacer()
                 if step < 2 {
                     Button("Skip", action: onFinish)
-                        .font(.titleMedium)
+                        .typography(.titleMedium)
                         .foregroundStyle(Theme.accent)
                 }
             }
@@ -96,11 +96,10 @@ private struct WelcomePage: View {
         OnboardingPage {
             StatusPill(text: "LOCK SCREEN MOTION")
             Text("Welcome to Glitter Live")
-                .font(.displayLarge)
-                .tracking(-0.8)
+                .typography(.displayLarge)
                 .foregroundStyle(Theme.textPrimary)
             Text("Turn your Lock Screen into a moving gallery. Your wallpaper comes alive every time you wake your iPhone.")
-                .font(.bodyLarge)
+                .typography(.bodyLarge)
                 .foregroundStyle(Theme.textSecondary)
 
             DeviceFrame {
@@ -132,11 +131,11 @@ private struct HowItWorksPage: View {
     var body: some View {
         OnboardingPage(alignment: .center) {
             Text("Convert Any Video in Seconds")
-                .font(.headlineLarge)
+                .typography(.headlineLarge)
                 .foregroundStyle(Theme.textPrimary)
                 .multilineTextAlignment(.center)
             Text("Pick a 1–3 second moment, frame it around the clock, and choose the photo shown while your iPhone is locked.")
-                .font(.bodyMedium)
+                .typography(.bodyMedium)
                 .foregroundStyle(Theme.textSecondary)
                 .multilineTextAlignment(.center)
 
@@ -179,11 +178,10 @@ private struct SetupPage: View {
             .padding(.top, 8)
 
             Text("You're All Set")
-                .font(.displayLarge)
-                .tracking(-0.8)
+                .typography(.displayLarge)
                 .foregroundStyle(Theme.textPrimary)
             Text("Pick any video and make your first live wallpaper in seconds.")
-                .font(.bodyLarge)
+                .typography(.bodyLarge)
                 .foregroundStyle(Theme.textSecondary)
                 .multilineTextAlignment(.center)
 
@@ -191,7 +189,7 @@ private struct SetupPage: View {
 
             VStack(alignment: .leading, spacing: 14) {
                 Label("What's included", systemImage: "star")
-                    .font(.headlineSmall)
+                    .typography(.headlineSmall)
                     .foregroundStyle(Theme.textPrimary)
                 IncludedRow(symbol: "infinity", title: "Unlimited conversions", detail: "Turn as many videos into live wallpapers as you like.")
                 IncludedRow(symbol: "photo.on.rectangle.angled", title: "Your Library", detail: "Every wallpaper you make is kept, ready to save or set again.")
@@ -211,12 +209,11 @@ private struct SetupPage: View {
         let granted = status == .authorized || status == .limited
         return HStack(spacing: 14) {
             Image(systemName: "photo.badge.plus")
-                .font(.system(size: 20))
+                .scaledIcon(size: 20, frame: 46)
                 .foregroundStyle(Theme.accent)
-                .frame(width: 46, height: 46)
                 .liquidGlass(in: Circle(), tint: Theme.accent.opacity(0.18))
             VStack(alignment: .leading, spacing: 3) {
-                Text("Save to Photos").font(.titleMedium).foregroundStyle(Theme.textPrimary)
+                Text("Save to Photos").typography(.titleMedium).foregroundStyle(Theme.textPrimary)
                 Text(status == .notDetermined
                      ? "Asked the first time you save a wallpaper. Glitter Live can't see your other photos."
                      : "Needed to add your wallpapers to Photos. Glitter Live can't see your other photos.")
@@ -280,13 +277,12 @@ private struct FeatureList: View {
             ForEach(rows) { row in
                 HStack(alignment: .top, spacing: 14) {
                     Image(systemName: row.symbol)
-                        .font(.system(size: 18, weight: .medium))
+                        .scaledIcon(size: 18, weight: .medium, frame: 44)
                         .foregroundStyle(Theme.accent)
-                        .frame(width: 44, height: 44)
                         .liquidGlass(in: Circle())
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 8) {
-                            Text(row.title).font(.titleMedium).foregroundStyle(Theme.textPrimary)
+                            Text(row.title).typography(.titleMedium).foregroundStyle(Theme.textPrimary)
                             if let badge = row.badge {
                                 Text(badge)
                                     .font(.labelSmall)
@@ -297,7 +293,7 @@ private struct FeatureList: View {
                                     .background(Theme.signalYellow.opacity(0.14), in: Capsule())
                             }
                         }
-                        Text(row.detail).font(.bodyMedium).foregroundStyle(Theme.textSecondary)
+                        Text(row.detail).typography(.bodyMedium).foregroundStyle(Theme.textSecondary)
                     }
                     Spacer(minLength: 0)
                 }
@@ -343,7 +339,7 @@ private struct TrimPreviewCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Label("Trim & Key Frame", systemImage: "film")
-                    .font(.titleMedium)
+                    .typography(.titleMedium)
                     .foregroundStyle(Theme.textPrimary)
                 Spacer()
                 Text("Target: \(Text("2.4 s").foregroundStyle(Theme.accent))")
@@ -393,12 +389,11 @@ private struct IncludedRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: symbol)
-                .font(.system(size: 16, weight: .semibold))
+                .scaledIcon(size: 16, weight: .semibold, frame: 38)
                 .foregroundStyle(Theme.accent)
-                .frame(width: 38, height: 38)
                 .background(Theme.accent.opacity(0.12), in: Circle())
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.titleMedium).foregroundStyle(Theme.textPrimary)
+                Text(title).typography(.titleMedium).foregroundStyle(Theme.textPrimary)
                 Text(detail).font(.labelMedium).foregroundStyle(Theme.textSecondary)
             }
         }

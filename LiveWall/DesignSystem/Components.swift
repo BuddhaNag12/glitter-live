@@ -157,7 +157,7 @@ struct AccentCapsuleButtonStyle: ButtonStyle {
 
         var body: some View {
             configuration.label
-                .font(.titleMedium)
+                .typography(.titleMedium)
                 .foregroundStyle(Theme.onAccent)
                 .padding(.horizontal, 18)
                 .frame(height: 44)
@@ -266,7 +266,7 @@ private struct ScreenHeader: View {
         // Equal side columns keep the logo centred and stop the title from running into it.
         HStack(spacing: 8) {
             Text(title)
-                .font(.titleMedium)
+                .typography(.titleMedium)
                 .foregroundStyle(Theme.textSecondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
@@ -329,5 +329,36 @@ extension AnyTransition {
     /// Swapping whole screens in place: the same fade and settle in both directions, or a plain fade with Reduce Motion.
     static func screen(reduceMotion: Bool) -> AnyTransition {
         reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.97))
+    }
+}
+
+// MARK: - Icons
+
+extension View {
+    /// An SF Symbol, and optionally its square frame, that grow with Dynamic Type like the text beside it.
+    func scaledIcon(size: CGFloat, weight: Font.Weight = .regular, frame: CGFloat? = nil, relativeTo style: Font.TextStyle = .body) -> some View {
+        modifier(ScaledIcon(size: size, weight: weight, frame: frame, style: style))
+    }
+}
+
+private struct ScaledIcon: ViewModifier {
+    let size: CGFloat
+    let weight: Font.Weight
+    let frame: CGFloat?
+    @ScaledMetric private var scale: CGFloat
+
+    init(size: CGFloat, weight: Font.Weight, frame: CGFloat?, style: Font.TextStyle) {
+        self.size = size
+        self.weight = weight
+        self.frame = frame
+        _scale = ScaledMetric(wrappedValue: 1, relativeTo: style)
+    }
+
+    func body(content: Content) -> some View {
+        // Capped so icons at the largest sizes don't crowd out the text they sit beside.
+        let factor = min(scale, 2)
+        content
+            .font(.system(size: size * factor, weight: weight))
+            .frame(width: frame.map { $0 * factor }, height: frame.map { $0 * factor })
     }
 }

@@ -45,6 +45,7 @@ final class ConvertEditor {
     @ObservationIgnored private var looper: AVPlayerLooper?
     @ObservationIgnored private let library: CreationLibrary?
     @ObservationIgnored private var creation: Creation?
+    @ObservationIgnored private var initialEdits: Edits?
     @ObservationIgnored private var scrubTarget: CMTime?
     @ObservationIgnored private var isSeeking = false
 
@@ -69,12 +70,15 @@ final class ConvertEditor {
     }
 
     func load() async {
+        // Trim Studio reappears after "Edit Again", which must keep the edits rather than start over.
+        guard phase == .loading else { return }
         do {
             let info = try await VideoInfo.load(sourceURL)
             duration = info.duration
             uprightSize = info.uprightSize
             clipLength = maxClipLength
             coverOffset = clipLength / 2
+            initialEdits = edits
             phase = .editing
             restartLoop()
             thumbnails = await makeThumbnails()
@@ -82,6 +86,18 @@ final class ConvertEditor {
             phase = .unavailable(error.localizedDescription)
         }
     }
+
+    private struct Edits: Equatable {
+        var clipStart: Double, clipLength: Double, coverOffset: Double, speed: Double, bounces: Bool
+        var zoom: CGFloat, panOffset: CGSize
+    }
+
+    private var edits: Edits {
+        Edits(clipStart: clipStart, clipLength: clipLength, coverOffset: coverOffset, speed: speed, bounces: bounces, zoom: zoom, panOffset: panOffset)
+    }
+
+    /// Whether closing would throw away anything the person chose.
+    var hasChanges: Bool { initialEdits.map { $0 != edits } ?? false }
 
     // MARK: Trimming
 

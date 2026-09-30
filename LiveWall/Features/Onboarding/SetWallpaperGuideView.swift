@@ -15,7 +15,7 @@ struct SetWallpaperGuideView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             HStack {
-                Text("Set as Wallpaper").font(.headlineLarge).foregroundStyle(Theme.textPrimary)
+                Text("Set as Wallpaper").typography(.headlineLarge).foregroundStyle(Theme.textPrimary)
                 Spacer()
                 Button { dismiss() } label: { Image(systemName: "xmark") }
                     .buttonStyle(CircleIconButtonStyle())
@@ -25,13 +25,12 @@ struct SetWallpaperGuideView: View {
                 ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
                     HStack(alignment: .top, spacing: 14) {
                         Image(systemName: step.symbol)
-                            .font(.system(size: 17, weight: .medium))
+                            .scaledIcon(size: 17, weight: .medium, frame: 40)
                             .foregroundStyle(Theme.accent)
-                            .frame(width: 40, height: 40)
                             .background(Theme.accent.opacity(0.12), in: Circle())
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Step \(index + 1)").font(.labelSmall).tracking(0.6).foregroundStyle(Theme.textTertiary)
-                            Text(step.text).font(.bodyMedium).foregroundStyle(Theme.textPrimary)
+                            Text(step.text).typography(.bodyMedium).foregroundStyle(Theme.textPrimary)
                         }
                     }
                 }
