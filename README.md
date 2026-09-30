@@ -110,3 +110,7 @@ scripts/          Icon, logo and app-bar logo renderer (swift scripts/render-ico
 
 - [LivePaper](https://github.com/Yuyang16Z/LivePaper) (MIT) for documenting the Lock Screen's Live Photo requirements. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 - [Inter](https://rsms.me/inter/) typeface (SIL Open Font License).
+
+## License
+
+Glitter Live is released under the [MIT License](LICENSE). The bundled Inter font files keep their own SIL Open Font License, and third-party notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
