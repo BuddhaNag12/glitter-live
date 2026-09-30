@@ -11,8 +11,13 @@ final class ScreenshotTests: XCTestCase {
             capture("library", appearance, arguments: ["-tab", "library"])
             captureLibrary(appearance)
             capture("convert-empty", appearance, arguments: ["-tab", "convert"])
-            capture("trim-studio", appearance, arguments: ["-tab", "convert", "-demoVideo"], scrolls: 2, settle: 6)
-            capture("result", appearance, arguments: ["-tab", "convert", "-demoResult"], settle: 12)
+            capture("trim-studio", appearance, arguments: ["-tab", "convert", "-demoVideo"], scrolls: 2) { app in
+                // Save is enabled once the demo video has loaded.
+                app.buttons["Save"].firstMatch
+            }
+            capture("result", appearance, arguments: ["-tab", "convert", "-demoResult"]) { app in
+                app.buttons["Set as Wallpaper"]
+            }
         }
     }
 
@@ -38,9 +43,15 @@ final class ScreenshotTests: XCTestCase {
     }
 
     @MainActor
-    private func capture(_ name: String, _ appearance: String, arguments: [String], scrolls: Int = 0, settle: TimeInterval = 2) {
+    private func capture(
+        _ name: String, _ appearance: String, arguments: [String], scrolls: Int = 0,
+        readyWhen ready: ((XCUIApplication) -> XCUIElement)? = nil
+    ) {
         let app = launch(appearance, arguments + ["-hasCompletedOnboarding", "YES"])
-        Thread.sleep(forTimeInterval: settle)
+        if let ready {
+            XCTAssertTrue(waitUntilEnabled(ready(app)), "\(name) never became ready")
+        }
+        Thread.sleep(forTimeInterval: 2)
         attach(app, name: "\(name)-\(appearance)")
         for index in 0..<scrolls {
             scrollDown(app)
@@ -65,14 +76,23 @@ final class ScreenshotTests: XCTestCase {
     @MainActor
     private func captureLibrary(_ appearance: String) {
         let app = launch(appearance, ["-tab", "library", "-demoLibrary", "-hasCompletedOnboarding", "YES"])
+        // Seeding encodes three Live Photos, which takes a while on a simulator.
+        XCTAssertTrue(app.buttons.matching(identifier: "creation-card").element(boundBy: 2).waitForExistence(timeout: 120))
         let card = app.buttons["creation-card"].firstMatch
-        XCTAssertTrue(card.waitForExistence(timeout: 30))
         Thread.sleep(forTimeInterval: 2)
         attach(app, name: "library-grid-\(appearance)")
         card.tap()
         Thread.sleep(forTimeInterval: 3)
         attach(app, name: "library-detail-\(appearance)")
         app.terminate()
+    }
+
+    /// Waits on the element rather than a fixed delay, since demo videos render at different speeds on each machine.
+    @MainActor
+    private func waitUntilEnabled(_ element: XCUIElement, timeout: TimeInterval = 120) -> Bool {
+        let predicate = NSPredicate(format: "exists == true AND isEnabled == true")
+        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
+        return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
     }
 
     /// Drags near the left edge, away from the timeline and preview controls.
