@@ -10,17 +10,33 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/onboarding.png" width="200" alt="Welcome screen">
-  <img src="docs/screenshots/convert.png" width="200" alt="Convert a video">
-  <img src="docs/screenshots/trim-studio.png" width="200" alt="Trim Studio preview">
-  <img src="docs/screenshots/trim-studio-controls.png" width="200" alt="Trim Studio controls">
+  <img src="docs/screenshots/onboarding-1-dark.png" width="200" alt="Welcome screen">
+  <img src="docs/screenshots/convert-empty-dark.png" width="200" alt="Convert a video">
+  <img src="docs/screenshots/trim-studio-dark.png" width="200" alt="Trim Studio preview">
+  <img src="docs/screenshots/trim-studio-3-dark.png" width="200" alt="Trim Studio controls">
 </p>
 <p align="center">
-  <img src="docs/screenshots/result.png" width="200" alt="Saved Live Photo">
-  <img src="docs/screenshots/library.png" width="200" alt="Library">
-  <img src="docs/screenshots/library-detail.png" width="200" alt="Library detail">
-  <img src="docs/screenshots/explore.png" width="200" alt="Explore">
+  <img src="docs/screenshots/result-dark.png" width="200" alt="Saved Live Photo">
+  <img src="docs/screenshots/library-grid-dark.png" width="200" alt="Library">
+  <img src="docs/screenshots/library-detail-dark.png" width="200" alt="Library detail">
+  <img src="docs/screenshots/explore-dark.png" width="200" alt="Explore">
 </p>
+
+<details>
+<summary>Light mode</summary>
+<p align="center">
+  <img src="docs/screenshots/onboarding-1-light.png" width="200" alt="Welcome screen, light">
+  <img src="docs/screenshots/convert-empty-light.png" width="200" alt="Convert, light">
+  <img src="docs/screenshots/trim-studio-3-light.png" width="200" alt="Trim Studio, light">
+  <img src="docs/screenshots/result-light.png" width="200" alt="Saved Live Photo, light">
+</p>
+<p align="center">
+  <img src="docs/screenshots/trim-studio-light.png" width="200" alt="Trim Studio preview, light">
+  <img src="docs/screenshots/library-grid-light.png" width="200" alt="Library, light">
+  <img src="docs/screenshots/library-detail-light.png" width="200" alt="Library detail, light">
+  <img src="docs/screenshots/explore-light.png" width="200" alt="Explore, light">
+</p>
+</details>
 
 ## Features
 
@@ -29,7 +45,7 @@
 - **Sharp cover photo**: the still shown while the phone is locked is rendered from the original video at up to 1320 px wide, sharper than the motion clip.
 - **Library**: every wallpaper is kept in the app, so it can be previewed, saved to Photos again or deleted.
 - **Private by design**: only asks to *add* photos, never reads the library, and collects no data.
-- **Liquid Glass UI**: native iOS 26+ glass materials and tab bar, with frosted fallbacks on iOS 17–25.
+- **Silver Shimmer design**: light and dark modes that follow the system, an obsidian dark mode lit by brand blue and silver, softly twinkling glitter, and native Liquid Glass on iOS 26+ with frosted fallbacks on iOS 17–25.
 - Free, with no watermark.
 
 ## Lock Screen motion
@@ -81,7 +97,7 @@ LiveWall/
 LiveWallTests/    Unit tests
 LiveWallUITests/  On-device screenshot tests
 Branding/         Logo files
-scripts/          Icon and logo renderer (swift scripts/render-icon.swift <dir> [icon|logo])
+scripts/          Icon, logo and app-bar logo renderer (swift scripts/render-icon.swift <dir> [icon|logo|appbar])
 ```
 
 ## Roadmap
