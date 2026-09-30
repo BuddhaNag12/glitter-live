@@ -7,8 +7,7 @@ final class ScreenshotTests: XCTestCase {
         continueAfterFailure = true
         for appearance in ["dark", "light"] {
             captureOnboarding(appearance)
-            capture("explore", appearance, arguments: ["-tab", "explore"])
-            capture("create", appearance, arguments: ["-tab", "create"])
+            captureExplore(appearance)
             capture("library", appearance, arguments: ["-tab", "library"])
             captureLibrary(appearance)
             capture("convert-empty", appearance, arguments: ["-tab", "convert"])
@@ -47,6 +46,19 @@ final class ScreenshotTests: XCTestCase {
             scrollDown(app)
             attach(app, name: "\(name)-\(index + 2)-\(appearance)")
         }
+        app.terminate()
+    }
+
+    @MainActor
+    private func captureExplore(_ appearance: String) {
+        let app = launch(appearance, ["-tab", "explore", "-hasCompletedOnboarding", "YES"])
+        let card = app.buttons["catalog-card"].firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: 30), "Catalog didn't load")
+        Thread.sleep(forTimeInterval: 3)
+        attach(app, name: "explore-\(appearance)")
+        card.tap()
+        Thread.sleep(forTimeInterval: 4)
+        attach(app, name: "explore-detail-\(appearance)")
         app.terminate()
     }
 
