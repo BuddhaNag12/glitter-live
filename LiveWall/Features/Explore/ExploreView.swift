@@ -2,7 +2,7 @@ import SwiftUI
 
 @Observable
 final class ExploreModel {
-    enum State { case loading, loaded, failed(String) }
+    enum State: Equatable { case loading, loaded, failed(String) }
 
     private(set) var state: State = .loading
     private(set) var wallpapers: [Wallpaper] = []
@@ -25,6 +25,9 @@ final class ExploreModel {
     }
 
     func load() async {
+        #if DEBUG
+        if DemoLaunch.holdsLoading { try? await Task.sleep(for: .seconds(3)) }
+        #endif
         if wallpapers.isEmpty { state = .loading }
         do {
             wallpapers = try await CatalogService.fetchWallpapers()
@@ -36,6 +39,9 @@ final class ExploreModel {
 }
 
 struct ExploreView: View {
+    /// Waits out the launch intro, which would otherwise hide the cards arriving.
+    var holdsReveal = false
+
     @State private var model = ExploreModel()
     @State private var selection: Wallpaper?
     /// The card being held down to preview its motion.
@@ -44,6 +50,10 @@ struct ExploreView: View {
     /// Marked when the preview starts, because the tap fires before the preview's end is seen.
     @State private var previewedCard: Wallpaper.ID?
     @State private var isVisible = false
+    /// Fast loads skip the placeholders, so they don't flash for a split second.
+    @State private var showsPlaceholders = false
+    /// Flips once the first catalog arrives, so the cards on screen rise in one by one; cards scrolled to later just appear.
+    @State private var isRevealed = false
     @Namespace private var zoom
 
     private let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
@@ -53,6 +63,8 @@ struct ExploreView: View {
             VStack(alignment: .leading, spacing: 16) {
                 content
             }
+            .animation(.easeOut(duration: 0.3), value: model.state)
+            .shimmerCoordinateSpace()
             .padding(16)
             .padding(.bottom, 24)
         }
@@ -60,6 +72,12 @@ struct ExploreView: View {
         .refreshable { await model.load() }
         .screenHeader("Explore")
         .task { await model.load() }
+        .task {
+            try? await Task.sleep(for: .milliseconds(300))
+            showsPlaceholders = true
+        }
+        .onChange(of: model.state, revealIfReady)
+        .onChange(of: holdsReveal, revealIfReady)
         .onAppear { isVisible = true }
         .onDisappear { isVisible = false }
         .sensoryFeedback(.impact(weight: .light), trigger: previewing) { _, id in id != nil }
@@ -80,19 +98,15 @@ struct ExploreView: View {
         }
     }
 
+    private func revealIfReady() {
+        if model.state == .loaded && !holdsReveal { isRevealed = true }
+    }
+
     @ViewBuilder
     private var content: some View {
         switch model.state {
         case .loading:
-            LazyVGrid(columns: columns, spacing: 12) {
-                ForEach(0..<6, id: \.self) { _ in
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .fill(Theme.elevated)
-                        .aspectRatio(9 / 16, contentMode: .fit)
-                }
-            }
-            .redacted(reason: .placeholder)
-            .accessibilityLabel("Loading wallpapers")
+            if showsPlaceholders { ExploreSkeleton(columns: columns) }
         case .failed(let message):
             ContentUnavailableView {
                 Label("Couldn't load wallpapers", systemImage: "wifi.exclamationmark")
@@ -108,16 +122,18 @@ struct ExploreView: View {
                 .padding(.top, 60)
         case .loaded:
             categoryChips
+                .staggeredReveal(0, isRevealed: isRevealed)
             if let featured = model.featured {
                 Button { selection = featured } label: {
                     FeaturedCard(wallpaper: featured, isPlaying: isVisible && selection == nil && UIAccessibility.isVideoAutoplayEnabled)
                 }
                 .buttonStyle(CardPressStyle())
                 .zoomSource(id: featured.id, in: zoom, cornerRadius: 28)
+                .staggeredReveal(1, isRevealed: isRevealed)
                 .accessibilityIdentifier("featured-card")
             }
             LazyVGrid(columns: columns, spacing: 12) {
-                ForEach(model.visibleWallpapers) { wallpaper in
+                ForEach(Array(model.visibleWallpapers.enumerated()), id: \.element.id) { index, wallpaper in
                     Button {
                         if previewedCard == wallpaper.id { previewedCard = nil } else { selection = wallpaper }
                     } label: {
@@ -128,6 +144,8 @@ struct ExploreView: View {
                         if isHeld { previewing = wallpaper.id } else if previewing == wallpaper.id { previewing = nil }
                     })
                     .zoomSource(id: wallpaper.id, in: zoom, cornerRadius: 24)
+                    // Row plus column, so the cards arrive in a diagonal wave like the loading sheen.
+                    .staggeredReveal(2 + index / 2 + index % 2, isRevealed: isRevealed)
                     .accessibilityIdentifier("catalog-card")
                 }
             }
@@ -167,6 +185,31 @@ struct ExploreView: View {
     }
 }
 
+private extension View {
+    func staggeredReveal(_ step: Int, isRevealed: Bool) -> some View {
+        modifier(StaggeredReveal(step: step, isRevealed: isRevealed))
+    }
+}
+
+/// Rises and fades in a beat after the step before it. Reduce Motion keeps just the fade, all at once.
+private struct StaggeredReveal: ViewModifier {
+    var step: Int
+    var isRevealed: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        let isMoving = !isRevealed && !reduceMotion
+        content
+            .opacity(isRevealed ? 1 : 0)
+            .offset(y: isMoving ? 16 : 0)
+            .scaleEffect(isMoving ? 0.97 : 1)
+            .animation(reduceMotion
+                ? .easeOut(duration: 0.25)
+                : .spring(duration: 0.5, bounce: 0.1).delay(Double(min(step, 8)) * 0.06),
+                value: isRevealed)
+    }
+}
+
 /// Shrinks on touch-down, so a card answers the finger before anything opens.
 private struct CardPressStyle: ButtonStyle {
     /// Holding a card plays its motion until the finger lifts, like a Live Photo in Photos.
@@ -194,8 +237,57 @@ private struct WallpaperThumbnail: View {
                 image.resizable().scaledToFill()
             } else {
                 AuroraView(isAnimated: false).opacity(0.35)
+                    .shimmer(phase.error == nil)
             }
         }
+    }
+}
+
+/// The loaded page's layout in placeholder form, so nothing jumps when the wallpapers arrive.
+private struct ExploreSkeleton: View {
+    let columns: [GridItem]
+    private let chipWidths: [CGFloat] = [52, 92, 76, 100]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 8) {
+                ForEach(chipWidths.indices, id: \.self) { index in
+                    Capsule().fill(Theme.placeholder).frame(width: chipWidths[index], height: 40).shimmer()
+                }
+            }
+            card(cornerRadius: 28, titleWidth: 0.5)
+                .aspectRatio(4 / 5, contentMode: .fit)
+            LazyVGrid(columns: columns, spacing: 12) {
+                ForEach(0..<4, id: \.self) { index in
+                    card(cornerRadius: 24, titleWidth: index.isMultiple(of: 2) ? 0.7 : 0.55)
+                        .aspectRatio(9 / 16, contentMode: .fit)
+                }
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Loading wallpapers")
+    }
+
+    /// Bars where the duration pill and caption will sit.
+    private func card(cornerRadius: CGFloat, titleWidth: CGFloat) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        return shape.fill(Theme.placeholder)
+            .overlay(alignment: .topLeading) {
+                Capsule().fill(Theme.fill).frame(width: 52, height: 24).padding(10)
+            }
+            .overlay(alignment: .bottomLeading) {
+                GeometryReader { geometry in
+                    VStack(alignment: .leading, spacing: 8) {
+                        Capsule().fill(Theme.fill).frame(width: geometry.size.width * titleWidth, height: 12)
+                        Capsule().fill(Theme.fill).frame(width: geometry.size.width * 0.35, height: 10)
+                    }
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    .padding(14)
+                }
+            }
+            .shimmer()
+            .clipShape(shape)
+            .overlay(shape.strokeBorder(Theme.specularRim, lineWidth: 1))
     }
 }
 
