@@ -13,8 +13,14 @@ final class ExploreModel {
         return wallpapers.map(\.category).filter { seen.insert($0).inserted }
     }
 
+    /// Leads "All" as a large, playing card; the first wallpaper in the catalog's Featured category.
+    var featured: Wallpaper? {
+        guard selectedCategory == nil else { return nil }
+        return wallpapers.first { $0.category.localizedCaseInsensitiveCompare("Featured") == .orderedSame }
+    }
+
     var visibleWallpapers: [Wallpaper] {
-        guard let selectedCategory else { return wallpapers }
+        guard let selectedCategory else { return wallpapers.filter { $0.id != featured?.id } }
         return wallpapers.filter { $0.category == selectedCategory }
     }
 
@@ -32,6 +38,12 @@ final class ExploreModel {
 struct ExploreView: View {
     @State private var model = ExploreModel()
     @State private var selection: Wallpaper?
+    /// The card being held down to preview its motion.
+    @GestureState private var previewing: Wallpaper.ID?
+    /// The release that ends a preview also counts as a tap, which shouldn't open the wallpaper.
+    /// Marked when the preview starts, because the tap fires before the preview's end is seen.
+    @State private var previewedCard: Wallpaper.ID?
+    @State private var isVisible = false
     @Namespace private var zoom
 
     private let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
@@ -48,6 +60,20 @@ struct ExploreView: View {
         .refreshable { await model.load() }
         .screenHeader("Explore")
         .task { await model.load() }
+        .onAppear { isVisible = true }
+        .onDisappear { isVisible = false }
+        .sensoryFeedback(.impact(weight: .light), trigger: previewing) { _, id in id != nil }
+        .onChange(of: previewing) { old, new in
+            if let new {
+                previewedCard = new
+            } else if let old {
+                // A drag off the card ends the preview without a tap, so the mark can't wait for one.
+                Task {
+                    try? await Task.sleep(for: .milliseconds(300))
+                    if previewedCard == old { previewedCard = nil }
+                }
+            }
+        }
         .sheet(item: $selection) { wallpaper in
             WallpaperDetailView(wallpaper: wallpaper)
                 .zoomTransition(from: wallpaper.id, in: zoom)
@@ -82,17 +108,44 @@ struct ExploreView: View {
                 .padding(.top, 60)
         case .loaded:
             categoryChips
+            if let featured = model.featured {
+                Button { selection = featured } label: {
+                    FeaturedCard(wallpaper: featured, isPlaying: isVisible && selection == nil && UIAccessibility.isVideoAutoplayEnabled)
+                }
+                .buttonStyle(CardPressStyle())
+                .zoomSource(id: featured.id, in: zoom, cornerRadius: 28)
+                .accessibilityIdentifier("featured-card")
+            }
             LazyVGrid(columns: columns, spacing: 12) {
                 ForEach(model.visibleWallpapers) { wallpaper in
-                    Button { selection = wallpaper } label: {
-                        CatalogCard(wallpaper: wallpaper)
+                    Button {
+                        if previewedCard == wallpaper.id { previewedCard = nil } else { selection = wallpaper }
+                    } label: {
+                        CatalogCard(wallpaper: wallpaper, isPreviewing: previewing == wallpaper.id)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(CardPressStyle())
+                    .simultaneousGesture(previewGesture(for: wallpaper))
                     .zoomSource(id: wallpaper.id, in: zoom, cornerRadius: 24)
                     .accessibilityIdentifier("catalog-card")
                 }
             }
+            if !model.visibleWallpapers.isEmpty {
+                Label("Touch and hold a wallpaper to preview its motion", systemImage: "hand.tap")
+                    .font(.labelMedium)
+                    .foregroundStyle(Theme.textSecondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 4)
+            }
         }
+    }
+
+    /// Holding a card plays its motion until the finger lifts, like a Live Photo in Photos.
+    private func previewGesture(for wallpaper: Wallpaper) -> some Gesture {
+        LongPressGesture(minimumDuration: 0.3, maximumDistance: 12)
+            .sequenced(before: DragGesture(minimumDistance: 0))
+            .updating($previewing) { value, state, _ in
+                if case .second(true, _) = value { state = wallpaper.id }
+            }
     }
 
     private var categoryChips: some View {
@@ -121,20 +174,78 @@ struct ExploreView: View {
     }
 }
 
+/// Shrinks on touch-down, so a card answers the finger before anything opens.
+private struct CardPressStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(.spring(duration: 0.25), value: configuration.isPressed)
+    }
+}
+
+private struct WallpaperThumbnail: View {
+    let wallpaper: Wallpaper
+
+    var body: some View {
+        AsyncImage(url: wallpaper.thumbnailURL, transaction: Transaction(animation: .easeOut(duration: 0.25))) { phase in
+            if let image = phase.image {
+                image.resizable().scaledToFill()
+            } else {
+                AuroraView(isAnimated: false).opacity(0.35)
+            }
+        }
+    }
+}
+
+/// The lead wallpaper, large and in motion, so Explore opens on something alive.
+private struct FeaturedCard: View {
+    let wallpaper: Wallpaper
+    var isPlaying: Bool
+
+    var body: some View {
+        Theme.lockScreen
+            .aspectRatio(4 / 5, contentMode: .fit)
+            .overlay {
+                WallpaperThumbnail(wallpaper: wallpaper)
+                    .overlay { LoopingVideoView(url: wallpaper.videoURL, isPlaying: isPlaying) }
+            }
+            .overlay(alignment: .topLeading) {
+                StatusPill(text: "FEATURED", dot: Theme.signalYellow, symbol: "star.fill")
+                    .padding(14)
+            }
+            .overlay(alignment: .bottom) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(wallpaper.title).typography(.headlineSmall).foregroundStyle(.white).lineLimit(1)
+                    Text(subtitle).font(.labelMedium.weight(.semibold)).foregroundStyle(Theme.onMediaSecondary).lineLimit(1)
+                }
+                .mediaCaption()
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).strokeBorder(Theme.specularRim, lineWidth: 1))
+            .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .environment(\.colorScheme, .dark)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Featured: \(wallpaper.title)")
+            .accessibilityAddTraits(.isButton)
+    }
+
+    private var subtitle: String {
+        let length = "\(wallpaper.durationSeconds.formatted(.number.precision(.fractionLength(1))))s live wallpaper"
+        guard let creator = wallpaper.creatorName else { return length }
+        return "\(length) · by \(creator)"
+    }
+}
+
 private struct CatalogCard: View {
     let wallpaper: Wallpaper
+    var isPreviewing = false
 
     var body: some View {
         Theme.lockScreen
             .aspectRatio(9 / 16, contentMode: .fit)
             .overlay {
-                AsyncImage(url: wallpaper.thumbnailURL, transaction: Transaction(animation: .easeOut(duration: 0.25))) { phase in
-                    if let image = phase.image {
-                        image.resizable().scaledToFill()
-                    } else {
-                        AuroraView(isAnimated: false).opacity(0.35)
-                    }
-                }
+                WallpaperThumbnail(wallpaper: wallpaper)
+                    .overlay { LoopingVideoView(url: wallpaper.videoURL, isPlaying: isPreviewing) }
             }
             .overlay(alignment: .topLeading) {
                 StatusPill(text: "\(wallpaper.durationSeconds.formatted(.number.precision(.fractionLength(1))))s", dot: Theme.signalYellow)

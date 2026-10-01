@@ -27,8 +27,6 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen:
           UIColorName: LaunchBackground
-          UIImageName: LaunchLogo
-          UIImageRespectsSafeAreaInsets: true
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         # Only standard HTTPS, so App Store Connect can skip the export compliance question.
         ITSAppUsesNonExemptEncryption: false

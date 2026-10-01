@@ -19,6 +19,7 @@ enum DemoAppearance {
 @main
 struct LiveWallApp: App {
     private let modelContainer = Self.makeModelContainer()
+    @State private var playsLaunchIntro = LaunchIntro.shouldPlay
 
     init() {
         // Catalog thumbnails are immutable, so a larger cache means they download once.
@@ -27,9 +28,14 @@ struct LiveWallApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootTabView()
-                .preferredColorScheme(DemoAppearance.override)
-                .tint(Theme.accent)
+            ZStack {
+                RootTabView(isLaunchIntroPlaying: playsLaunchIntro)
+                if playsLaunchIntro {
+                    LaunchIntroView { playsLaunchIntro = false }
+                }
+            }
+            .preferredColorScheme(DemoAppearance.override)
+            .tint(Theme.accent)
         }
         .modelContainer(modelContainer)
     }
