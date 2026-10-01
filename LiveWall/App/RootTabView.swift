@@ -53,7 +53,7 @@ struct RootTabView: View {
     private func screen(for tab: AppTab) -> some View {
         switch tab {
         case .explore: ExploreView(holdsReveal: isLaunchIntroPlaying)
-        case .create: CreateComingSoonView()
+        case .create: CreateView()
         case .convert: ConvertView()
         case .library: LibraryView { selection = .convert }
         }
