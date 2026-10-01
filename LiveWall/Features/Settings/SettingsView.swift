@@ -1,5 +1,11 @@
 import SwiftUI
 
+/// Public pages for the App Store listing and Settings. They're served from the repository's docs folder.
+enum AppLinks {
+    static let privacyPolicy = URL(string: "https://github.com/BuddhaNag12/glitter-live/blob/main/docs/privacy.md")!
+    static let support = URL(string: "https://github.com/BuddhaNag12/glitter-live/blob/main/docs/support.md")!
+}
+
 struct SettingsView: View {
     var onShowIntro: () -> Void = {}
 
@@ -33,6 +39,17 @@ struct SettingsView: View {
                     }
                     .glass(.surface, cornerRadius: 22)
 
+                    VStack(spacing: 0) {
+                        Link(destination: AppLinks.support) {
+                            rowLabel("Support", symbol: "questionmark.circle", opensWeb: true)
+                        }
+                        Divider().overlay(Theme.stroke)
+                        Link(destination: AppLinks.privacyPolicy) {
+                            rowLabel("Privacy Policy", symbol: "hand.raised", opensWeb: true)
+                        }
+                    }
+                    .glass(.surface, cornerRadius: 22)
+
                     Text("Glitter Live \(version)")
                         .font(.labelMedium)
                         .foregroundStyle(Theme.textTertiary)
@@ -58,12 +75,13 @@ struct SettingsView: View {
         Button(action: action) { rowLabel(title, symbol: symbol) }
     }
 
-    private func rowLabel(_ title: String, symbol: String) -> some View {
+    /// Rows that leave the app end in an outward arrow instead of a chevron.
+    private func rowLabel(_ title: String, symbol: String, opensWeb: Bool = false) -> some View {
         HStack(spacing: 12) {
             Image(systemName: symbol).foregroundStyle(Theme.accent).frame(width: 24)
             Text(title).typography(.bodyLarge).foregroundStyle(Theme.textPrimary)
             Spacer()
-            Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(Theme.textTertiary)
+            Image(systemName: opensWeb ? "arrow.up.forward" : "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(Theme.textTertiary)
         }
         .padding(.horizontal, 16)
         .frame(minHeight: 54)

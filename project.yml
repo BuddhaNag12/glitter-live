@@ -9,7 +9,7 @@ settings:
     SWIFT_VERSION: "6.0"
     SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
     SWIFT_APPROACHABLE_CONCURRENCY: YES
-    MARKETING_VERSION: "0.1.0"
+    MARKETING_VERSION: "1.0.0"
     CURRENT_PROJECT_VERSION: "1"
     DEVELOPMENT_TEAM: C3ZASV2S6N
     CODE_SIGN_STYLE: Automatic
@@ -22,10 +22,14 @@ targets:
       path: LiveWall/Info.plist
       properties:
         CFBundleDisplayName: Glitter Live
-        # Plain background: the launch intro paints the logo on from nothing.
+        # XcodeGen otherwise writes a fixed 1.0 (1), ignoring the version settings above.
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen:
           UIColorName: LaunchBackground
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        # Only standard HTTPS, so App Store Connect can skip the export compliance question.
+        ITSAppUsesNonExemptEncryption: false
         NSPhotoLibraryAddUsageDescription: Glitter Live saves the live wallpapers you create to your photo library.
         UIAppFonts: [Inter-Light.ttf, Inter-Regular.ttf, Inter-Medium.ttf, Inter-SemiBold.ttf, Inter-Bold.ttf]
     settings:
