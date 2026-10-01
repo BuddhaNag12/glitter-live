@@ -106,6 +106,7 @@ private struct GlassPanel: ViewModifier {
 // MARK: - Buttons
 
 /// The primary call to action: the blue-to-slate brand gradient, with a silver shine sweeping across once when it appears.
+/// Disabled, it becomes an outlined slate capsule, still visible on any background but plainly not tappable.
 struct KineticButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         KineticButton(configuration: configuration)
@@ -119,13 +120,12 @@ struct KineticButtonStyle: ButtonStyle {
             let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
             configuration.label
                 .font(.inter(18, .semibold, relativeTo: .headline))
-                .foregroundStyle(Theme.onAccent)
+                .foregroundStyle(isEnabled ? Theme.onAccent : Theme.textSecondary)
                 .frame(maxWidth: .infinity, minHeight: 58)
                 .padding(.horizontal, 16)
-                .background(Theme.accentGradient, in: shape)
+                .background { if isEnabled { shape.fill(Theme.accentGradient) } else { DisabledFill(shape: shape) } }
                 .overlay { if isEnabled { ShimmerSweep().clipShape(shape) } }
                 .scaleEffect(configuration.isPressed ? 0.97 : 1)
-                .opacity(isEnabled ? 1 : 0.45)
                 .animation(.spring(duration: 0.25), value: configuration.isPressed)
         }
     }
@@ -175,14 +175,24 @@ struct AccentCapsuleButtonStyle: ButtonStyle {
         var body: some View {
             configuration.label
                 .typography(.titleMedium)
-                .foregroundStyle(Theme.onAccent)
+                .foregroundStyle(isEnabled ? Theme.onAccent : Theme.textSecondary)
                 .padding(.horizontal, 18)
                 .frame(height: 44)
-                .background(Theme.accentGradient, in: Capsule())
+                .background { if isEnabled { Capsule().fill(Theme.accentGradient) } else { DisabledFill(shape: Capsule()) } }
                 .scaleEffect(configuration.isPressed ? 0.95 : 1)
-                .opacity(isEnabled ? 1 : 0.45)
                 .animation(.spring(duration: 0.2), value: configuration.isPressed)
         }
+    }
+}
+
+/// A faded gradient still reads as tappable, so disabled main buttons drop the color for a slate tint and outline.
+private struct DisabledFill<S: InsettableShape>: View {
+    let shape: S
+
+    var body: some View {
+        shape
+            .fill(Theme.slate.opacity(0.16))
+            .overlay(shape.strokeBorder(Theme.slate.opacity(0.4), lineWidth: 1))
     }
 }
 
