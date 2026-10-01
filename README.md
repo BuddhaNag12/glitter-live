@@ -40,13 +40,14 @@
 
 ## Features
 
-- **Explore**: a curated catalog of live wallpapers, served from Supabase, that saves to Photos as a Lock Screen-ready Live Photo in one tap.
+- **Explore**: a curated catalog of live wallpapers, served from Supabase, that saves to Photos as a Lock Screen-ready Live Photo in one tap. It opens on a playing Featured wallpaper, and touching and holding any wallpaper previews its motion.
 - **Video to Live Wallpaper**: pick any video, trim a 1–3 second moment, and save it as a Live Photo that plays on the Lock Screen when the iPhone wakes.
-- **Trim Studio**: filmstrip with trim handles, pinch-and-drag framing inside a Lock Screen preview (clock, widgets and quick actions), cover-frame picker, 0.5×–2× speed and a forward-and-back bounce.
+- **Trim Studio**: filmstrip with trim handles that preview the frame under your finger and stretch softly at their limits, a draggable cover-frame marker, pinch-and-drag framing inside a Lock Screen preview (clock, widgets and quick actions) that springs back with your finger's momentum, 0.5×–2× speed and a forward-and-back bounce.
 - **Sharp cover photo**: the still shown while the phone is locked is rendered from the original video at up to 1320 px wide, sharper than the motion clip.
 - **Library**: every wallpaper is kept in the app, so it can be previewed, saved to Photos again or deleted.
 - **Private by design**: only asks to *add* photos, never reads the library, and collects no data.
-- **Silver Shimmer design**: light and dark modes that follow the system, an obsidian dark mode lit by brand blue and silver, softly twinkling glitter, and native Liquid Glass on iOS 26+ with frosted fallbacks on iOS 17–25.
+- **Silver Shimmer design**: light and dark modes that follow the system, an obsidian dark mode lit by brand blue and silver, softly twinkling glitter, and native Liquid Glass on iOS 26+ with frosted fallbacks on iOS 17–25. A logo reveal plays as the app launches.
+- **Accessible**: Dynamic Type with size-tuned letter-spacing, Reduce Motion, Increase Contrast and Reduce Transparency are all supported.
 - Free, with no watermark.
 
 ## Lock Screen motion
@@ -101,26 +102,41 @@ xcodebuild test -project LiveWall.xcodeproj -scheme LiveWall \
 
 ```
 LiveWall/
-  App/            App entry point and tab bar
+  App/            App entry point, tab bar and launch intro
   Core/LivePhoto/ Video → Live Photo pipeline, saving and preview
-  DesignSystem/   Colors, type, glass components, Lock Screen overlay
+  DesignSystem/   Colors, type, glass components, motion, logo artwork, Lock Screen overlay
   Core/Catalog/   Supabase catalog client and downloads
   Features/       Explore, Convert, Library, Onboarding, Settings
   Resources/      Assets, fonts, privacy manifest
 LiveWallTests/    Unit tests
 LiveWallUITests/  On-device screenshot tests
-Branding/         Logo files
-scripts/          Icon and logo renderer, wallpaper upload tools
+Branding/         Logo files, layered SVGs and the Jitter logo reveal
+docs/             Privacy policy, support page, App Store listing, screenshots
+scripts/          Icon, logo and SVG renderer, wallpaper upload tools
 supabase/         Database migrations
 ```
 
 ## Roadmap
 
-- Create: generate live wallpapers from a text prompt or a photo
-  - the first 3 generations are free
-  - after that, each generation unlocks by watching a short ad, or with a one-time **Lifetime** purchase (₹399) for unlimited, ad-free generations
-- Animation and smoothness pass: profile hitches with Instruments, keep scrolling and transitions at 120 Hz on ProMotion, pause background effects when off screen, animate Library cards into their detail view, and tune springs and haptics consistently
-- App Store release
+### 1.0: built, not yet submitted
+
+- [x] Video to Live Wallpaper with Trim Studio, Library and Explore
+- [x] Design pass on Apple's fluid-interface guidance: interruptible springs, momentum, rubber-banding, press feedback, card-to-detail zoom transitions and consistent haptics
+- [x] Accessibility: Dynamic Type, Reduce Motion, Increase Contrast and Reduce Transparency
+- [x] Launch logo reveal
+- [x] Explore: playing Featured wallpaper and touch-and-hold motion preview
+- [x] Release prep: version 1.0.0, [privacy policy](docs/privacy.md), [support page](docs/support.md) and [App Store listing](docs/app-store.md)
+- [x] Launch time measured at about 270 ms to first frame on an iPhone 17 Pro
+- [ ] App Store submission: 6.9" screenshots, archive and upload
+- [ ] Refresh the README screenshots for the latest design
+
+### Next
+
+- **Create**: generate live wallpapers from a text prompt or a photo. Only a teaser screen exists so far, hidden behind `FeatureFlags.aiGeneration` until generation works end to end. Needs an AI video provider, a small server that keeps the provider's key out of the app, generation limits, and the Create screen from the design mockups.
+- **Pricing**: decide between the original plan (the first 3 generations free, then a short ad per generation or a one-time **Lifetime** purchase at ₹399) and the paywall mockup (weekly or yearly subscription plus credit packs).
+- **Explore extras** from the mockup: search, sort by New, and later like counts and Free/VIP badges (likes need backend support; badges need pricing).
+- **Trim Studio**: video stabilization (the mockup's Stabilize toggle).
+- **Smoothness**: allow 120 Hz on ProMotion (`CADisableMinimumFrameDurationOnPhone`), confirm background effects pause on tabs that aren't visible, and profile scrolling with Instruments.
 
 ## Acknowledgements
 
