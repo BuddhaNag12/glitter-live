@@ -25,6 +25,7 @@ struct RootTabView: View {
                 screen(for: tab)
                     // Convert always has a moving preview on screen.
                     .background { AppBackground(twinkles: tab != .convert) }
+                    .environment(\.isTabSelected, selection == tab)
                     .tabItem { Label(tab.title, systemImage: tab.symbol) }
                     .tag(tab)
             }

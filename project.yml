@@ -28,6 +28,8 @@ targets:
         UILaunchScreen:
           UIColorName: LaunchBackground
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        # Without this, custom animations are capped at 60 Hz on ProMotion iPhones.
+        CADisableMinimumFrameDurationOnPhone: true
         # Only standard HTTPS, so App Store Connect can skip the export compliance question.
         ITSAppUsesNonExemptEncryption: false
         NSPhotoLibraryAddUsageDescription: Glitter Live saves the live wallpapers you create to your photo library.
