@@ -132,8 +132,8 @@ supabase/         Database migrations
 
 ### Next
 
-- **Create**: generate live wallpapers from a text prompt or a photo. Only a teaser screen exists so far, hidden behind `FeatureFlags.aiGeneration` until generation works end to end. Needs an AI video provider, a small server that keeps the provider's key out of the app, generation limits, and the Create screen from the design mockups.
-- **Pricing**: decide between the original plan (the first 3 generations free, then a short ad per generation or a one-time **Lifetime** purchase at ₹399) and the paywall mockup (weekly or yearly subscription plus credit packs).
+- **Create** (in progress, [plan](docs/create-plan.md)): type a prompt, get a wallpaper image from FLUX.1 schnell, bring it to life as a 3-second clip with LTX-Video, and save it straight to the Library and Photos as a Live wallpaper. Hidden behind `FeatureFlags.aiGeneration` in release builds until it works end to end.
+- **Pricing**: one subscription. The first 5 generations are free, then each generation unlocks with a short rewarded ad (up to 10 a day). **Glitter Live Pro** (₹299 a month) removes ads and allows up to 100 generations a month. Explore and Convert stay free with no ads.
 - **Explore extras** from the mockup: search, sort by New, and later like counts and Free/VIP badges (likes need backend support; badges need pricing).
 - **Trim Studio**: video stabilization (the mockup's Stabilize toggle).
 - **Smoothness**: profile scrolling with Instruments. 120 Hz on ProMotion and pausing background effects on hidden tabs are done.
