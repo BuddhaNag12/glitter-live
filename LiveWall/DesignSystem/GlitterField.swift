@@ -5,12 +5,13 @@ import SwiftUI
 struct GlitterField: View {
     var isAnimated = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.isTabSelected) private var isTabSelected
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         // Twinkling is slow, so 15 fps looks smooth at a fraction of the cost.
         let holdsStill = reduceMotion || !isAnimated
-        TimelineView(.animation(minimumInterval: 1 / 15, paused: holdsStill)) { context in
+        TimelineView(.animation(minimumInterval: 1 / 15, paused: holdsStill || !isTabSelected)) { context in
             let time = context.date.timeIntervalSinceReferenceDate
             Canvas { canvas, size in
                 let isDark = colorScheme == .dark

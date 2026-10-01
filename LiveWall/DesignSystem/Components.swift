@@ -33,6 +33,8 @@ struct GlassGroup<Content: View>: View {
 extension EnvironmentValues {
     /// True inside a glass surface, so nested elements draw as fills instead of more glass.
     @Entry var isOnGlass = false
+    /// False on tabs that aren't selected, so their background effects stop redrawing.
+    @Entry var isTabSelected = true
 }
 
 private struct LiquidGlass<S: InsettableShape>: ViewModifier {
