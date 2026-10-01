@@ -5,6 +5,7 @@ struct LivePhotoResultView: View {
     let editor: ConvertEditor
     let result: LivePhotoResult
     let saved: Bool
+    var newTitle = "New Video"
     var onNewVideo: () -> Void
 
     @State private var livePhoto: PHLivePhoto?
@@ -61,7 +62,7 @@ struct LivePhotoResultView: View {
                             Label("Edit Again", systemImage: "slider.horizontal.3").frame(maxWidth: .infinity)
                         }
                         Button(action: onNewVideo) {
-                            Label("New Video", systemImage: "plus").frame(maxWidth: .infinity)
+                            Label(newTitle, systemImage: "plus").frame(maxWidth: .infinity)
                         }
                     }
                     .buttonStyle(GlassPillButtonStyle())

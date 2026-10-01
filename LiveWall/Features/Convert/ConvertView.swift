@@ -24,7 +24,7 @@ struct ConvertView: View {
     var body: some View {
         VStack(spacing: 0) {
             if let editor {
-                content(for: editor)
+                ConvertFlowView(editor: editor, onClose: close)
             } else {
                 emptyState.transition(.screen(reduceMotion: reduceMotion))
             }
@@ -48,28 +48,6 @@ struct ConvertView: View {
             Button("OK") { importError = nil }
         } message: {
             Text(importError ?? "")
-        }
-    }
-
-    @ViewBuilder
-    private func content(for editor: ConvertEditor) -> some View {
-        switch editor.phase {
-        case .finished(let result, let saved):
-            LivePhotoResultView(editor: editor, result: result, saved: saved, onNewVideo: close)
-                .transition(.screen(reduceMotion: reduceMotion))
-        case .unavailable(let message):
-            ContentUnavailableView {
-                Label("Can't use this video", systemImage: "exclamationmark.triangle")
-            } description: {
-                Text(message)
-            } actions: {
-                Button("Choose Another", action: close).buttonStyle(GlassPillButtonStyle())
-            }
-            .frame(maxHeight: .infinity)
-            .transition(.screen(reduceMotion: reduceMotion))
-        default:
-            TrimStudioView(editor: editor, onClose: close)
-                .transition(.screen(reduceMotion: reduceMotion))
         }
     }
 
@@ -150,6 +128,35 @@ struct ConvertView: View {
         editor?.stop()
         if let url = editor?.sourceURL { try? FileManager.default.removeItem(at: url) }
         editor = nil
+    }
+}
+
+/// Trim Studio, then the result, for a video that's been picked or generated.
+struct ConvertFlowView: View {
+    let editor: ConvertEditor
+    var newTitle = "New Video"
+    var onClose: () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        switch editor.phase {
+        case .finished(let result, let saved):
+            LivePhotoResultView(editor: editor, result: result, saved: saved, newTitle: newTitle, onNewVideo: onClose)
+                .transition(.screen(reduceMotion: reduceMotion))
+        case .unavailable(let message):
+            ContentUnavailableView {
+                Label("Can't use this video", systemImage: "exclamationmark.triangle")
+            } description: {
+                Text(message)
+            } actions: {
+                Button("Choose Another", action: onClose).buttonStyle(GlassPillButtonStyle())
+            }
+            .frame(maxHeight: .infinity)
+            .transition(.screen(reduceMotion: reduceMotion))
+        default:
+            TrimStudioView(editor: editor, onClose: onClose)
+                .transition(.screen(reduceMotion: reduceMotion))
+        }
     }
 }
 
