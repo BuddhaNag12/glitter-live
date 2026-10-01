@@ -2,6 +2,9 @@ import SwiftData
 import SwiftUI
 
 struct RootTabView: View {
+    /// Onboarding is a full-screen cover, which would appear above the launch intro, so it waits for it.
+    var isLaunchIntroPlaying = false
+
     @State private var selection: AppTab = Self.initialTab
     @State private var showsSettings = false
     @State private var showsIntroAfterSettings = false
@@ -34,7 +37,7 @@ struct RootTabView: View {
         .sheet(isPresented: $showsSettings, onDismiss: showIntroIfRequested) {
             SettingsView { showsIntroAfterSettings = true }
         }
-        .fullScreenCover(isPresented: Binding(get: { !hasCompletedOnboarding }, set: { hasCompletedOnboarding = !$0 })) {
+        .fullScreenCover(isPresented: Binding(get: { !hasCompletedOnboarding && !isLaunchIntroPlaying }, set: { hasCompletedOnboarding = !$0 })) {
             OnboardingView { hasCompletedOnboarding = true }
         }
     }

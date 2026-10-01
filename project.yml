@@ -22,10 +22,9 @@ targets:
       path: LiveWall/Info.plist
       properties:
         CFBundleDisplayName: Glitter Live
+        # Plain background: the launch intro paints the logo on from nothing.
         UILaunchScreen:
           UIColorName: LaunchBackground
-          UIImageName: LaunchLogo
-          UIImageRespectsSafeAreaInsets: true
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         NSPhotoLibraryAddUsageDescription: Glitter Live saves the live wallpapers you create to your photo library.
         UIAppFonts: [Inter-Light.ttf, Inter-Regular.ttf, Inter-Medium.ttf, Inter-SemiBold.ttf, Inter-Bold.ttf]
