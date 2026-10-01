@@ -39,7 +39,7 @@ struct ExploreView: View {
     @State private var model = ExploreModel()
     @State private var selection: Wallpaper?
     /// The card being held down to preview its motion.
-    @GestureState private var previewing: Wallpaper.ID?
+    @State private var previewing: Wallpaper.ID?
     /// The release that ends a preview also counts as a tap, which shouldn't open the wallpaper.
     /// Marked when the preview starts, because the tap fires before the preview's end is seen.
     @State private var previewedCard: Wallpaper.ID?
@@ -123,8 +123,10 @@ struct ExploreView: View {
                     } label: {
                         CatalogCard(wallpaper: wallpaper, isPreviewing: previewing == wallpaper.id)
                     }
-                    .buttonStyle(CardPressStyle())
-                    .simultaneousGesture(previewGesture(for: wallpaper))
+                    // The button's own press, unlike an added gesture, gives way to scrolling.
+                    .buttonStyle(CardPressStyle { isHeld in
+                        if isHeld { previewing = wallpaper.id } else if previewing == wallpaper.id { previewing = nil }
+                    })
                     .zoomSource(id: wallpaper.id, in: zoom, cornerRadius: 24)
                     .accessibilityIdentifier("catalog-card")
                 }
@@ -137,15 +139,6 @@ struct ExploreView: View {
                     .padding(.top, 4)
             }
         }
-    }
-
-    /// Holding a card plays its motion until the finger lifts, like a Live Photo in Photos.
-    private func previewGesture(for wallpaper: Wallpaper) -> some Gesture {
-        LongPressGesture(minimumDuration: 0.3, maximumDistance: 12)
-            .sequenced(before: DragGesture(minimumDistance: 0))
-            .updating($previewing) { value, state, _ in
-                if case .second(true, _) = value { state = wallpaper.id }
-            }
     }
 
     private var categoryChips: some View {
@@ -176,10 +169,19 @@ struct ExploreView: View {
 
 /// Shrinks on touch-down, so a card answers the finger before anything opens.
 private struct CardPressStyle: ButtonStyle {
+    /// Holding a card plays its motion until the finger lifts, like a Live Photo in Photos.
+    var onHold: ((Bool) -> Void)?
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .animation(.spring(duration: 0.25), value: configuration.isPressed)
+            .task(id: configuration.isPressed) {
+                guard let onHold else { return }
+                guard configuration.isPressed else { return onHold(false) }
+                try? await Task.sleep(for: .seconds(0.3))
+                if !Task.isCancelled { onHold(true) }
+            }
     }
 }
 

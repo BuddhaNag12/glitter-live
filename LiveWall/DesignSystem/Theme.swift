@@ -80,7 +80,8 @@ extension Color {
 
     init(light: UInt32, lightOpacity: Double = 1, dark: UInt32, darkOpacity: Double = 1, increased: ContrastVariant? = nil) {
         let standard = ContrastVariant(light: light, lightOpacity: lightOpacity, dark: dark, darkOpacity: darkOpacity)
-        self.init(uiColor: UIColor { traits in
+        // SwiftUI can resolve colors on its render thread, so the provider mustn't inherit main-actor isolation.
+        self.init(uiColor: UIColor { @Sendable traits in
             let variant = traits.accessibilityContrast == .high ? increased ?? standard : standard
             return traits.userInterfaceStyle == .dark
                 ? UIColor(hex: variant.dark, alpha: variant.darkOpacity)
@@ -98,7 +99,7 @@ nonisolated struct ContrastVariant: Sendable {
 }
 
 extension UIColor {
-    convenience init(hex: UInt32, alpha: Double = 1) {
+    nonisolated convenience init(hex: UInt32, alpha: Double = 1) {
         self.init(
             red: CGFloat((hex >> 16) & 0xFF) / 255,
             green: CGFloat((hex >> 8) & 0xFF) / 255,
