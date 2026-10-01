@@ -52,8 +52,12 @@ struct CreateView: View {
                 AllowanceBanner(access: model.allowance.access)
                 promptCard
                 onTheGoToggle
+                // Right after the settings it acts on; the page fits on one screen with the styles folded away.
+                generateButton
+                    .padding(.top, 4)
             }
             .padding(16)
+            .padding(.bottom, 24)
             // Taps between the cards land here and put the keyboard away; taps on controls still reach them.
             .background {
                 Color.clear
@@ -63,13 +67,6 @@ struct CreateView: View {
         }
         .scrollIndicators(.hidden)
         .scrollDismissesKeyboard(.interactively)
-        // Pinned, so the main action is always in reach, above the tab bar or the keyboard.
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            generateButton
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-                .padding(.bottom, 12)
-        }
     }
 
     private var promptCard: some View {
