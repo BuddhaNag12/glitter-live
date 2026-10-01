@@ -3,7 +3,7 @@ import CoreGraphics
 import ImageIO
 import UniformTypeIdentifiers
 
-// Usage: swift scripts/render-icon.swift <output-dir> [icon|logo|appbar]
+// Usage: swift scripts/render-icon.swift <output-dir> [icon|logo|appbar|svg]
 let outputDir = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
 try? FileManager.default.createDirectory(at: outputDir, withIntermediateDirectories: true)
 
@@ -18,7 +18,7 @@ import CoreText
 let brandBlue: UInt32 = 0x3B82F6, brandSlate: UInt32 = 0x64748B, ink: UInt32 = 0x0F172A, night: UInt32 = 0x0B1120
 
 /// A four-point glint: the "glitter" in the brand. Solid fill, no effects.
-func drawSparkle(_ ctx: CGContext, at c: CGPoint, radius r: CGFloat, color: CGColor) {
+func sparklePath(at c: CGPoint, radius r: CGFloat) -> CGPath {
     let waist = r * 0.14
     let path = CGMutablePath()
     path.move(to: CGPoint(x: c.x, y: c.y + r))
@@ -26,7 +26,12 @@ func drawSparkle(_ ctx: CGContext, at c: CGPoint, radius r: CGFloat, color: CGCo
     path.addQuadCurve(to: CGPoint(x: c.x, y: c.y - r), control: CGPoint(x: c.x + waist, y: c.y - waist))
     path.addQuadCurve(to: CGPoint(x: c.x - r, y: c.y), control: CGPoint(x: c.x - waist, y: c.y - waist))
     path.addQuadCurve(to: CGPoint(x: c.x, y: c.y + r), control: CGPoint(x: c.x - waist, y: c.y + waist))
-    ctx.addPath(path)
+    path.closeSubpath()
+    return path
+}
+
+func drawSparkle(_ ctx: CGContext, at c: CGPoint, radius r: CGFloat, color: CGColor) {
+    ctx.addPath(sparklePath(at: c, radius: r))
     ctx.setFillColor(color)
     ctx.fillPath()
 }
@@ -233,6 +238,118 @@ func renderLaunchLogo(pixels: Int, onDark: Bool, name: String) {
     writePNG(ctx, name)
 }
 
+// MARK: - Layered SVG
+
+/// Vector logo with every part on its own named layer, for motion tools like Jitter.
+enum SVG {
+    static func pathData(_ path: CGPath, height: CGFloat) -> String {
+        var d = ""
+        func p(_ point: CGPoint) -> String { String(format: "%.2f %.2f", point.x, height - point.y) }
+        path.applyWithBlock { element in
+            let e = element.pointee
+            switch e.type {
+            case .moveToPoint: d += "M\(p(e.points[0]))"
+            case .addLineToPoint: d += "L\(p(e.points[0]))"
+            case .addQuadCurveToPoint: d += "Q\(p(e.points[0])) \(p(e.points[1]))"
+            case .addCurveToPoint: d += "C\(p(e.points[0])) \(p(e.points[1])) \(p(e.points[2]))"
+            case .closeSubpath: d += "Z"
+            @unknown default: break
+            }
+        }
+        return d
+    }
+
+    static func hex(_ value: UInt32) -> String { String(format: "#%06X", value) }
+
+    static func circle(_ rect: CGRect, height: CGFloat) -> String {
+        String(format: "cx=\"%.2f\" cy=\"%.2f\" r=\"%.2f\"", rect.midX, height - rect.midY, rect.width / 2)
+    }
+
+    static func mark(center: CGPoint, scale s: CGFloat, theme: Theme, height h: CGFloat) -> String {
+        let starColor = theme == .dark ? "#FFFFFF" : hex(ink)
+        var out = "<g id=\"mark\">\n"
+        out += "  <g id=\"enso\" fill=\"\(hex(brandBlue))\">\n"
+        out += "    <path id=\"enso-stroke\" d=\"\(pathData(ensoPath(center: center, scale: s), height: h))\"/>\n"
+        out += "    <circle id=\"enso-head\" \(circle(ensoHead(center: center, scale: s), height: h))/>\n"
+        out += "  </g>\n"
+        out += "  <g id=\"dots\" fill=\"\(hex(brandSlate))\">\n"
+        for i in 0..<28 {
+            // Numbered clockwise from the ensō's head, so a stagger follows the brush.
+            let angle = CGFloat.pi * 0.62 - CGFloat(i) / 28 * 2 * .pi
+            let point = CGPoint(x: center.x + cos(angle) * 292 * s, y: center.y + sin(angle) * 292 * s)
+            let r = 9 * s
+            out += "    <circle id=\"dot-\(String(format: "%02d", i + 1))\" \(circle(CGRect(x: point.x - r, y: point.y - r, width: 2 * r, height: 2 * r), height: h))/>\n"
+        }
+        out += "  </g>\n"
+        out += "  <path id=\"star\" fill=\"\(starColor)\" d=\"\(pathData(sparklePath(at: center, radius: 200 * s), height: h))\"/>\n"
+        out += "  <path id=\"sparkle-blue\" fill=\"\(hex(brandBlue))\" d=\"\(pathData(sparklePath(at: CGPoint(x: center.x + 150 * s, y: center.y + 150 * s), radius: 62 * s), height: h))\"/>\n"
+        out += "  <path id=\"sparkle-slate\" fill=\"\(hex(brandSlate))\" d=\"\(pathData(sparklePath(at: CGPoint(x: center.x - 138 * s, y: center.y - 150 * s), radius: 38 * s), height: h))\"/>\n"
+        return out + "</g>\n"
+    }
+
+    /// One path per letter, so a motion tool can stagger them.
+    static func word(_ string: String, id: String, font: CTFont, origin: CGPoint, color: String, height h: CGFloat) -> String {
+        let line = CTLineCreateWithAttributedString(NSAttributedString(string: string, attributes: [.init(kCTFontAttributeName as String): font]))
+        var out = "  <g id=\"\(id)\" fill=\"\(color)\">\n"
+        var index = 0
+        for run in (CTLineGetGlyphRuns(line) as! [CTRun]) {
+            let count = CTRunGetGlyphCount(run)
+            var glyphs = [CGGlyph](repeating: 0, count: count)
+            var positions = [CGPoint](repeating: .zero, count: count)
+            CTRunGetGlyphs(run, CFRange(location: 0, length: count), &glyphs)
+            CTRunGetPositions(run, CFRange(location: 0, length: count), &positions)
+            let characters = Array(string)
+            for (glyph, position) in zip(glyphs, positions) {
+                guard let glyphPath = CTFontCreatePathForGlyph(font, glyph, nil) else { index += 1; continue }
+                var move = CGAffineTransform(translationX: origin.x + position.x, y: origin.y + position.y)
+                let placed = glyphPath.copy(using: &move)!
+                let letter = characters[index] == "\u{0131}" ? "i" : String(characters[index])
+                out += "    <path id=\"\(id)-\(index + 1)-\(letter)\" d=\"\(pathData(placed, height: h))\"/>\n"
+                index += 1
+            }
+        }
+        return out + "  </g>\n"
+    }
+
+    static func wordmark(origin: CGPoint, theme: Theme, height h: CGFloat) -> String {
+        let font = CTFontCreateWithName("Inter-Bold" as CFString, wordmarkSize, nil)
+        let glitterLine = textLine("Gl\u{0131}tter", font: font).1
+        let glitterWidth = CTLineGetTypographicBounds(glitterLine, nil, nil, nil)
+        let iStart = CTLineGetOffsetForStringIndex(glitterLine, 2, nil)
+        let iEnd = CTLineGetOffsetForStringIndex(glitterLine, 3, nil)
+        let glint = sparklePath(at: CGPoint(x: origin.x + (iStart + iEnd) / 2, y: origin.y + CTFontGetXHeight(font) + wordmarkSize * 0.2), radius: wordmarkSize * 0.15)
+        var out = "<g id=\"wordmark\">\n"
+        out += word("Gl\u{0131}tter", id: "glitter", font: font, origin: origin, color: theme == .dark ? "#FFFFFF" : hex(ink), height: h)
+        out += word("Live", id: "live", font: font, origin: CGPoint(x: origin.x + glitterWidth + wordGap, y: origin.y), color: hex(brandBlue), height: h)
+        out += "  <path id=\"i-sparkle\" fill=\"\(hex(brandBlue))\" d=\"\(pathData(glint, height: h))\"/>\n"
+        return out + "</g>\n"
+    }
+
+    static func write(_ body: String, width: CGFloat, height: CGFloat, name: String) {
+        let svg = """
+        <svg xmlns="http://www.w3.org/2000/svg" width="\(Int(width))" height="\(Int(height))" viewBox="0 0 \(Int(width)) \(Int(height))">
+        \(body)</svg>
+
+        """
+        try! svg.write(to: outputDir.appendingPathComponent(name), atomically: true, encoding: .utf8)
+        print(name)
+    }
+
+    /// Same geometry as the horizontal PNG lockup, on a transparent canvas.
+    static func renderHorizontal(theme: Theme, name: String) {
+        let font = CTFontCreateWithName("Inter-Bold" as CFString, wordmarkSize, nil)
+        let markSize: CGFloat = 760, padding: CGFloat = 120
+        let width = padding * 2 + markSize + 70 + wordmarkWidth(), height = markSize + padding * 2
+        let body = mark(center: CGPoint(x: padding + markSize / 2, y: height / 2), scale: markSize / 1024, theme: theme, height: height)
+            + wordmark(origin: CGPoint(x: padding + markSize + 70, y: height / 2 - CTFontGetCapHeight(font) / 2), theme: theme, height: height)
+        write(body, width: width, height: height, name: name)
+    }
+
+    static func renderMark(theme: Theme, name: String) {
+        write(mark(center: CGPoint(x: 512, y: 512), scale: 1, theme: theme, height: 1024), width: 1024, height: 1024, name: name)
+    }
+}
+
 // MARK: - Entry point
 
 let mode = CommandLine.arguments.count > 2 ? CommandLine.arguments[2] : "icon"
@@ -246,6 +363,12 @@ if mode == "logo" {
     renderLogo(layout: .stacked, theme: .dark, background: true, name: "GlitterLive-Logo-Stacked-Dark.png")
     renderMark(theme: .light, background: true, name: "GlitterLive-Mark-Light.png")
     renderMark(theme: .dark, background: true, name: "GlitterLive-Mark-Dark.png")
+} else if mode == "svg" {
+    registerInter()
+    SVG.renderHorizontal(theme: .light, name: "GlitterLive-Logo-Horizontal-Light.svg")
+    SVG.renderHorizontal(theme: .dark, name: "GlitterLive-Logo-Horizontal-Dark.svg")
+    SVG.renderMark(theme: .light, name: "GlitterLive-Mark-Light.svg")
+    SVG.renderMark(theme: .dark, name: "GlitterLive-Mark-Dark.svg")
 } else if mode == "appbar" {
     registerInter()
     renderAppBarLogo(theme: .light, url: outputDir.appendingPathComponent("BrandLogo-Light.pdf"))
