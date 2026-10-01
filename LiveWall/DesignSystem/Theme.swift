@@ -7,6 +7,8 @@ enum Theme {
     static let background = Color(light: 0xF8FAFC, dark: 0x090C12)
     static let surface = Color(light: 0xFFFFFF, dark: 0x121722)
     static let elevated = Color(light: 0xF1F5F9, dark: 0x1A202B)
+    /// Loading placeholders. A step deeper than `elevated` in light mode, which would vanish into the background.
+    static let placeholder = Color(light: 0xE2E8F0, lightOpacity: 0.8, dark: 0x1A202B)
     static let border = Color(light: 0xE2E8F0, dark: 0xFFFFFF, darkOpacity: 0.10,
                               increased: .init(light: 0x64748B, dark: 0xFFFFFF, darkOpacity: 0.45))
     /// Controls and rows sitting on a glass panel.

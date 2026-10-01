@@ -40,7 +40,7 @@
 
 ## Features
 
-- **Explore**: a curated catalog of live wallpapers, served from Supabase, that saves to Photos as a Lock Screen-ready Live Photo in one tap. It opens on a playing Featured wallpaper, and touching and holding any wallpaper previews its motion.
+- **Explore**: the first tab, a curated catalog of live wallpapers, served from Supabase, that saves to Photos as a Lock Screen-ready Live Photo in one tap. It opens on a playing Featured wallpaper, and touching and holding any wallpaper previews its motion. While the catalog loads, shimmering placeholders hold the page's shape, and the cards rise into place in a wave when it arrives.
 - **Video to Live Wallpaper**: pick any video, trim a 1–3 second moment, and save it as a Live Photo that plays on the Lock Screen when the iPhone wakes.
 - **Trim Studio**: filmstrip with trim handles that preview the frame under your finger and stretch softly at their limits, a draggable cover-frame marker, pinch-and-drag framing inside a Lock Screen preview (clock, widgets and quick actions) that springs back with your finger's momentum, 0.5×–2× speed and a forward-and-back bounce.
 - **Sharp cover photo**: the still shown while the phone is locked is rendered from the original video at up to 1320 px wide, sharper than the motion clip.
@@ -136,7 +136,7 @@ supabase/         Database migrations
 - **Pricing**: decide between the original plan (the first 3 generations free, then a short ad per generation or a one-time **Lifetime** purchase at ₹399) and the paywall mockup (weekly or yearly subscription plus credit packs).
 - **Explore extras** from the mockup: search, sort by New, and later like counts and Free/VIP badges (likes need backend support; badges need pricing).
 - **Trim Studio**: video stabilization (the mockup's Stabilize toggle).
-- **Smoothness**: allow 120 Hz on ProMotion (`CADisableMinimumFrameDurationOnPhone`), confirm background effects pause on tabs that aren't visible, and profile scrolling with Instruments.
+- **Smoothness**: profile scrolling with Instruments. 120 Hz on ProMotion and pausing background effects on hidden tabs are done.
 
 ## Acknowledgements
 

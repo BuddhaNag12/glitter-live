@@ -15,7 +15,7 @@ struct RootTabView: View {
         #if DEBUG
         if let tab = DemoLaunch.initialTab.flatMap(AppTab.init(rawValue:)), AppTab.visible.contains(tab) { return tab }
         #endif
-        return .convert
+        return .explore
     }
 
     var body: some View {
@@ -52,7 +52,7 @@ struct RootTabView: View {
     @ViewBuilder
     private func screen(for tab: AppTab) -> some View {
         switch tab {
-        case .explore: ExploreView()
+        case .explore: ExploreView(holdsReveal: isLaunchIntroPlaying)
         case .create: CreateComingSoonView()
         case .convert: ConvertView()
         case .library: LibraryView { selection = .convert }
