@@ -22,6 +22,7 @@ struct LiveWallApp: App {
     @State private var playsLaunchIntro = LaunchIntro.shouldPlay
     @State private var conversions: ConversionAllowance
     @State private var purchases: Purchases
+    @State private var incoming = IncomingVideo()
 
     init() {
         let conversions = ConversionAllowance()
@@ -43,6 +44,7 @@ struct LiveWallApp: App {
             .tint(Theme.accent)
             .environment(conversions)
             .environment(purchases)
+            .environment(incoming)
             .task { await purchases.load() }
             .task { if FeatureFlags.showsAds { await RewardedAds.shared.warmUp() } }
         }

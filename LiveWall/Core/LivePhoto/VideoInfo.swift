@@ -23,9 +23,7 @@ nonisolated struct PickedVideo: Transferable {
 
     static var transferRepresentation: some TransferRepresentation {
         FileRepresentation(importedContentType: .movie) { received in
-            let directory = URL.temporaryDirectory.appending(path: "Imports", directoryHint: .isDirectory)
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            let destination = directory.appending(path: "\(UUID().uuidString).\(received.file.pathExtension)")
+            let destination = try ImportedVideos.destination(pathExtension: received.file.pathExtension)
             try FileManager.default.copyItem(at: received.file, to: destination)
             return PickedVideo(url: destination)
         }

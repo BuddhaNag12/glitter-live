@@ -9,6 +9,8 @@ struct RootTabView: View {
     @State private var showsSettings = false
     @State private var showsIntroAfterSettings = false
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(IncomingVideo.self) private var incoming
     @AppStorage(OnboardingState.completedKey) private var hasCompletedOnboarding = false
 
     private static var initialTab: AppTab {
@@ -33,6 +35,10 @@ struct RootTabView: View {
         .tint(Theme.accent)
         .modifier(MinimizingTabBar())
         .task { CreationLibrary(context: modelContext).removeOrphanedFiles() }
+        // A video shared from another app opens in Convert the next time the app comes forward.
+        .onChange(of: scenePhase, initial: true) { _, phase in
+            if phase == .active, incoming.checkInbox() { selection = .convert }
+        }
         .environment(\.showSettings, SettingsAction { showsSettings = true })
         // The intro is a full-screen cover, which can only appear once the Settings sheet has gone.
         .sheet(isPresented: $showsSettings, onDismiss: showIntroIfRequested) {
