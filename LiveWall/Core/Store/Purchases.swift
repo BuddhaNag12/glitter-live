@@ -11,6 +11,8 @@ final class Purchases {
     private(set) var unlimitedConversions: Product?
     private(set) var ownsUnlimitedConversions = false
     private(set) var isPurchasing = false
+    /// Bumped when a purchase or restore unlocks Convert just now, so the app can celebrate that moment only.
+    private(set) var unlockCount = 0
     var message: String?
 
     @ObservationIgnored private let conversions: ConversionAllowance
@@ -56,6 +58,7 @@ final class Purchases {
                 }
                 await transaction.finish()
                 await refreshEntitlements()
+                if ownsUnlimitedConversions { unlockCount += 1 }
                 return ownsUnlimitedConversions
             case .pending:
                 message = "Your purchase is waiting for approval. Convert unlocks as soon as it's approved."
@@ -69,10 +72,19 @@ final class Purchases {
         }
     }
 
+    #if DEBUG
+    /// Plays the unlock celebration without buying anything, since the product only exists when run from Xcode.
+    func previewUnlockCelebration() {
+        unlockCount += 1
+    }
+    #endif
+
     func restore() async {
         do {
+            let ownedBefore = ownsUnlimitedConversions
             try await AppStore.sync()
             await refreshEntitlements()
+            if ownsUnlimitedConversions && !ownedBefore { unlockCount += 1 }
             message = ownsUnlimitedConversions
                 ? "Unlimited conversions are unlocked."
                 : "No purchases were found for this Apple Account."

@@ -11,6 +11,7 @@ struct RootTabView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @Environment(IncomingVideo.self) private var incoming
+    @Environment(Purchases.self) private var purchases
     @AppStorage(OnboardingState.completedKey) private var hasCompletedOnboarding = false
 
     private static var initialTab: AppTab {
@@ -46,6 +47,7 @@ struct RootTabView: View {
         }
         // A layer under the launch intro rather than a full-screen cover, which could only slide up once the
         // intro had gone and showed the tabs for a moment first. The intro now fades straight into it.
+        .unlockCelebration(count: purchases.unlockCount)
         .accessibilityHidden(!hasCompletedOnboarding)
         .overlay {
             if !hasCompletedOnboarding {

@@ -312,6 +312,7 @@ private struct CropPreview: View {
     @GestureState private var isPinching = false
     /// The spring back after a gesture, run by hand so a new gesture can catch it where it is on screen.
     @State private var settling: FramingSettle?
+    @Environment(\.wallpaperCanvasNamespace) private var canvasNamespace
 
     var body: some View {
         DeviceFrame(highlighted: isFraming) {
@@ -319,6 +320,7 @@ private struct CropPreview: View {
                 canvas(at: context.date)
             }
         }
+        .wallpaperCanvasGeometry(canvasNamespace)
         .task(id: settling) {
             guard settling != nil else { return }
             try? await Task.sleep(for: .seconds(FramingSettle.duration))
