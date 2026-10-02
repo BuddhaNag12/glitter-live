@@ -10,8 +10,18 @@ import UserMessagingPlatform
 final class RewardedAds: NSObject, RewardedAdPresenter {
     static let shared = RewardedAds()
 
-    /// Google's sample rewarded unit, which always fills and never pays. Swap in the real unit before ads go live in release.
-    private static let adUnitID = "ca-app-pub-3940256099942544/1712485313"
+    /// From `GAD_REWARDED_AD_UNIT_ID` in project.yml: Google's sample unit in debug, the real one in release.
+    private static let adUnitID = Bundle.main.object(forInfoDictionaryKey: "GADRewardedAdUnitID") as? String ?? ""
+
+    /// A release build still carrying Google's sample IDs would show "Test Ad" to real people and earn nothing,
+    /// so it skips ads instead, as if none could be loaded.
+    private static var hasRealAdUnit: Bool {
+        #if DEBUG
+        true
+        #else
+        !adUnitID.isEmpty && !adUnitID.hasPrefix("ca-app-pub-3940256099942544")
+        #endif
+    }
 
     /// Asking for consent or loading the ad, so the screen can say one is on its way.
     private(set) var isPreparing = false
@@ -33,6 +43,7 @@ final class RewardedAds: NSObject, RewardedAdPresenter {
     /// True once the ad has been watched to the end. Also true when no ad can be had (offline, no fill), so a
     /// missing ad never blocks anyone; false only when someone closes the ad early.
     func present() async -> Bool {
+        guard Self.hasRealAdUnit else { return true }
         guard !isPreparing, dismissal == nil else { return false }
         isPreparing = true
         await gatherConsent()

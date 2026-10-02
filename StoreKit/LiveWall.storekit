@@ -15,7 +15,7 @@
           "locale" : "en_US"
         }
       ],
-      "productID" : "dev.distinction.livewall.convert.unlimited",
+      "productID" : "com.buddhanag.glitterlive.convert.unlimited",
       "referenceName" : "Unlimited Conversions",
       "type" : "NonConsumable"
     }

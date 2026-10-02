@@ -41,14 +41,14 @@
 ## Features
 
 - **Explore**: the first tab, a curated catalog of live wallpapers, served from Supabase, that saves to Photos as a Lock Screen-ready Live Photo in one tap. It opens on a playing Featured wallpaper, and touching and holding any wallpaper previews its motion. While the catalog loads, shimmering placeholders hold the page's shape, and the cards rise into place in a wave when it arrives.
-- **Video to Live Wallpaper**: pick any video, trim a 1–3 second moment, and save it as a Live Photo that plays on the Lock Screen when the iPhone wakes.
+- **Video to Live Wallpaper**: pick any video, trim a 1–3 second moment, and save it as a Live Photo that plays on the Lock Screen when the iPhone wakes. Videos can come from Photos, Files, a direct link (Dropbox and Google Drive share links work), or Share → Glitter Live from another app.
 - **Trim Studio**: filmstrip with trim handles that preview the frame under your finger and stretch softly at their limits, a draggable cover-frame marker, pinch-and-drag framing inside a Lock Screen preview (clock, widgets and quick actions) that springs back with your finger's momentum, 0.5×–2× speed and a forward-and-back bounce.
 - **Sharp cover photo**: the still shown while the phone is locked is rendered from the original video at up to 1320 px wide, sharper than the motion clip.
 - **Library**: every wallpaper is kept in the app, so it can be previewed, saved to Photos again or deleted.
-- **Private by design**: only asks to *add* photos, never reads the library, and collects no data.
+- **Private by design**: videos are processed on the device, and the app only asks to *add* photos, never reading the library. The only data collected is what Google's ad SDK needs when someone chooses to watch an ad (see [privacy](docs/privacy.md)).
 - **Silver Shimmer design**: light and dark modes that follow the system, an obsidian dark mode lit by brand blue and silver, softly twinkling glitter, and native Liquid Glass on iOS 26+ with frosted fallbacks on iOS 17–25. A logo reveal plays as the app launches.
 - **Accessible**: Dynamic Type with size-tuned letter-spacing, Reduce Motion, Increase Contrast and Reduce Transparency are all supported.
-- Free, with no watermark.
+- **Free to try**: Explore and the first 5 conversions are free; then each conversion is free with a rewarded ad, or a one-time Unlimited Conversions purchase removes the limit and the ads. Never a watermark.
 
 ## Lock Screen motion
 
