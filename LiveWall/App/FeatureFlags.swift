@@ -26,4 +26,7 @@ enum FeatureFlags {
     #else
     static let conversionLimits = false
     #endif
+
+    /// Whether anything can ask for a rewarded ad, so ads and their consent prompts stay out of builds that don't use them.
+    static var showsAds: Bool { conversionLimits || (aiGeneration && generationLimits) }
 }

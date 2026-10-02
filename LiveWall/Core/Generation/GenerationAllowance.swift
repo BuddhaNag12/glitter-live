@@ -96,8 +96,3 @@ final class GenerationAllowance {
 protocol RewardedAdPresenter {
     func present() async -> Bool
 }
-
-/// Stands in until AdMob is set up: no ad plays, and the generation goes ahead.
-struct PendingRewardedAds: RewardedAdPresenter {
-    func present() async -> Bool { true }
-}

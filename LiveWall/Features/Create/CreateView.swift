@@ -167,11 +167,12 @@ struct CreateView: View {
             Label(generateTitle, systemImage: generateSymbol)
         }
         .buttonStyle(KineticButtonStyle())
-        .disabled(!model.canGenerate)
+        .disabled(!model.canGenerate || RewardedAds.shared.isPreparing)
     }
 
     private var generateTitle: String {
-        switch model.allowance.access {
+        if RewardedAds.shared.isPreparing { return "Loading Ad…" }
+        return switch model.allowance.access {
         case .unlimited, .free, .pro: "Generate Wallpaper"
         case .ad: "Watch Ad & Generate"
         case .dailyLimitReached: "Back Tomorrow"

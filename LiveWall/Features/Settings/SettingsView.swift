@@ -92,6 +92,12 @@ struct SettingsView: View {
             row("Restore purchases", symbol: "arrow.clockwise") {
                 Task { await purchases.restore() }
             }
+            if RewardedAds.shared.offersPrivacyChoices {
+                Divider().overlay(Theme.stroke)
+                row("Ad privacy choices", symbol: "hand.raised.square") {
+                    Task { await RewardedAds.shared.showPrivacyChoices() }
+                }
+            }
             #if DEBUG
             Divider().overlay(Theme.stroke)
             row("Reset free conversions", symbol: "hammer", detail: "\(conversions.freeUsed) used", action: conversions.reset)

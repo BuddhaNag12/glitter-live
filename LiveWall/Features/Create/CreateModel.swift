@@ -33,7 +33,7 @@ final class CreateModel {
     @ObservationIgnored private var imageURL: URL?
     @ObservationIgnored private var surpriseQueue: [String] = []
 
-    init(service: (any GenerationService)? = nil, ads: any RewardedAdPresenter = PendingRewardedAds()) {
+    init(service: (any GenerationService)? = nil, ads: any RewardedAdPresenter = RewardedAds.shared) {
         self.service = service ?? Self.defaultService
         self.ads = ads
     }
