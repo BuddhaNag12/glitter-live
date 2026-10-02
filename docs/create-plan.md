@@ -1,14 +1,18 @@
 # Create: AI live wallpapers
 
-Plan for the Create tab: type a prompt, get a wallpaper image, bring it to life as a 3-second video, and save it as a Live Photo wallpaper in one step.
+Plan for the Create tab: type a prompt and get a wallpaper image, then save it as it is or add motion to make it a Live Photo wallpaper.
 
 ## Flow
 
-1. **Prompt**: describe a scene and pick a style. "Surprise Me" fills in an example.
-2. **Image**: the server generates a sharp 9:16 wallpaper with FLUX.1 schnell. It can be saved as a still wallpaper.
-3. **Motion**: "Bring to Life" animates that image into a 3-second clip with LTX-Video.
-4. **Convert on the go** (on by default): the clip goes straight through the existing Live Photo pipeline and is saved to the Library and Photos as a Lock Screen-ready Live Photo. The generated image becomes the Lock Screen still, so it's sharper than a frame from the video.
-5. **Fine-tune**: "Edit in Trim Studio" opens the clip for speed, bounce and framing.
+1. **Prompt**: describe a scene and pick a style from the menu in the prompt card. "Surprise Me" cycles through 100 prompts without repeats.
+2. **Image**: "Generate Wallpaper" makes only the image (FLUX.1 schnell, about 10 seconds). This is the step that counts as a generation.
+3. **Your wallpaper**: the image on a Lock Screen preview, with:
+   - **Save Wallpaper**: a 9:16 still in Photos, then "Set as Wallpaper" opens the guide.
+   - **Add Motion**: depth parallax made on the phone (Apple's Depth Anything V2), free and about a second on device.
+   - **Try Again** (same prompt, new image) and **Edit Prompt**.
+4. **Live preview**: **Save Live Wallpaper** keeps it in the Library and Photos; **Edit Motion** opens Trim Studio; **Back to Still** returns to step 3.
+
+When AI motion is available (`FeatureFlags.aiMotion`), Add Motion can offer it alongside the free depth motion, for example as a Pro option.
 
 ## Pricing: one subscription
 
@@ -32,8 +36,8 @@ Plan for the Create tab: type a prompt, get a wallpaper image, bring it to life 
 
 | Step | Model | Licence | Where it runs |
 |---|---|---|---|
-| Image | FLUX.1 schnell | Apache 2.0 | Cloudflare Workers AI (free tier, about 170 images a day) |
-| Video | LTX-Video, distilled | LTX licence, free under $10M company revenue | Hosted at first (fal.ai, about $0.02 a clip), then a self-hosted GPU once volume justifies it |
+| Image | FLUX.1 schnell (1024 px square) | Apache 2.0 | Cloudflare Workers AI (free tier, about 170 images a day) |
+| Video | LTX-Video 13B distilled, 9:16 at 720p, 73 frames at 24 fps | LTX licence, free under $10M company revenue | Hosted at first (fal.ai `fal-ai/ltx-video-13b-distilled/image-to-video`), then a self-hosted GPU once volume justifies it |
 | Prompt safety | Llama Guard | Llama licence | Cloudflare Workers AI |
 
 ## Architecture
@@ -48,6 +52,16 @@ App ──► Supabase Edge Function `generate` ──► Cloudflare Workers AI 
 ```
 
 The app never holds an AI provider key, and it never grants generations itself.
+
+## Server
+
+`supabase/functions/generate` is deployed with `--no-verify-jwt`, because the app sends the publishable key rather than a user JWT. Provider keys are Supabase secrets: `CLOUDFLARE_ACCOUNT_ID` (the 32-character account ID, not the login email), `CLOUDFLARE_AI_TOKEN` and `FAL_KEY`.
+
+```bash
+supabase functions deploy generate --no-verify-jwt --use-api --project-ref jusrioirjfpaocgmsbbv
+```
+
+Before release, the function must enforce the limits itself (DeviceCheck for the free generations, ad tokens, Pro status), since today anyone with the publishable key could call it.
 
 ## Build order
 

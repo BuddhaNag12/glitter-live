@@ -236,7 +236,8 @@ final class ConvertEditor {
 
     // MARK: Export
 
-    func export() async {
+    /// With `savesToPhotos` off, the result is only previewed; `save` keeps it in the Library and Photos when asked.
+    func export(savesToPhotos: Bool = true) async {
         guard phase == .editing else { return }
         phase = .exporting
         player.pause()
@@ -249,11 +250,10 @@ final class ConvertEditor {
             bounces: bounces
         )
         do {
-            var result = try await LivePhotoBuilder.build(request, in: .livePhotosDirectory)
-            // A library failure shouldn't block saving to Photos, so fall back to the temporary files.
-            if let library, let creation = try? library.add(result, duration: outputDuration) {
-                self.creation = creation
-                result = creation.livePhoto
+            let result = try await LivePhotoBuilder.build(request, in: .livePhotosDirectory)
+            guard savesToPhotos else {
+                phase = .finished(result, saved: false)
+                return
             }
             await save(result)
         } catch {
@@ -264,6 +264,12 @@ final class ConvertEditor {
     }
 
     func save(_ result: LivePhotoResult) async {
+        var result = result
+        // A library failure shouldn't block saving to Photos, so fall back to the temporary files.
+        if creation?.livePhoto != result, let library, let creation = try? library.add(result, duration: outputDuration) {
+            self.creation = creation
+            result = creation.livePhoto
+        }
         do {
             try await LivePhotoSaver.save(result)
             if let creation, creation.livePhoto == result {

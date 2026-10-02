@@ -5,13 +5,25 @@ import SwiftUI
 
 nonisolated enum LivePhotoSaver {
     static func save(_ result: LivePhotoResult) async throws {
-        let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
-        guard status == .authorized || status == .limited else { throw LivePhotoError.photoLibraryDenied }
+        try await requestAccess()
         try await PHPhotoLibrary.shared().performChanges {
             let request = PHAssetCreationRequest.forAsset()
             request.addResource(with: .photo, fileURL: result.imageURL, options: nil)
             request.addResource(with: .pairedVideo, fileURL: result.videoURL, options: nil)
         }
+    }
+
+    /// A plain photo, for wallpapers saved without motion.
+    static func saveStill(_ imageURL: URL) async throws {
+        try await requestAccess()
+        try await PHPhotoLibrary.shared().performChanges {
+            PHAssetCreationRequest.forAsset().addResource(with: .photo, fileURL: imageURL, options: nil)
+        }
+    }
+
+    private static func requestAccess() async throws {
+        let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+        guard status == .authorized || status == .limited else { throw LivePhotoError.photoLibraryDenied }
     }
 }
 

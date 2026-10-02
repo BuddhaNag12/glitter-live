@@ -10,6 +10,8 @@ final class GenerationAllowance {
     static let monthlyProGenerations = 100
 
     enum Access: Equatable {
+        /// Limits are off for testing: no counts, no ads.
+        case unlimited
         case free(remaining: Int)
         case ad(remainingToday: Int)
         case pro(remainingThisMonth: Int)
@@ -33,10 +35,12 @@ final class GenerationAllowance {
     private var proUsed: Int
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let now: () -> Date
+    @ObservationIgnored private let enforcesLimits: Bool
 
-    init(defaults: UserDefaults = .standard, now: @escaping () -> Date = Date.init) {
+    init(defaults: UserDefaults = .standard, now: @escaping () -> Date = Date.init, enforcesLimits: Bool = FeatureFlags.generationLimits) {
         self.defaults = defaults
         self.now = now
+        self.enforcesLimits = enforcesLimits
         freeUsed = defaults.integer(forKey: Key.freeUsed)
         adDay = defaults.string(forKey: Key.adDay) ?? ""
         adUsed = defaults.integer(forKey: Key.adUsed)
@@ -45,6 +49,7 @@ final class GenerationAllowance {
     }
 
     var access: Access {
+        guard enforcesLimits else { return .unlimited }
         if isPro {
             let used = proMonth == month ? proUsed : 0
             return used < Self.monthlyProGenerations ? .pro(remainingThisMonth: Self.monthlyProGenerations - used) : .monthlyLimitReached
@@ -70,7 +75,7 @@ final class GenerationAllowance {
             proMonth = month
             defaults.set(proUsed, forKey: Key.proUsed)
             defaults.set(proMonth, forKey: Key.proMonth)
-        case .dailyLimitReached, .monthlyLimitReached:
+        case .unlimited, .dailyLimitReached, .monthlyLimitReached:
             break
         }
     }

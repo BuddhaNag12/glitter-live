@@ -11,7 +11,7 @@ struct LibraryEmptyView: View {
                     .font(.system(size: 46, weight: .light))
                     .foregroundStyle(Theme.accent)
                 Text("No wallpapers yet").typography(.headlineSmall).foregroundStyle(Theme.textPrimary)
-                Text("Every live wallpaper you convert is kept here, so you can preview it, save it again, or set it later.")
+                Text("Every wallpaper you make, live or still, is kept here, so you can preview it, save it again, or set it later.")
                     .typography(.bodyMedium)
                     .foregroundStyle(Theme.textSecondary)
                     .multilineTextAlignment(.center)

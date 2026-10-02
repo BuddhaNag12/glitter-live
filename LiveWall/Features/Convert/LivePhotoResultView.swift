@@ -5,8 +5,15 @@ struct LivePhotoResultView: View {
     let editor: ConvertEditor
     let result: LivePhotoResult
     let saved: Bool
-    var newTitle = "New Video"
+    var labels = Labels()
     var onNewVideo: () -> Void
+
+    struct Labels {
+        var save = "Save to Photos"
+        var edit = "Edit Again"
+        var new = "New Video"
+        var newSymbol = "plus"
+    }
 
     @State private var livePhoto: PHLivePhoto?
     @State private var isSaving = false
@@ -52,17 +59,17 @@ struct LivePhotoResultView: View {
                                 isSaving = false
                             }
                         } label: {
-                            Label(isSaving ? "Saving…" : "Save to Photos", systemImage: "square.and.arrow.down")
+                            Label(isSaving ? "Saving…" : labels.save, systemImage: "square.and.arrow.down")
                         }
                         .buttonStyle(KineticButtonStyle())
                         .disabled(isSaving)
                     }
                     HStack(spacing: 12) {
                         Button(action: editor.returnToEditing) {
-                            Label("Edit Again", systemImage: "slider.horizontal.3").frame(maxWidth: .infinity)
+                            Label(labels.edit, systemImage: "slider.horizontal.3").frame(maxWidth: .infinity)
                         }
                         Button(action: onNewVideo) {
-                            Label(newTitle, systemImage: "plus").frame(maxWidth: .infinity)
+                            Label(labels.new, systemImage: labels.newSymbol).frame(maxWidth: .infinity)
                         }
                     }
                     .buttonStyle(GlassPillButtonStyle())

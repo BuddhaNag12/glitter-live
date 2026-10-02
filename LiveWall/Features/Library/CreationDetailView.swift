@@ -8,11 +8,13 @@ struct CreationDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @State private var livePhoto: PHLivePhoto?
+    @State private var still: UIImage?
     @State private var filesMissing = false
     @State private var isSaving = false
     @State private var errorMessage: String?
     @State private var confirmsDelete = false
     @State private var showsGuide = false
+    @State private var addsMotion = false
     /// Counts successful saves, so "Save Again" confirms with a haptic too.
     @State private var saves = 0
 
@@ -21,11 +23,21 @@ struct CreationDetailView: View {
             ScrollView {
                 VStack(spacing: 16) {
                     DeviceFrame {
-                        LivePhotoView(livePhoto: livePhoto)
-                            .overlay { LockScreenOverlay() }
-                            .overlay(alignment: .topLeading) {
-                                StatusPill(text: "LIVE", dot: Theme.signalYellow).padding(12)
+                        Group {
+                            if creation.isLive {
+                                LivePhotoView(livePhoto: livePhoto)
+                            } else {
+                                Theme.lockScreen.overlay {
+                                    if let still { Image(uiImage: still).resizable().scaledToFill() }
+                                }
+                                .clipped()
                             }
+                        }
+                        .overlay { LockScreenOverlay() }
+                        .overlay(alignment: .topLeading) {
+                            StatusPill(text: creation.isLive ? "LIVE" : "STILL", dot: creation.isLive ? Theme.signalYellow : Theme.slate)
+                                .padding(12)
+                        }
                     }
                     .containerRelativeFrame(.horizontal) { width, _ in width * 0.5 }
 
@@ -33,7 +45,7 @@ struct CreationDetailView: View {
                         Label("This wallpaper's files are missing.", systemImage: "exclamationmark.triangle")
                             .font(.labelMedium)
                             .foregroundStyle(Theme.signalYellow)
-                    } else {
+                    } else if creation.isLive {
                         Label("Touch and hold the preview to play it", systemImage: "hand.tap")
                             .font(.labelMedium)
                             .foregroundStyle(Theme.textSecondary)
@@ -55,6 +67,11 @@ struct CreationDetailView: View {
             }
         }
         .task(id: creation.id) {
+            guard creation.isLive else {
+                still = UIImage(contentsOfFile: creation.imageURL.path(percentEncoded: false))
+                filesMissing = still == nil
+                return
+            }
             do {
                 livePhoto = try await LivePhotoLoader.load(creation.livePhoto)
             } catch {
@@ -63,6 +80,9 @@ struct CreationDetailView: View {
         }
         .sheet(isPresented: $showsGuide) {
             SetWallpaperGuideView().presentationDetents([.medium, .large])
+        }
+        .fullScreenCover(isPresented: $addsMotion) {
+            AddMotionView(imageURL: creation.imageURL)
         }
         .sensoryFeedback(.success, trigger: saves)
         .sensoryFeedback(.error, trigger: errorMessage) { _, message in message != nil }
@@ -92,6 +112,13 @@ struct CreationDetailView: View {
                 .buttonStyle(KineticButtonStyle())
                 .disabled(isSaving || filesMissing)
             }
+            if !creation.isLive {
+                Button { addsMotion = true } label: {
+                    Label("Add Motion", systemImage: "sparkles").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(GlassPillButtonStyle(tint: Theme.accent))
+                .disabled(filesMissing)
+            }
             HStack(spacing: 12) {
                 if creation.savedToPhotos {
                     Button(action: save) {
@@ -115,7 +142,11 @@ struct CreationDetailView: View {
             isSaving = true
             defer { isSaving = false }
             do {
-                try await LivePhotoSaver.save(creation.livePhoto)
+                if creation.isLive {
+                    try await LivePhotoSaver.save(creation.livePhoto)
+                } else {
+                    try await LivePhotoSaver.saveStill(creation.imageURL)
+                }
                 creation.savedToPhotos = true
                 saves += 1
                 try? modelContext.save()

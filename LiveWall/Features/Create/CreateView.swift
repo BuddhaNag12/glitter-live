@@ -3,19 +3,19 @@ import SwiftUI
 
 struct CreateView: View {
     @State private var model = CreateModel()
-    @AppStorage("create.convertsOnTheGo") private var convertsOnTheGo = true
     @FocusState private var isPromptFocused: Bool
     @State private var showsStyles = false
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private enum Stage { case compose, progress, edit }
+    private enum Stage { case compose, progress, image, live }
 
     private var stage: Stage {
         switch model.phase {
         case .composing: .compose
-        case .editing: .edit
-        default: .progress
+        case .makingImage, .addingMotion: .progress
+        case .image: .image
+        case .live: .live
         }
     }
 
@@ -27,9 +27,18 @@ struct CreateView: View {
             case .progress:
                 GenerationProgressView(phase: model.phase, style: model.style)
                     .transition(.screen(reduceMotion: reduceMotion))
-            case .edit:
+            case .image:
+                if case .image(let url) = model.phase {
+                    GeneratedImageView(model: model, imageURL: url, library: CreationLibrary(context: modelContext))
+                        .transition(.screen(reduceMotion: reduceMotion))
+                }
+            case .live:
                 if let editor = model.editor {
-                    ConvertFlowView(editor: editor, newTitle: "New Wallpaper", onClose: model.startOver)
+                    ConvertFlowView(
+                        editor: editor,
+                        labels: .init(save: "Save Live Wallpaper", edit: "Edit Motion", new: "Back to Still", newSymbol: "photo"),
+                        onClose: model.backToStill
+                    )
                 }
             }
         }
@@ -38,6 +47,7 @@ struct CreateView: View {
         .sensoryFeedback(trigger: model.editor?.phase) { _, phase in
             if case .finished(_, saved: true) = phase { .success } else { nil }
         }
+        .sensoryFeedback(.success, trigger: model.savedStill) { _, saved in saved }
         .sensoryFeedback(.error, trigger: model.errorMessage) { _, message in message != nil }
         .alert("Couldn't create", isPresented: .constant(model.errorMessage != nil)) {
             Button("OK") { model.errorMessage = nil }
@@ -51,8 +61,7 @@ struct CreateView: View {
             VStack(alignment: .leading, spacing: 16) {
                 AllowanceBanner(access: model.allowance.access)
                 promptCard
-                onTheGoToggle
-                // Right after the settings it acts on; the page fits on one screen with the styles folded away.
+                // Right after the prompt it acts on; the page fits on one screen with the styles folded away.
                 generateButton
                     .padding(.top, 4)
             }
@@ -150,28 +159,10 @@ struct CreateView: View {
         .padding(.horizontal, -18)
     }
 
-    private var onTheGoToggle: some View {
-        Toggle(isOn: $convertsOnTheGo) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text("Convert on the go")
-                    .typography(.labelLarge)
-                    .foregroundStyle(Theme.textPrimary)
-                Text(convertsOnTheGo ? "Saves straight to Library and Photos" : "Opens in Trim Studio first")
-                    .font(.labelMedium)
-                    .foregroundStyle(Theme.textSecondary)
-            }
-        }
-        .toggleStyle(CompactSwitchStyle())
-        .tint(Theme.accentFill)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .glass(.floating, cornerRadius: 20)
-    }
-
     private var generateButton: some View {
         Button {
             isPromptFocused = false
-            Task { await model.generate(convertsOnTheGo: convertsOnTheGo, library: CreationLibrary(context: modelContext)) }
+            Task { await model.generate() }
         } label: {
             Label(generateTitle, systemImage: generateSymbol)
         }
@@ -181,7 +172,7 @@ struct CreateView: View {
 
     private var generateTitle: String {
         switch model.allowance.access {
-        case .free, .pro: "Generate Live Wallpaper"
+        case .unlimited, .free, .pro: "Generate Wallpaper"
         case .ad: "Watch Ad & Generate"
         case .dailyLimitReached: "Back Tomorrow"
         case .monthlyLimitReached: "Back Next Month"
@@ -216,6 +207,7 @@ private struct AllowanceBanner: View {
 
     private var symbol: String {
         switch access {
+        case .unlimited: "hammer"
         case .free: "gift"
         case .ad: "play.rectangle"
         case .pro: "crown"
@@ -225,6 +217,7 @@ private struct AllowanceBanner: View {
 
     private var title: String {
         switch access {
+        case .unlimited: "Testing mode"
         case .free(let remaining): remaining == 1 ? "1 free generation left" : "\(remaining) free generations left"
         case .ad: "Free with a short ad"
         case .pro: "Glitter Live Pro"
@@ -235,24 +228,12 @@ private struct AllowanceBanner: View {
 
     private var detail: String {
         switch access {
+        case .unlimited: "No limits or ads in this build."
         case .free: "After that, a short ad unlocks each one."
         case .ad(let remaining): "\(remaining) left today. Pro removes ads."
         case .pro(let remaining): "No ads. \(remaining) left this month."
         case .dailyLimitReached: "\(GenerationAllowance.dailyAdGenerations) more tomorrow, or go Pro for \(GenerationAllowance.monthlyProGenerations) a month without ads."
         case .monthlyLimitReached: "Your \(GenerationAllowance.monthlyProGenerations) generations refill next month."
-        }
-    }
-}
-
-/// A switch at 80% size, for a secondary setting that shouldn't outweigh the content around it.
-private struct CompactSwitchStyle: ToggleStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: 12) {
-            configuration.label
-            Spacer(minLength: 0)
-            Toggle(configuration)
-                .labelsHidden()
-                .scaleEffect(0.8, anchor: .trailing)
         }
     }
 }
@@ -292,52 +273,37 @@ private struct GenerationProgressView: View {
     let style: WallpaperStyle
     @State private var image: UIImage?
 
-    private var step: Int {
-        switch phase {
-        case .animating: 1
-        case .converting: 2
-        default: 0
-        }
-    }
-
     private var imageURL: URL? {
-        switch phase {
-        case .animating(let url), .converting(let url): url
-        default: nil
-        }
+        if case .addingMotion(let url) = phase { url } else { nil }
     }
 
     var body: some View {
         VStack(spacing: 22) {
             Spacer(minLength: 0)
             DeviceFrame {
-                ZStack {
-                    AuroraView(colors: style.palette.map { Color(hex: $0) })
-                    if let image {
-                        Image(uiImage: image).resizable().scaledToFill().transition(.opacity)
+                AuroraView(colors: style.palette.map { Color(hex: $0) })
+                    // An overlay takes the frame's size, so a square image is cropped rather than widening the phone.
+                    .overlay {
+                        if let image {
+                            Image(uiImage: image).resizable().scaledToFill().transition(.opacity)
+                        }
                     }
-                }
-                .shimmer(step < 2)
+                    .clipped()
+                    .shimmer()
                 .overlay { LockScreenOverlay() }
             }
             .frame(width: 190)
             .animation(.easeOut(duration: 0.5), value: image != nil)
 
             VStack(spacing: 6) {
-                Text(title).typography(.headlineSmall).foregroundStyle(Theme.textPrimary)
-                Text(detail).typography(.bodyMedium).foregroundStyle(Theme.textSecondary)
+                Text(imageURL == nil ? "Painting your wallpaper" : "Adding motion")
+                    .typography(.headlineSmall)
+                    .foregroundStyle(Theme.textPrimary)
+                Text(imageURL == nil ? "This usually takes about 10 seconds." : "Turning it into a 3-second loop.")
+                    .typography(.bodyMedium)
+                    .foregroundStyle(Theme.textSecondary)
             }
             .multilineTextAlignment(.center)
-
-            HStack(spacing: 6) {
-                ForEach(0..<3, id: \.self) { index in
-                    Capsule()
-                        .fill(index <= step ? Theme.accentFill : Theme.placeholder)
-                        .frame(width: 28, height: 4)
-                }
-            }
-            .animation(.spring(duration: 0.4), value: step)
-            .accessibilityHidden(true)
             Spacer(minLength: 0)
             Spacer(minLength: 0)
         }
@@ -346,23 +312,7 @@ private struct GenerationProgressView: View {
         .accessibilityElement(children: .combine)
         .task(id: imageURL) {
             guard let imageURL else { return image = nil }
-            image = UIImage(contentsOfFile: imageURL.path())
-        }
-    }
-
-    private var title: String {
-        switch step {
-        case 0: "Painting your wallpaper"
-        case 1: "Bringing it to life"
-        default: "Making it a Live Photo"
-        }
-    }
-
-    private var detail: String {
-        switch step {
-        case 0: "This usually takes a few seconds."
-        case 1: "Turning it into a 3-second loop."
-        default: "Saving to your Library and Photos."
+            image = UIImage(contentsOfFile: imageURL.path(percentEncoded: false))
         }
     }
 }

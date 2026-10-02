@@ -134,14 +134,14 @@ struct ConvertView: View {
 /// Trim Studio, then the result, for a video that's been picked or generated.
 struct ConvertFlowView: View {
     let editor: ConvertEditor
-    var newTitle = "New Video"
+    var labels = LivePhotoResultView.Labels()
     var onClose: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         switch editor.phase {
         case .finished(let result, let saved):
-            LivePhotoResultView(editor: editor, result: result, saved: saved, newTitle: newTitle, onNewVideo: onClose)
+            LivePhotoResultView(editor: editor, result: result, saved: saved, labels: labels, onNewVideo: onClose)
                 .transition(.screen(reduceMotion: reduceMotion))
         case .unavailable(let message):
             ContentUnavailableView {
