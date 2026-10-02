@@ -1,0 +1,5 @@
+// The real AdMob IDs live in AdMob.secrets.xcconfig, which isn't committed because the repository is public.
+// Without it, release builds fall back to Google's sample IDs and show no ads (see RewardedAds.hasRealAdUnit).
+GAD_APPLICATION_ID = ca-app-pub-3940256099942544~1458002511
+GAD_REWARDED_AD_UNIT_ID = ca-app-pub-3940256099942544/1712485313
+#include? "AdMob.secrets.xcconfig"

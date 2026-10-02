@@ -48,7 +48,7 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         NSPhotoLibraryAddUsageDescription: Glitter Live saves the live wallpapers you create to your photo library.
         NSUserTrackingUsageDescription: Your choice only changes which ads you see. Glitter Live shows an ad only when you choose to watch one.
-        # Debug builds use Google's sample IDs; release takes the real ones from the Release settings below.
+        # Filled from Config/Debug.xcconfig and Config/Release.xcconfig.
         GADApplicationIdentifier: $(GAD_APPLICATION_ID)
         GADRewardedAdUnitID: $(GAD_REWARDED_AD_UNIT_ID)
         # Google's list of ad networks allowed to attribute installs from its ads.
@@ -112,13 +112,10 @@ targets:
         MTL_COMPILER_FLAGS: -fcikernel
         MTLLINKER_FLAGS: -cikernel
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        GAD_APPLICATION_ID: ca-app-pub-3940256099942544~1458002511
-        GAD_REWARDED_AD_UNIT_ID: ca-app-pub-3940256099942544/1712485313
-      configs:
-        # Replace both with the real AdMob app and rewarded unit IDs before turning ads on for release.
-        Release:
-          GAD_APPLICATION_ID: ca-app-pub-3940256099942544~1458002511
-          GAD_REWARDED_AD_UNIT_ID: ca-app-pub-3940256099942544/1712485313
+    # AdMob IDs: Google's samples in debug; the real ones in release, from the uncommitted secrets file.
+    configFiles:
+      Debug: Config/Debug.xcconfig
+      Release: Config/Release.xcconfig
   LiveWallShare:
     type: app-extension
     platform: iOS

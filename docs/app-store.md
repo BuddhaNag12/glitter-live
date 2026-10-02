@@ -133,6 +133,6 @@ Everything in the app is ready; these are the account steps, in order.
 2. **AdMob → Privacy & messaging**: create a **European regulations** (GDPR) message for the app, so the consent form appears in the EU and UK. Optionally add an **IDFA explainer** before the tracking prompt.
 3. **app-ads.txt**: AdMob verifies the app through an `app-ads.txt` file at the root of the developer website listed on the App Store page. GitHub blob links can't serve one, so publish it with GitHub Pages (a repository named `BuddhaNag12.github.io`) and use that site as the Marketing URL.
 4. **App Store Connect**: sign the Paid Apps agreement and add banking and tax details, then create the in-app purchase above with its review screenshot.
-5. **In the app** (I'll do this when you send the IDs): put the real IDs in `project.yml` and turn on `FeatureFlags.conversionLimits` for release.
+5. **In the app**: done. The real IDs are in `Config/AdMob.secrets.xcconfig`, which isn't committed because the repository is public; keep a copy somewhere safe, since a release built without it shows no ads.
 6. **Archive**, generate the privacy report, fill in App Privacy from it, and submit the build together with the in-app purchase.
 

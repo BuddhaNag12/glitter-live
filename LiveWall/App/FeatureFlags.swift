@@ -19,13 +19,8 @@ enum FeatureFlags {
     static let generationLimits = true
     #endif
 
-    /// Convert's 5 free conversions, then an ad or the one-time unlock. On in debug builds so it can be tried;
-    /// off in release until AdMob replaces the stand-in ad and the unlock exists in App Store Connect.
-    #if DEBUG
+    /// Convert's 5 free conversions, then an ad or the one-time unlock.
     static let conversionLimits = true
-    #else
-    static let conversionLimits = false
-    #endif
 
     /// Whether anything can ask for a rewarded ad, so ads and their consent prompts stay out of builds that don't use them.
     static var showsAds: Bool { conversionLimits || (aiGeneration && generationLimits) }
