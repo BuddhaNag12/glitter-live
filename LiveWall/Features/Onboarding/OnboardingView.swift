@@ -110,6 +110,7 @@ private struct WelcomePage: View {
         OnboardingPage { isShort in
             WakingPhone(isAnimating: isActive)
                 .frame(width: isShort ? 112 : 168)
+                .parallax()
                 .padding(.bottom, 6)
                 .reveal(isShown, order: 0)
             PageTitle("Welcome to Glitter Live", detail: "Your Lock Screen, alive. Your wallpaper moves every time you wake your iPhone.")
@@ -140,6 +141,7 @@ private struct WaysPage: View {
             .reveal(isShown, order: 0)
             if !isShort {
                 TrimPreviewCard(isAnimating: isActive)
+                    .parallax()
                     .reveal(isShown, order: 1)
             }
             WayRow(symbol: "sparkles", title: "Explore", detail: "Hand-picked live wallpapers, saved in a tap.")
@@ -163,6 +165,7 @@ private struct SetUpPage: View {
         OnboardingPage { isShort in
             if !isShort {
                 HeroIcon(symbol: "photo.on.rectangle.angled", isShown: isShown)
+                    .parallax()
                     .reveal(isShown, order: 0)
             }
             PageTitle("Set It From Photos", detail: "Only Photos can set a wallpaper, so it takes four quick taps. You'll find these steps in Settings too.")
@@ -183,6 +186,7 @@ private struct ReadyPage: View {
         OnboardingPage { isShort in
             if !isShort {
                 HeroIcon(symbol: "checkmark.seal.fill", badge: "bolt.fill", isShown: isShown)
+                    .parallax()
                     .reveal(isShown, order: 0)
             }
             PageTitle("You're All Set", detail: "Pick a video or a wallpaper and make your first one in seconds.")
@@ -314,9 +318,27 @@ private struct Reveal: ViewModifier {
     }
 }
 
+/// While swiping between pages, artwork trails the text a little, which gives the pages depth.
+private struct Parallax: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        let isEnabled = !reduceMotion
+        return content.visualEffect { view, proxy in
+            let viewport = proxy.bounds(of: .scrollView(axis: .horizontal))?.width ?? 0
+            let distance = viewport / 2 - proxy.frame(in: .scrollView(axis: .horizontal)).midX
+            return view.offset(x: isEnabled && viewport > 0 ? distance * 0.3 : 0)
+        }
+    }
+}
+
 private extension View {
     func reveal(_ isShown: Bool, order: Int) -> some View {
         modifier(Reveal(isShown: isShown, order: order))
+    }
+
+    func parallax() -> some View {
+        modifier(Parallax())
     }
 }
 

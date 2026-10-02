@@ -61,6 +61,8 @@ async function runCloudflare(model: string, input: unknown) {
     body: JSON.stringify(input),
   });
   const json = await response.json().catch(() => ({}));
+  // The free tier allows 10,000 neurons a day and resets at midnight UTC; say so rather than "unavailable".
+  if (response.status === 429) throw new RequestError("AI wallpapers have reached today's limit. Try again tomorrow.", 503);
   if (!response.ok || json.success === false) {
     throw new Error(`Cloudflare ${model} returned ${response.status}: ${JSON.stringify(json.errors ?? json).slice(0, 500)}`);
   }

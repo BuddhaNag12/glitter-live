@@ -12,6 +12,9 @@ struct ConvertView: View {
     @State private var choosesPhoto = false
     @State private var opensPhotosAfterLink = false
     @State private var showsShareTip = false
+    /// What the badge shows. It catches up with the real count after a save, so the number visibly ticks down.
+    @State private var shownAccess: ConversionAllowance.Access?
+    @Namespace private var canvas
     @Environment(\.modelContext) private var modelContext
     @Environment(ConversionAllowance.self) private var conversions
     @Environment(Purchases.self) private var purchases
@@ -39,6 +42,8 @@ struct ConvertView: View {
             }
         }
         .animation(.spring(duration: 0.4), value: stage)
+        // Reduce Motion keeps the plain cross-fade instead of the hero growing into Trim Studio.
+        .environment(\.wallpaperCanvasNamespace, reduceMotion ? nil : canvas)
         .screenHeader("Convert")
         .sensoryFeedback(trigger: editor?.phase) { _, phase in
             if case .finished(_, saved: true) = phase { .success } else { nil }
@@ -82,7 +87,7 @@ struct ConvertView: View {
         return GeometryReader { geometry in
             ScrollView {
                 VStack(spacing: 16) {
-                    AllowanceBadge(access: conversions.access)
+                    AllowanceBadge(access: shownAccess ?? conversions.access)
                     Spacer(minLength: 0)
                     // Short screens such as the iPhone SE drop the steps and shrink the phone, so the buttons stay in view.
                     hero(isShort: geometry.size.height < 600)
@@ -111,6 +116,15 @@ struct ConvertView: View {
             .scrollBounceBehavior(.basedOnSize)
             .scrollIndicators(.hidden)
         }
+        .task(id: conversions.access) {
+            guard shownAccess != nil, shownAccess != conversions.access else {
+                shownAccess = conversions.access
+                return
+            }
+            // Waits for the screen to settle back in, so the change is seen rather than missed mid-transition.
+            try? await Task.sleep(for: .seconds(0.6))
+            withAnimation(.spring(duration: 0.5, bounce: 0.3)) { shownAccess = conversions.access }
+        }
         .alert("Share from an App", isPresented: $showsShareTip) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -127,6 +141,7 @@ struct ConvertView: View {
                 AuroraView().overlay { LockScreenOverlay(showsMotionBadge: true) }
             }
             .frame(width: isStacked ? 120 : isShort ? 100 : 140)
+            .wallpaperCanvasGeometry(reduceMotion ? nil : canvas)
             VStack(alignment: .leading, spacing: 10) {
                 Text("Video to Live Wallpaper")
                     .typography(.headlineSmall)
@@ -257,14 +272,18 @@ private struct AllowanceBadge: View {
     let access: ConversionAllowance.Access
 
     var body: some View {
-        Label(text, systemImage: symbol)
-            .font(.labelMedium.weight(.semibold))
-            .foregroundStyle(Theme.accent)
-            .padding(.horizontal, 12)
-            .frame(minHeight: 30)
-            .liquidGlass(in: Capsule(), tint: Theme.accent.opacity(0.16))
-            .contentTransition(.numericText())
-            .animation(.spring(duration: 0.3), value: access)
+        HStack(spacing: 6) {
+            Image(systemName: symbol)
+                .contentTransition(.symbolEffect(.replace))
+            Text(text)
+                .contentTransition(.numericText(countsDown: true))
+        }
+        .font(.labelMedium.weight(.semibold))
+        .foregroundStyle(Theme.accent)
+        .padding(.horizontal, 12)
+        .frame(minHeight: 30)
+        .liquidGlass(in: Capsule(), tint: Theme.accent.opacity(0.16))
+        .accessibilityElement(children: .combine)
     }
 
     private var text: String {
@@ -302,6 +321,23 @@ private struct MiniStep: View {
                 .foregroundStyle(Theme.textPrimary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.85)
+        }
+    }
+}
+
+extension EnvironmentValues {
+    /// Shared by Convert's hero phone and Trim Studio's preview, so a picked video grows out of the hero.
+    /// Create's Trim Studio has no hero, so it's nil there.
+    @Entry var wallpaperCanvasNamespace: Namespace.ID?
+}
+
+extension View {
+    @ViewBuilder
+    func wallpaperCanvasGeometry(_ namespace: Namespace.ID?) -> some View {
+        if let namespace {
+            matchedGeometryEffect(id: "wallpaperCanvas", in: namespace)
+        } else {
+            self
         }
     }
 }

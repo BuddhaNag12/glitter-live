@@ -76,6 +76,8 @@ struct SettingsView: View {
             SetWallpaperGuideView()
         }
         .purchaseMessages(purchases)
+        // Settings is a sheet, which would hide the app's own celebration behind it.
+        .unlockCelebration(count: purchases.unlockCount)
     }
 
     private var purchaseRows: some View {
@@ -101,6 +103,8 @@ struct SettingsView: View {
             #if DEBUG
             Divider().overlay(Theme.stroke)
             row("Reset free conversions", symbol: "hammer", detail: "\(conversions.freeUsed) used", action: conversions.reset)
+            Divider().overlay(Theme.stroke)
+            row("Preview unlock celebration", symbol: "party.popper", action: purchases.previewUnlockCelebration)
             #endif
         }
     }
