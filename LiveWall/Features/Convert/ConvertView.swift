@@ -11,11 +11,13 @@ struct ConvertView: View {
     @State private var pastesLink = false
     @State private var choosesPhoto = false
     @State private var opensPhotosAfterLink = false
+    @State private var showsShareTip = false
     @Environment(\.modelContext) private var modelContext
     @Environment(ConversionAllowance.self) private var conversions
     @Environment(Purchases.self) private var purchases
     @Environment(IncomingVideo.self) private var incoming
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private enum Stage { case pick, edit, result, unavailable }
 
@@ -74,66 +76,93 @@ struct ConvertView: View {
         }
     }
 
+    /// One screen with no scrolling: the free count, a compact preview, then the sources within thumb reach.
     private var emptyState: some View {
         let pickerTitle = isImporting ? "Opening…" : "Choose from Photos"
-        return ScrollView {
-            VStack(spacing: 18) {
-                AllowanceBadge(access: conversions.access)
-
-                DeviceFrame {
-                    AuroraView().overlay { LockScreenOverlay(showsMotionBadge: true) }
-                }
-                .frame(width: 124)
-
-                VStack(spacing: 8) {
-                    Text("Video to Live Wallpaper")
-                        .typography(.headlineSmall)
-                        .foregroundStyle(Theme.textPrimary)
-                    Text("Trim a short moment from any video and set it as a Lock Screen wallpaper that moves when you wake your iPhone.")
-                        .typography(.bodyMedium)
-                        .foregroundStyle(Theme.textSecondary)
-                        .multilineTextAlignment(.center)
-                }
-
-                HStack(spacing: 10) {
-                    StepChip(number: 1, title: "Pick", symbol: "film")
-                    StepChip(number: 2, title: "Trim", symbol: "timeline.selection")
-                    StepChip(number: 3, title: "Set", symbol: "iphone")
-                }
-
-                VStack(spacing: 10) {
-                    PhotosPicker(selection: $selection, matching: .videos, preferredItemEncoding: .current) {
-                        Label(pickerTitle, systemImage: "photo.badge.plus")
-                    }
-                    .buttonStyle(KineticButtonStyle())
-
-                    HStack(spacing: 10) {
-                        Button { choosesFile = true } label: {
-                            Label("Files", systemImage: "folder").frame(maxWidth: .infinity)
+        return GeometryReader { geometry in
+            ScrollView {
+                VStack(spacing: 16) {
+                    AllowanceBadge(access: conversions.access)
+                    Spacer(minLength: 0)
+                    // Short screens such as the iPhone SE drop the steps and shrink the phone, so the buttons stay in view.
+                    hero(isShort: geometry.size.height < 600)
+                    Spacer(minLength: 12)
+                    VStack(spacing: 12) {
+                        PhotosPicker(selection: $selection, matching: .videos, preferredItemEncoding: .current) {
+                            Label(pickerTitle, systemImage: "photo.badge.plus")
                         }
-                        Button { pastesLink = true } label: {
-                            Label("Paste Link", systemImage: "link").frame(maxWidth: .infinity)
+                        .buttonStyle(KineticButtonStyle())
+                        otherSources
+                        if conversions.access == .ad {
+                            Button(purchases.unlockTitle, systemImage: "infinity") {
+                                Task { await purchases.buyUnlimitedConversions() }
+                            }
+                            .buttonStyle(GlassPillButtonStyle(tint: Theme.accent))
+                            .disabled(purchases.isPurchasing)
                         }
                     }
-                    .buttonStyle(GlassPillButtonStyle())
+                    .disabled(isImporting)
                 }
-                .disabled(isImporting)
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 20)
+                .frame(minHeight: geometry.size.height)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollIndicators(.hidden)
+        }
+        .alert("Share from an App", isPresented: $showsShareTip) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("In Photos, Files, WhatsApp or any app, tap Share on a video and choose Glitter Live. If it isn't listed, tap More and turn it on.")
+        }
+    }
 
-                if conversions.access == .ad {
-                    Button(purchases.unlockTitle, systemImage: "infinity") {
-                        Task { await purchases.buyUnlimitedConversions() }
+    private func hero(isShort: Bool) -> some View {
+        // Side by side normally; stacked at accessibility sizes, where the text column would break mid-word.
+        let isStacked = dynamicTypeSize.isAccessibilitySize
+        let layout = isStacked ? AnyLayout(VStackLayout(spacing: 18)) : AnyLayout(HStackLayout(spacing: 18))
+        return layout {
+            DeviceFrame {
+                AuroraView().overlay { LockScreenOverlay(showsMotionBadge: true) }
+            }
+            .frame(width: isStacked ? 120 : isShort ? 100 : 140)
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Video to Live Wallpaper")
+                    .typography(.headlineSmall)
+                    .foregroundStyle(Theme.textPrimary)
+                Text("Trim a moment from any video. It moves each time you wake your iPhone.")
+                    .typography(.bodyMedium)
+                    .foregroundStyle(Theme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if !isShort {
+                    VStack(alignment: .leading, spacing: 8) {
+                        MiniStep(number: 1, text: "Pick a video")
+                        MiniStep(number: 2, text: "Trim 1–3 seconds")
+                        MiniStep(number: 3, text: "Set it from Photos")
                     }
-                    .buttonStyle(GlassPillButtonStyle(tint: Theme.accent))
-                    .disabled(purchases.isPurchasing)
+                    .padding(.top, 4)
                 }
             }
-            .padding(22)
-            .glass(.floating, cornerRadius: 34)
-            .padding(.horizontal, 16)
-            .padding(.top, 16)
-            .padding(.bottom, 24)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .scrollIndicators(.hidden)
+        .padding(18)
+        .glass(.floating, cornerRadius: 30)
+    }
+
+    /// The less common sources wait in a menu, so Photos stays the obvious first choice.
+    private var otherSources: some View {
+        Menu {
+            Button("Files", systemImage: "folder") { choosesFile = true }
+            Button("Paste Link", systemImage: "link") { pastesLink = true }
+            Divider()
+            Button("Share from an App", systemImage: "square.and.arrow.up") { showsShareTip = true }
+        } label: {
+            Label("Other Sources", systemImage: "ellipsis.circle")
+                .frame(maxWidth: .infinity)
+        }
+        .menuStyle(.button)
+        .buttonStyle(GlassPillButtonStyle())
     }
 
     /// Two sheets can't be up at once, so the picker waits for the link sheet to go.
@@ -256,21 +285,23 @@ private struct AllowanceBadge: View {
     }
 }
 
-private struct StepChip: View {
+private struct MiniStep: View {
     let number: Int
-    let title: String
-    let symbol: String
+    let text: String
 
     var body: some View {
-        VStack(spacing: 6) {
-            Image(systemName: symbol)
-                .scaledIcon(size: 17, weight: .medium)
+        HStack(spacing: 8) {
+            Text("\(number)")
+                .font(.labelSmall)
+                .monospacedDigit()
                 .foregroundStyle(Theme.accent)
-            Text("\(number). \(title)")
+                .frame(width: 20, height: 20)
+                .background(Theme.accent.opacity(0.16), in: Circle())
+            Text(text)
                 .font(.labelMedium.weight(.semibold))
                 .foregroundStyle(Theme.textPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
         }
-        .frame(maxWidth: .infinity, minHeight: 64)
-        .liquidGlass(in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }
