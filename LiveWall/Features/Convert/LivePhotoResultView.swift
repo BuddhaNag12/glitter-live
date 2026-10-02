@@ -86,7 +86,6 @@ struct LivePhotoResultView: View {
         }
         .sheet(isPresented: $showsGuide) {
             SetWallpaperGuideView()
-                .presentationDetents([.medium, .large])
         }
         .alert("Couldn't save", isPresented: .constant(editor.errorMessage != nil)) {
             Button("OK") { editor.errorMessage = nil }

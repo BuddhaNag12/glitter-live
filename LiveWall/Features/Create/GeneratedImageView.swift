@@ -82,7 +82,7 @@ struct GeneratedImageView: View {
             image = UIImage(contentsOfFile: imageURL.path(percentEncoded: false))
         }
         .sheet(isPresented: $showsGuide) {
-            SetWallpaperGuideView().presentationDetents([.medium, .large])
+            SetWallpaperGuideView(isLive: false)
         }
     }
 

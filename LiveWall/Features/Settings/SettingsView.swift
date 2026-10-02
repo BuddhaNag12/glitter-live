@@ -73,7 +73,7 @@ struct SettingsView: View {
             }
         }
         .sheet(isPresented: $showsGuide) {
-            SetWallpaperGuideView().presentationDetents([.medium, .large])
+            SetWallpaperGuideView()
         }
         .purchaseMessages(purchases)
     }

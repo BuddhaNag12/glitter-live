@@ -5,25 +5,30 @@ enum OnboardingState {
     static let completedKey = "hasCompletedOnboarding"
 }
 
-/// First-launch introduction.
+/// First-launch introduction: what the app does, the ways to make a wallpaper, how to set one, and what's free.
 struct OnboardingView: View {
+    /// The launch intro is still playing on top, so the first page waits to animate in.
+    var holdsReveal = false
     var onFinish: () -> Void
 
     @State private var page: Int? = 0
-    private let titles = ["Welcome", "How It Works", "Setup"]
+    private static let pageCount = 4
 
     private var step: Int { page ?? 0 }
+    private var isLastStep: Bool { step == Self.pageCount - 1 }
 
     var body: some View {
         VStack(spacing: 0) {
             header
             // A paging scroll view rather than a page-style TabView, which clips its pages at the footer
-            // instead of letting them scroll underneath it.
+            // instead of letting them scroll underneath it. Not lazy: Continue scrolls to a page by id,
+            // which silently fails if that page hasn't been built yet.
             ScrollView(.horizontal) {
-                LazyHStack(spacing: 0) {
-                    WelcomePage().containerRelativeFrame(.horizontal).id(0)
-                    HowItWorksPage().containerRelativeFrame(.horizontal).id(1)
-                    SetupPage().containerRelativeFrame(.horizontal).id(2)
+                HStack(spacing: 0) {
+                    WelcomePage(isActive: step == 0 && !holdsReveal).containerRelativeFrame(.horizontal).id(0)
+                    WaysPage(isActive: step == 1).containerRelativeFrame(.horizontal).id(1)
+                    SetUpPage(isActive: step == 2).containerRelativeFrame(.horizontal).id(2)
+                    ReadyPage(isActive: step == 3).containerRelativeFrame(.horizontal).id(3)
                 }
                 .scrollTargetLayout()
             }
@@ -37,60 +42,53 @@ struct OnboardingView: View {
     }
 
     private func go(to newStep: Int) {
-        withAnimation(.spring(duration: 0.35)) { page = newStep }
+        withAnimation(.spring(duration: 0.4)) { page = newStep }
     }
 
+    /// Back and Skip get the same minimum width, so the progress dots sit in the center.
     private var header: some View {
-        VStack(spacing: 14) {
-            HStack {
-                Button { go(to: step - 1) } label: { Image(systemName: "chevron.left") }
-                    .buttonStyle(CircleIconButtonStyle(size: 40))
-                    .opacity(step > 0 ? 1 : 0)
-                    .disabled(step == 0)
-                    .accessibilityLabel("Back")
-                Text(titles[step])
-                    .typography(.headlineSmall)
-                    .foregroundStyle(Theme.textPrimary)
-                    .contentTransition(.opacity)
-                Spacer()
-                if step < 2 {
-                    Button("Skip", action: onFinish)
-                        .typography(.titleMedium)
-                        .foregroundStyle(Theme.accent)
-                }
-            }
+        HStack {
+            Button { go(to: step - 1) } label: { Image(systemName: "chevron.left") }
+                .buttonStyle(CircleIconButtonStyle(size: 40))
+                .opacity(step > 0 ? 1 : 0)
+                .disabled(step == 0)
+                .accessibilityLabel("Back")
+                .frame(minWidth: 64, alignment: .leading)
+            Spacer()
             HStack(spacing: 6) {
-                ForEach(0..<3) { index in
+                ForEach(0..<Self.pageCount, id: \.self) { index in
                     Capsule()
                         .fill(index <= step ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(Theme.border))
-                        .frame(width: index == step ? 28 : 10, height: 6)
+                        .frame(width: index == step ? 28 : 8, height: 8)
                 }
-                Spacer()
-                Text("STEP \(step + 1) OF 3")
-                    .font(.labelSmall)
-                    .tracking(1)
-                    .foregroundStyle(Theme.textSecondary)
             }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Step \(step + 1) of 3")
+            .accessibilityLabel("Step \(step + 1) of \(Self.pageCount)")
+            Spacer()
+            Button("Skip", action: onFinish)
+                .typography(.titleMedium)
+                .foregroundStyle(Theme.accent)
+                .fixedSize()
+                .frame(minWidth: 64, minHeight: 44, alignment: .trailing)
+                .opacity(isLastStep ? 0 : 1)
+                .disabled(isLastStep)
         }
         .padding(.horizontal, 20)
         .padding(.top, 8)
-        .padding(.bottom, 4)
         // Swiping between pages changes the step without an animation, so the header animates itself.
         .animation(.spring(duration: 0.35), value: step)
     }
 
     private var footer: some View {
-        VStack(spacing: 10) {
-            Button {
-                if step < 2 { go(to: step + 1) } else { onFinish() }
-            } label: {
-                Label(step < 2 ? "Continue" : "Start Creating", systemImage: "arrow.right")
-                    .labelStyle(TrailingIcon())
-            }
-            .buttonStyle(KineticButtonStyle())
+        Button {
+            if isLastStep { onFinish() } else { go(to: step + 1) }
+        } label: {
+            Label(isLastStep ? "Start Creating" : "Continue", systemImage: isLastStep ? "sparkles" : "arrow.right")
+                .labelStyle(TrailingIcon())
+                .contentTransition(.interpolate)
         }
+        .buttonStyle(KineticButtonStyle())
+        .animation(.spring(duration: 0.35), value: isLastStep)
         .padding(.horizontal, 20)
         .padding(.top, 12)
         .padding(.bottom, 8)
@@ -105,117 +103,116 @@ struct OnboardingView: View {
 // MARK: - Pages
 
 private struct WelcomePage: View {
+    let isActive: Bool
+    @State private var isShown = false
+
     var body: some View {
-        OnboardingPage {
-            StatusPill(text: "LOCK SCREEN MOTION")
-            Text("Welcome to Glitter Live")
-                .typography(.displayLarge)
-                .foregroundStyle(Theme.textPrimary)
-            Text("Turn your Lock Screen into a moving gallery. Your wallpaper comes alive every time you wake your iPhone.")
-                .typography(.bodyLarge)
-                .foregroundStyle(Theme.textSecondary)
-
-            DeviceFrame {
-                AuroraView().overlay { LockScreenOverlay() }
-            }
-            .frame(width: 190)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 6)
-
-            GlassGroup(spacing: 8) {
-                FlowChips(items: [
-                    ("sparkles", "Moves when you wake"),
-                    ("livephoto", "Real Live Photos"),
-                    ("checkmark.seal", "Free, no watermark"),
-                ])
-            }
-
-            FeatureList(rows: [
-                .init(symbol: "livephoto", title: "Video to Live Wallpaper", detail: "Trim any video into a Lock Screen wallpaper in seconds."),
-                FeatureFlags.aiGeneration
-                    ? .init(symbol: "wand.and.stars", title: "AI Generator", detail: "Describe a scene, and AI brings it to life as a live wallpaper.")
-                    : .init(symbol: "sparkles", title: "Curated Wallpapers", detail: "Browse hand-picked live wallpapers and save one in a tap."),
+        OnboardingPage { isShort in
+            WakingPhone(isAnimating: isActive)
+                .frame(width: isShort ? 112 : 168)
+                .padding(.bottom, 6)
+                .reveal(isShown, order: 0)
+            PageTitle("Welcome to Glitter Live", detail: "Your Lock Screen, alive. Your wallpaper moves every time you wake your iPhone.")
+                .reveal(isShown, order: 1)
+            FlowChips(items: [
+                ("sparkles", "Moves when you wake"),
+                ("livephoto", "Real Live Photos"),
+                ("checkmark.seal", "No watermark"),
             ])
+            .reveal(isShown, order: 2)
         }
+        .onChange(of: isActive, initial: true) { _, active in if active { isShown = true } }
     }
 }
 
-private struct HowItWorksPage: View {
+private struct WaysPage: View {
+    let isActive: Bool
+    @State private var isShown = false
+
     var body: some View {
-        OnboardingPage(alignment: .center) {
-            Text("Convert Any Video in Seconds")
-                .typography(.headlineLarge)
-                .foregroundStyle(Theme.textPrimary)
-                .multilineTextAlignment(.center)
-            Text("Pick a 1–3 second moment, frame it around the clock, and choose the photo shown while your iPhone is locked.")
-                .typography(.bodyMedium)
-                .foregroundStyle(Theme.textSecondary)
-                .multilineTextAlignment(.center)
-
-            DeviceFrame {
-                AuroraView(colors: [WallpaperPalette.sky, Color(hex: 0x1E3A8A), WallpaperPalette.indigo])
-                    .overlay { LockScreenOverlay(showsMotionBadge: true) }
+        OnboardingPage { isShort in
+            PageTitle(
+                "Make One Your Way",
+                detail: FeatureFlags.aiGeneration
+                    ? "Start from the gallery, any video, or a few words."
+                    : "Start from the gallery or any video you have."
+            )
+            .reveal(isShown, order: 0)
+            if !isShort {
+                TrimPreviewCard(isAnimating: isActive)
+                    .reveal(isShown, order: 1)
             }
-            .frame(width: 170)
-            .padding(.vertical, 4)
-
-            TrimPreviewCard()
-
-            FeatureList(rows: [
-                .init(symbol: "timeline.selection", title: "Precise Trimming", detail: "Drag the handles to pick exactly the moment you want."),
-                .init(symbol: "photo", title: "Sharp Cover Photo", detail: "Choose the frame your Lock Screen shows while asleep, at full screen resolution."),
-                .init(symbol: "lock.shield", title: "Privacy First", detail: "Glitter Live only asks to add photos. It never reads your library."),
-            ])
+            WayRow(symbol: "sparkles", title: "Explore", detail: "Hand-picked live wallpapers, saved in a tap.")
+                .reveal(isShown, order: 2)
+            WayRow(symbol: "livephoto", title: "Convert a video", detail: "From Photos, Files, a link, or Share in another app.")
+                .reveal(isShown, order: 3)
+            if FeatureFlags.aiGeneration {
+                WayRow(symbol: "wand.and.stars", title: "Create with AI", detail: "Describe a scene, then add motion on your iPhone.")
+                    .reveal(isShown, order: 4)
+            }
         }
+        .onChange(of: isActive, initial: true) { _, active in if active { isShown = true } }
     }
 }
 
-private struct SetupPage: View {
+private struct SetUpPage: View {
+    let isActive: Bool
+    @State private var isShown = false
+
+    var body: some View {
+        OnboardingPage { isShort in
+            if !isShort {
+                HeroIcon(symbol: "photo.on.rectangle.angled", isShown: isShown)
+                    .reveal(isShown, order: 0)
+            }
+            PageTitle("Set It From Photos", detail: "Only Photos can set a wallpaper, so it takes four quick taps. You'll find these steps in Settings too.")
+                .reveal(isShown, order: 1)
+            WallpaperSteps(highlightsInTurn: isActive)
+                .reveal(isShown, order: 2)
+        }
+        .onChange(of: isActive, initial: true) { _, active in if active { isShown = true } }
+    }
+}
+
+private struct ReadyPage: View {
+    let isActive: Bool
+    @State private var isShown = false
     @State private var status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
 
     var body: some View {
-        OnboardingPage(alignment: .center) {
-            ZStack(alignment: .topTrailing) {
-                Image(systemName: "checkmark.seal.fill")
-                    .font(.system(size: 40))
-                    .foregroundStyle(Theme.accent)
-                    .frame(width: 96, height: 96)
-                    .liquidGlass(in: Circle(), tint: Theme.accent.opacity(0.18))
-                Image(systemName: "bolt.fill")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 30, height: 30)
-                    .background(Theme.accentFill, in: Circle())
-                    .offset(x: 4, y: -4)
+        OnboardingPage { isShort in
+            if !isShort {
+                HeroIcon(symbol: "checkmark.seal.fill", badge: "bolt.fill", isShown: isShown)
+                    .reveal(isShown, order: 0)
             }
-            .padding(.top, 8)
-
-            Text("You're All Set")
-                .typography(.displayLarge)
-                .foregroundStyle(Theme.textPrimary)
-            Text("Pick any video and make your first live wallpaper in seconds.")
-                .typography(.bodyLarge)
-                .foregroundStyle(Theme.textSecondary)
-                .multilineTextAlignment(.center)
-
+            PageTitle("You're All Set", detail: "Pick a video or a wallpaper and make your first one in seconds.")
+                .reveal(isShown, order: 1)
             permissionCard
-
-            VStack(alignment: .leading, spacing: 14) {
-                Label("What's included", systemImage: "star")
-                    .typography(.headlineSmall)
-                    .foregroundStyle(Theme.textPrimary)
-                IncludedRow(symbol: "infinity", title: "Unlimited conversions", detail: "Turn as many videos into live wallpapers as you like.")
-                IncludedRow(symbol: "photo.on.rectangle.angled", title: "Your Library", detail: "Every wallpaper you make is kept, ready to save or set again.")
-                if FeatureFlags.aiGeneration {
-                    IncludedRow(symbol: "wand.and.stars", title: "AI Generator", detail: "5 free generations, then free with a short ad.")
-                } else {
-                    IncludedRow(symbol: "sparkles", title: "Curated wallpapers", detail: "Hand-picked live wallpapers in Explore, saved in one tap.")
-                }
-            }
-            .padding(18)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .glass(.floating, cornerRadius: 28)
+                .reveal(isShown, order: 2)
+            includedCard
+                .reveal(isShown, order: 3)
         }
+        .onChange(of: isActive, initial: true) { _, active in if active { isShown = true } }
+    }
+
+    private var includedCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("What's included")
+                .typography(.titleMedium)
+                .foregroundStyle(Theme.textPrimary)
+            if FeatureFlags.conversionLimits {
+                IncludedRow(symbol: "gift", title: "\(ConversionAllowance.freeConversions) free conversions", detail: "Then a short ad for each, or unlock unlimited once.")
+            } else {
+                IncludedRow(symbol: "infinity", title: "Free conversions", detail: "Turn as many videos into live wallpapers as you like.")
+            }
+            if FeatureFlags.aiGeneration {
+                IncludedRow(symbol: "wand.and.stars", title: "AI Generator", detail: "\(GenerationAllowance.freeGenerations) free generations, then free with a short ad.")
+            }
+            IncludedRow(symbol: "photo.on.rectangle.angled", title: "Your Library", detail: "Everything you make is kept, ready to save or set again.")
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glass(.floating, cornerRadius: 26)
     }
 
     private var permissionCard: some View {
@@ -228,15 +225,15 @@ private struct SetupPage: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text("Save to Photos").typography(.titleMedium).foregroundStyle(Theme.textPrimary)
                 Text(status == .notDetermined
-                     ? "Asked the first time you save a wallpaper. Glitter Live can't see your other photos."
+                     ? "Asked the first time you save. Glitter Live can't see your other photos."
                      : "Needed to add your wallpapers to Photos. Glitter Live can't see your other photos.")
                     .font(.labelMedium)
                     .foregroundStyle(Theme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
             if granted {
-                Label("Allowed", systemImage: "checkmark")
-                    .labelStyle(.iconOnly)
+                Image(systemName: "checkmark")
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(Theme.onAccent)
                     .frame(width: 34, height: 34)
@@ -250,73 +247,167 @@ private struct SetupPage: View {
             }
         }
         .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .glass(.surface, cornerRadius: 24)
     }
 }
 
 // MARK: - Building blocks
 
+/// One screen per page: content is centered vertically and only scrolls when large text needs it.
+/// Short screens such as the iPhone SE get told so, and leave out decoration to keep everything in view.
 private struct OnboardingPage<Content: View>: View {
-    var alignment: HorizontalAlignment = .leading
-    @ViewBuilder var content: Content
+    @ViewBuilder var content: (_ isShort: Bool) -> Content
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: alignment, spacing: 16) {
-                content
+        GeometryReader { geometry in
+            ScrollView {
+                VStack(spacing: 18) {
+                    content(geometry.size.height < 560)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .frame(minHeight: geometry.size.height)
             }
-            .frame(maxWidth: .infinity, alignment: alignment == .center ? .center : .leading)
-            .padding(.horizontal, 20)
-            .padding(.top, 12)
-            .padding(.bottom, 24)
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollIndicators(.hidden)
         }
-        .scrollIndicators(.hidden)
     }
 }
 
-private struct FeatureList: View {
-    struct Row: Identifiable {
-        let symbol: String
-        let title: String
-        let detail: String
-        var badge: String?
-        var id: String { title }
+private struct PageTitle: View {
+    let title: String
+    let detail: String
+
+    init(_ title: String, detail: String) {
+        self.title = title
+        self.detail = detail
     }
 
-    let rows: [Row]
+    var body: some View {
+        VStack(spacing: 10) {
+            Text(title)
+                .typography(.headlineLarge)
+                .foregroundStyle(Theme.textPrimary)
+            Text(detail)
+                .typography(.bodyLarge)
+                .foregroundStyle(Theme.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .multilineTextAlignment(.center)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// Fades and rises into place, one element after another, the first time a page appears.
+private struct Reveal: ViewModifier {
+    let isShown: Bool
+    let order: Int
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(isShown ? 1 : 0)
+            .offset(y: isShown || reduceMotion ? 0 : 20)
+            .animation(.spring(duration: 0.55, bounce: 0.2).delay(0.05 * Double(order)), value: isShown)
+    }
+}
+
+private extension View {
+    func reveal(_ isShown: Bool, order: Int) -> some View {
+        modifier(Reveal(isShown: isShown, order: order))
+    }
+}
+
+/// A Lock Screen that keeps waking up: dark and still, then bright and moving, like the real thing.
+private struct WakingPhone: View {
+    let isAnimating: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        VStack(spacing: 0) {
-            ForEach(rows) { row in
-                HStack(alignment: .top, spacing: 14) {
-                    Image(systemName: row.symbol)
-                        .scaledIcon(size: 18, weight: .medium, frame: 44)
-                        .foregroundStyle(Theme.accent)
-                        .liquidGlass(in: Circle())
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 8) {
-                            Text(row.title).typography(.titleMedium).foregroundStyle(Theme.textPrimary)
-                            if let badge = row.badge {
-                                Text(badge)
-                                    .font(.labelSmall)
-                                    .tracking(0.8)
-                                    .foregroundStyle(Theme.signalYellow)
-                                    .padding(.horizontal, 8)
-                                    .frame(height: 22)
-                                    .background(Theme.signalYellow.opacity(0.14), in: Capsule())
-                            }
-                        }
-                        Text(row.detail).typography(.bodyMedium).foregroundStyle(Theme.textSecondary)
-                    }
-                    Spacer(minLength: 0)
-                }
-                .padding(16)
-                if row.id != rows.last?.id {
-                    Divider().overlay(Theme.stroke).padding(.horizontal, 16)
-                }
+        if reduceMotion || !isAnimating {
+            phone(awake: true)
+        } else {
+            PhaseAnimator([false, true]) { awake in
+                phone(awake: awake)
+            } animation: { awake in
+                awake ? .spring(duration: 0.7, bounce: 0.25).delay(0.9) : .easeIn(duration: 0.6).delay(2.6)
             }
         }
-        .glass(.floating, cornerRadius: 26)
+    }
+
+    private func phone(awake: Bool) -> some View {
+        DeviceFrame {
+            AuroraView(isAnimated: awake)
+                .overlay { LockScreenOverlay(showsMotionBadge: awake) }
+                .brightness(awake ? 0 : -0.55)
+                .saturation(awake ? 1 : 0.4)
+        }
+        .scaleEffect(awake ? 1 : 0.95)
+        .background {
+            Circle()
+                .fill(Theme.glowPrimary)
+                .blur(radius: 50)
+                .scaleEffect(awake ? 1.2 : 0.6)
+                .opacity(awake ? 1 : 0.3)
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+private struct HeroIcon: View {
+    let symbol: String
+    var badge: String?
+    let isShown: Bool
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Image(systemName: symbol)
+                .font(.system(size: 38))
+                .foregroundStyle(Theme.accent)
+                .symbolEffect(.bounce, value: isShown)
+                .frame(width: 92, height: 92)
+                .liquidGlass(in: Circle(), tint: Theme.accent.opacity(0.18))
+            if let badge {
+                Image(systemName: badge)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 30, height: 30)
+                    .background(Theme.accentFill, in: Circle())
+                    .offset(x: 4, y: -4)
+                    .scaleEffect(isShown ? 1 : 0.2)
+                    .animation(.spring(duration: 0.5, bounce: 0.5).delay(0.35), value: isShown)
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+private struct WayRow: View {
+    let symbol: String
+    let title: String
+    let detail: String
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Image(systemName: symbol)
+                .scaledIcon(size: 18, weight: .medium, frame: 44)
+                .foregroundStyle(Theme.accent)
+                .liquidGlass(in: Circle(), tint: Theme.accent.opacity(0.14))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).typography(.titleMedium).foregroundStyle(Theme.textPrimary)
+                Text(detail)
+                    .typography(.bodyMedium)
+                    .foregroundStyle(Theme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glass(.floating, cornerRadius: 22)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -324,40 +415,79 @@ private struct FlowChips: View {
     let items: [(symbol: String, text: String)]
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 8) { chips }
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 8) { chips(items.prefix(2)) }
-                HStack(spacing: 8) { chips(items.dropFirst(2)) }
+        CenteredFlow(spacing: 8) {
+            ForEach(items, id: \.text) { item in
+                Label(item.text, systemImage: item.symbol)
+                    .font(.labelMedium.weight(.semibold))
+                    .foregroundStyle(Theme.textPrimary)
+                    .lineLimit(1)
+                    .fixedSize()
+                    .padding(.horizontal, 12)
+                    .frame(height: 34)
+                    .liquidGlass(in: Capsule())
             }
-        }
-    }
-
-    private var chips: some View { chips(items[...]) }
-
-    private func chips(_ slice: ArraySlice<(symbol: String, text: String)>) -> some View {
-        ForEach(slice, id: \.text) { item in
-            Label(item.text, systemImage: item.symbol)
-                .font(.labelMedium.weight(.semibold))
-                .foregroundStyle(Theme.textPrimary)
-                .padding(.horizontal, 12)
-                .frame(height: 34)
-                .liquidGlass(in: Capsule())
         }
     }
 }
 
+/// Lays chips out in centered rows, starting a new row only when the next chip doesn't fit.
+private struct CenteredFlow: Layout {
+    var spacing: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let rows = rows(for: subviews, width: proposal.width ?? .infinity)
+        let height = rows.map(\.height).reduce(0, +) + spacing * CGFloat(max(rows.count - 1, 0))
+        return CGSize(width: proposal.width ?? rows.map(\.width).max() ?? 0, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var y = bounds.minY
+        for row in rows(for: subviews, width: bounds.width) {
+            var x = bounds.midX - row.width / 2
+            for index in row.indices {
+                let size = subviews[index].sizeThatFits(.unspecified)
+                subviews[index].place(at: CGPoint(x: x, y: y), proposal: .unspecified)
+                x += size.width + spacing
+            }
+            y += row.height + spacing
+        }
+    }
+
+    private func rows(for subviews: Subviews, width: CGFloat) -> [(indices: [Int], width: CGFloat, height: CGFloat)] {
+        var rows: [(indices: [Int], width: CGFloat, height: CGFloat)] = []
+        for index in subviews.indices {
+            let size = subviews[index].sizeThatFits(.unspecified)
+            if var last = rows.last, last.width + spacing + size.width <= width {
+                last.indices.append(index)
+                last.width += spacing + size.width
+                last.height = max(last.height, size.height)
+                rows[rows.count - 1] = last
+            } else {
+                rows.append(([index], size.width, size.height))
+            }
+        }
+        return rows
+    }
+}
+
+/// A miniature Trim Studio whose playhead keeps sweeping through the chosen moment.
 private struct TrimPreviewCard: View {
+    let isAnimating: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private let clipStart = 0.14
+    private let clipWidth = 0.58
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Label("Trim & Key Frame", systemImage: "film")
+                Label("Trim the moment", systemImage: "film")
                     .typography(.titleMedium)
                     .foregroundStyle(Theme.textPrimary)
                 Spacer()
-                Text("Target: \(Text("2.4 s").foregroundStyle(Theme.accent))")
+                Text("1–3 s")
                     .font(.labelMedium.weight(.semibold))
-                    .foregroundStyle(Theme.textSecondary)
+                    .foregroundStyle(Theme.accent)
                     .padding(.horizontal, 10)
                     .frame(height: 26)
                     .liquidGlass(in: Capsule())
@@ -367,16 +497,20 @@ private struct TrimPreviewCard: View {
                 ZStack(alignment: .leading) {
                     AuroraView().opacity(0.5)
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(Theme.signalYellow, lineWidth: 3)
-                        .frame(width: width * 0.62)
+                        .strokeBorder(Theme.trimHandle, lineWidth: 3)
+                        .frame(width: width * clipWidth)
                         .overlay(alignment: .leading) { handle }
                         .overlay(alignment: .trailing) { handle }
-                        .offset(x: width * 0.12)
-                    VStack(spacing: 0) {
-                        Circle().fill(Theme.accent).frame(width: 10, height: 10)
-                        Rectangle().fill(.white).frame(width: 2)
+                        .offset(x: width * clipStart)
+                    if reduceMotion || !isAnimating {
+                        playhead.offset(x: width * (clipStart + clipWidth * 0.45))
+                    } else {
+                        PhaseAnimator([false, true]) { atEnd in
+                            playhead.offset(x: width * (clipStart + 0.03 + (atEnd ? clipWidth - 0.06 : 0)))
+                        } animation: { atEnd in
+                            atEnd ? .linear(duration: 1.6) : .easeOut(duration: 0.25).delay(0.3)
+                        }
                     }
-                    .offset(x: width * 0.42)
                 }
             }
             .frame(height: 54)
@@ -387,9 +521,16 @@ private struct TrimPreviewCard: View {
         .accessibilityHidden(true)
     }
 
+    private var playhead: some View {
+        VStack(spacing: 0) {
+            Circle().fill(Theme.accent).frame(width: 10, height: 10)
+            Rectangle().fill(.white).frame(width: 2)
+        }
+    }
+
     private var handle: some View {
         RoundedRectangle(cornerRadius: 6, style: .continuous)
-            .fill(Theme.signalYellow)
+            .fill(Theme.trimHandle)
             .frame(width: 12)
     }
 }
@@ -407,7 +548,10 @@ private struct IncludedRow: View {
                 .background(Theme.accent.opacity(0.12), in: Circle())
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).typography(.titleMedium).foregroundStyle(Theme.textPrimary)
-                Text(detail).font(.labelMedium).foregroundStyle(Theme.textSecondary)
+                Text(detail)
+                    .font(.labelMedium)
+                    .foregroundStyle(Theme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

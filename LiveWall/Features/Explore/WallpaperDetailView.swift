@@ -86,7 +86,7 @@ struct WallpaperDetailView: View {
         .onAppear(perform: startPreview)
         .onDisappear { player.pause() }
         .sheet(isPresented: $showsGuide) {
-            SetWallpaperGuideView().presentationDetents([.medium, .large])
+            SetWallpaperGuideView()
         }
         .sensoryFeedback(trigger: saver.phase) { _, phase in
             switch phase {

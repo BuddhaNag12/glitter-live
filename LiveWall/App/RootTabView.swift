@@ -2,7 +2,7 @@ import SwiftData
 import SwiftUI
 
 struct RootTabView: View {
-    /// Onboarding is a full-screen cover, which would appear above the launch intro, so it waits for it.
+    /// Explore and the first onboarding page hold their entrance animations until the launch intro has gone.
     var isLaunchIntroPlaying = false
 
     @State private var selection: AppTab = Self.initialTab
@@ -44,21 +44,29 @@ struct RootTabView: View {
         .sheet(isPresented: $showsSettings, onDismiss: showIntroIfRequested) {
             SettingsView { showsIntroAfterSettings = true }
         }
-        .fullScreenCover(isPresented: Binding(get: { !hasCompletedOnboarding && !isLaunchIntroPlaying }, set: { hasCompletedOnboarding = !$0 })) {
-            OnboardingView { hasCompletedOnboarding = true }
+        // A layer under the launch intro rather than a full-screen cover, which could only slide up once the
+        // intro had gone and showed the tabs for a moment first. The intro now fades straight into it.
+        .accessibilityHidden(!hasCompletedOnboarding)
+        .overlay {
+            if !hasCompletedOnboarding {
+                OnboardingView(holdsReveal: isLaunchIntroPlaying) {
+                    withAnimation(.easeOut(duration: 0.35)) { hasCompletedOnboarding = true }
+                }
+                .transition(.opacity)
+            }
         }
     }
 
     private func showIntroIfRequested() {
         guard showsIntroAfterSettings else { return }
         showsIntroAfterSettings = false
-        hasCompletedOnboarding = false
+        withAnimation(.easeOut(duration: 0.35)) { hasCompletedOnboarding = false }
     }
 
     @ViewBuilder
     private func screen(for tab: AppTab) -> some View {
         switch tab {
-        case .explore: ExploreView(holdsReveal: isLaunchIntroPlaying)
+        case .explore: ExploreView(holdsReveal: isLaunchIntroPlaying || !hasCompletedOnboarding)
         case .create: CreateView()
         case .convert: ConvertView()
         case .library: LibraryView { selection = .convert }

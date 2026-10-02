@@ -79,7 +79,7 @@ struct CreationDetailView: View {
             }
         }
         .sheet(isPresented: $showsGuide) {
-            SetWallpaperGuideView().presentationDetents([.medium, .large])
+            SetWallpaperGuideView(isLive: creation.isLive)
         }
         .fullScreenCover(isPresented: $addsMotion) {
             AddMotionView(imageURL: creation.imageURL)
