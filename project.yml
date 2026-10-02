@@ -4,6 +4,7 @@ options:
   deploymentTarget:
     iOS: "17.0"
   createIntermediateGroups: true
+fileGroups: [StoreKit]
 settings:
   base:
     SWIFT_VERSION: "6.0"
@@ -69,5 +70,8 @@ schemes:
     build:
       targets:
         LiveWall: all
+    run:
+      # Local products for purchases run from Xcode; device installs outside Xcode use App Store sandbox products.
+      storeKitConfiguration: StoreKit/LiveWall.storekit
     test:
       targets: [LiveWallTests, LiveWallUITests]

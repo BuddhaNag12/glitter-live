@@ -8,6 +8,8 @@ struct ConvertView: View {
     @State private var isImporting = false
     @State private var importError: String?
     @Environment(\.modelContext) private var modelContext
+    @Environment(ConversionAllowance.self) private var conversions
+    @Environment(Purchases.self) private var purchases
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private enum Stage { case pick, edit, result, unavailable }
@@ -44,6 +46,7 @@ struct ConvertView: View {
             guard let item else { return }
             Task { await importVideo(item) }
         }
+        .purchaseMessages(purchases)
         .alert("Couldn't open video", isPresented: .constant(importError != nil)) {
             Button("OK") { importError = nil }
         } message: {
@@ -83,9 +86,17 @@ struct ConvertView: View {
                 .buttonStyle(KineticButtonStyle())
                 .disabled(isImporting)
 
-                Label("Free forever · No watermark", systemImage: "checkmark.seal.fill")
+                allowanceLabel
                     .font(.labelMedium.weight(.semibold))
                     .foregroundStyle(Theme.accent)
+
+                if conversions.access == .ad {
+                    Button(purchases.unlockTitle, systemImage: "lock.open") {
+                        Task { await purchases.buyUnlimitedConversions() }
+                    }
+                    .buttonStyle(GlassPillButtonStyle(tint: Theme.accent))
+                    .disabled(purchases.isPurchasing)
+                }
             }
             .padding(22)
             .glass(.floating, cornerRadius: 34)
@@ -96,6 +107,20 @@ struct ConvertView: View {
         .scrollIndicators(.hidden)
     }
 
+    /// How the next save is paid for, so an ad never comes as a surprise.
+    @ViewBuilder private var allowanceLabel: some View {
+        switch conversions.access {
+        case .unlimited:
+            Label("Free forever · No watermark", systemImage: "checkmark.seal.fill")
+        case .free(let remaining):
+            Label(remaining == 1 ? "1 free conversion left · No watermark" : "\(remaining) free conversions left · No watermark", systemImage: "gift.fill")
+        case .ad:
+            Label("Free with a short ad · No watermark", systemImage: "play.rectangle.fill")
+        case .unlocked:
+            Label("Unlimited · No watermark", systemImage: "checkmark.seal.fill")
+        }
+    }
+
     private func importVideo(_ item: PhotosPickerItem) async {
         isImporting = true
         defer { isImporting = false }
@@ -104,7 +129,7 @@ struct ConvertView: View {
                 importError = "The selected item isn't a video."
                 return
             }
-            editor = ConvertEditor(sourceURL: video.url, library: CreationLibrary(context: modelContext))
+            editor = ConvertEditor(sourceURL: video.url, library: CreationLibrary(context: modelContext), allowance: conversions)
         } catch {
             importError = error.localizedDescription
         }

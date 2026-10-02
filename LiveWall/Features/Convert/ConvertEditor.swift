@@ -40,18 +40,23 @@ final class ConvertEditor {
     var canvasSize: CGSize = .zero
 
     var errorMessage: String?
+    /// This video already used a free conversion or an ad, so saving it again after more edits costs nothing.
+    private(set) var isPaidFor = false
 
     let player = AVQueuePlayer()
     @ObservationIgnored private var looper: AVPlayerLooper?
     @ObservationIgnored private let library: CreationLibrary?
+    /// Convert's limits. Create's generated videos pass none, because they're paid for when the image is made.
+    @ObservationIgnored private let allowance: ConversionAllowance?
     @ObservationIgnored private var creation: Creation?
     @ObservationIgnored private var initialEdits: Edits?
     @ObservationIgnored private var scrubTarget: CMTime?
     @ObservationIgnored private var isSeeking = false
 
-    init(sourceURL: URL, library: CreationLibrary? = nil) {
+    init(sourceURL: URL, library: CreationLibrary? = nil, allowance: ConversionAllowance? = nil) {
         self.sourceURL = sourceURL
         self.library = library
+        self.allowance = allowance
         player.isMuted = true
     }
 
@@ -236,9 +241,16 @@ final class ConvertEditor {
 
     // MARK: Export
 
+    /// The free conversions are used up, so this video needs an ad or the unlock before it can be saved.
+    var needsPayment: Bool { !isPaidFor && allowance?.access == .ad }
+
+    func adWatched() {
+        isPaidFor = true
+    }
+
     /// With `savesToPhotos` off, the result is only previewed; `save` keeps it in the Library and Photos when asked.
     func export(savesToPhotos: Bool = true) async {
-        guard phase == .editing else { return }
+        guard phase == .editing, !needsPayment else { return }
         phase = .exporting
         player.pause()
         let request = LivePhotoRequest(
@@ -251,6 +263,10 @@ final class ConvertEditor {
         )
         do {
             let result = try await LivePhotoBuilder.build(request, in: .livePhotosDirectory)
+            if !isPaidFor, let allowance {
+                allowance.recordFreeConversion()
+                isPaidFor = true
+            }
             guard savesToPhotos else {
                 phase = .finished(result, saved: false)
                 return
