@@ -31,3 +31,7 @@ SOFTWARE.
 ## Inter
 
 The bundled Inter font files are licensed under the SIL Open Font License; see `LiveWall/Resources/Fonts/Inter-LICENSE.txt`.
+
+## Depth Anything V2
+
+Create's parallax motion uses Depth Anything V2 Small, converted to Core ML by Apple (https://huggingface.co/apple/coreml-depth-anything-v2-small), from Depth Anything V2 by Lihe Yang et al. (https://github.com/DepthAnything/Depth-Anything-V2). Licensed under the Apache License, Version 2.0 (https://www.apache.org/licenses/LICENSE-2.0). The model is used unmodified.

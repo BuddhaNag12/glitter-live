@@ -38,6 +38,9 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.distinction.livewall
         TARGETED_DEVICE_FAMILY: "1"
+        # Compiles the Metal files as Core Image kernels (DepthParallax.metal).
+        MTL_COMPILER_FLAGS: -fcikernel
+        MTLLINKER_FLAGS: -cikernel
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
   LiveWallTests:
     type: bundle.unit-test

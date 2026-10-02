@@ -7,6 +7,8 @@ nonisolated enum DemoLaunch {
     static var opensEditor: Bool { ProcessInfo.processInfo.arguments.contains("-demoVideo") }
     static var opensResult: Bool { ProcessInfo.processInfo.arguments.contains("-demoResult") }
     static var seedsLibrary: Bool { ProcessInfo.processInfo.arguments.contains("-demoLibrary") }
+    /// Makes Create use the on-device stand-in instead of the AI server, for offline runs and screenshots.
+    static var usesPreviewGenerator: Bool { ProcessInfo.processInfo.arguments.contains("-previewGenerator") }
     /// Holds Explore on its loading placeholders for a few seconds before the catalog loads.
     static var holdsLoading: Bool { ProcessInfo.processInfo.arguments.contains("-demoLoading") }
     /// Demo runs use a throwaway store so they never touch the real library.
