@@ -18,7 +18,8 @@ When AI motion is available (`FeatureFlags.aiMotion`), Add Motion can offer it a
 
 | | Free | Glitter Live Pro |
 |---|---|---|
-| Explore, Convert, Library | Free, no ads | Free, no ads |
+| Explore, Library | Free, no ads | Free, no ads |
+| Convert | First 5 free, then one rewarded ad per video, or the one-time Unlimited Conversions purchase | Same as Free (Pro covers Create only) |
 | AI generations | First 5 free, then one rewarded ad per generation | No ads, up to 100 a month |
 | Daily limit | 10 ad generations a day | Covered by the monthly cap |
 | Price | Free | ₹299 a month (one plan, auto-renewing) |

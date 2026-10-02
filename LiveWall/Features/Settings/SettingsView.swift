@@ -10,6 +10,8 @@ struct SettingsView: View {
     var onShowIntro: () -> Void = {}
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(ConversionAllowance.self) private var conversions
+    @Environment(Purchases.self) private var purchases
     @State private var showsGuide = false
 
     private var version: String {
@@ -23,6 +25,10 @@ struct SettingsView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
+                    if conversions.access != .unlimited {
+                        purchaseRows.glass(.surface, cornerRadius: 22)
+                    }
+
                     VStack(spacing: 0) {
                         row("How to set a live wallpaper", symbol: "iphone.gen3") { showsGuide = true }
                         Divider().overlay(Theme.stroke)
@@ -69,19 +75,45 @@ struct SettingsView: View {
         .sheet(isPresented: $showsGuide) {
             SetWallpaperGuideView().presentationDetents([.medium, .large])
         }
+        .purchaseMessages(purchases)
     }
 
-    private func row(_ title: String, symbol: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) { rowLabel(title, symbol: symbol) }
+    private var purchaseRows: some View {
+        VStack(spacing: 0) {
+            if conversions.access == .unlocked {
+                rowLabel("Unlimited conversions", symbol: "checkmark.seal.fill", detail: "Unlocked")
+            } else {
+                row("Unlock unlimited conversions", symbol: "lock.open", detail: purchases.unlimitedConversions?.displayPrice) {
+                    Task { await purchases.buyUnlimitedConversions() }
+                }
+                .disabled(purchases.isPurchasing)
+            }
+            Divider().overlay(Theme.stroke)
+            row("Restore purchases", symbol: "arrow.clockwise") {
+                Task { await purchases.restore() }
+            }
+            #if DEBUG
+            Divider().overlay(Theme.stroke)
+            row("Reset free conversions", symbol: "hammer", detail: "\(conversions.freeUsed) used", action: conversions.reset)
+            #endif
+        }
     }
 
-    /// Rows that leave the app end in an outward arrow instead of a chevron.
-    private func rowLabel(_ title: String, symbol: String, opensWeb: Bool = false) -> some View {
+    private func row(_ title: String, symbol: String, detail: String? = nil, action: @escaping () -> Void) -> some View {
+        Button(action: action) { rowLabel(title, symbol: symbol, detail: detail) }
+    }
+
+    /// Rows that leave the app end in an outward arrow instead of a chevron; rows with a detail show it instead.
+    private func rowLabel(_ title: String, symbol: String, opensWeb: Bool = false, detail: String? = nil) -> some View {
         HStack(spacing: 12) {
             Image(systemName: symbol).foregroundStyle(Theme.accent).frame(width: 24)
             Text(title).typography(.bodyLarge).foregroundStyle(Theme.textPrimary)
             Spacer()
-            Image(systemName: opensWeb ? "arrow.up.forward" : "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(Theme.textTertiary)
+            if let detail {
+                Text(detail).typography(.bodyMedium).foregroundStyle(Theme.textSecondary)
+            } else {
+                Image(systemName: opensWeb ? "arrow.up.forward" : "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(Theme.textTertiary)
+            }
         }
         .padding(.horizontal, 16)
         .frame(minHeight: 54)

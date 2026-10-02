@@ -20,8 +20,13 @@ enum DemoAppearance {
 struct LiveWallApp: App {
     private let modelContainer = Self.makeModelContainer()
     @State private var playsLaunchIntro = LaunchIntro.shouldPlay
+    @State private var conversions: ConversionAllowance
+    @State private var purchases: Purchases
 
     init() {
+        let conversions = ConversionAllowance()
+        _conversions = State(initialValue: conversions)
+        _purchases = State(initialValue: Purchases(conversions: conversions))
         // Catalog thumbnails are immutable, so a larger cache means they download once.
         URLCache.shared = URLCache(memoryCapacity: 32 * 1024 * 1024, diskCapacity: 256 * 1024 * 1024)
     }
@@ -36,6 +41,9 @@ struct LiveWallApp: App {
             }
             .preferredColorScheme(DemoAppearance.override)
             .tint(Theme.accent)
+            .environment(conversions)
+            .environment(purchases)
+            .task { await purchases.load() }
         }
         .modelContainer(modelContainer)
     }
