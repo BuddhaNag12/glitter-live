@@ -7,9 +7,14 @@ struct ConvertView: View {
     @State private var editor: ConvertEditor?
     @State private var isImporting = false
     @State private var importError: String?
+    @State private var choosesFile = false
+    @State private var pastesLink = false
+    @State private var choosesPhoto = false
+    @State private var opensPhotosAfterLink = false
     @Environment(\.modelContext) private var modelContext
     @Environment(ConversionAllowance.self) private var conversions
     @Environment(Purchases.self) private var purchases
+    @Environment(IncomingVideo.self) private var incoming
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private enum Stage { case pick, edit, result, unavailable }
@@ -46,6 +51,21 @@ struct ConvertView: View {
             guard let item else { return }
             Task { await importVideo(item) }
         }
+        .onChange(of: incoming.url, initial: true) { _, url in
+            guard let url else { return }
+            incoming.url = nil
+            open(url)
+        }
+        .fileImporter(isPresented: $choosesFile, allowedContentTypes: [.movie]) { result in
+            Task { await importFile(result) }
+        }
+        .sheet(isPresented: $pastesLink, onDismiss: openPhotosIfRequested) {
+            LinkImportSheet(onImport: open) {
+                opensPhotosAfterLink = true
+                pastesLink = false
+            }
+        }
+        .photosPicker(isPresented: $choosesPhoto, selection: $selection, matching: .videos, preferredItemEncoding: .current)
         .purchaseMessages(purchases)
         .alert("Couldn't open video", isPresented: .constant(importError != nil)) {
             Button("OK") { importError = nil }
@@ -55,14 +75,15 @@ struct ConvertView: View {
     }
 
     private var emptyState: some View {
-        let pickerTitle = isImporting ? "Opening…" : "Choose Video"
+        let pickerTitle = isImporting ? "Opening…" : "Choose from Photos"
         return ScrollView {
             VStack(spacing: 18) {
+                AllowanceBadge(access: conversions.access)
+
                 DeviceFrame {
                     AuroraView().overlay { LockScreenOverlay(showsMotionBadge: true) }
                 }
                 .frame(width: 124)
-                .padding(.top, 4)
 
                 VStack(spacing: 8) {
                     Text("Video to Live Wallpaper")
@@ -80,18 +101,26 @@ struct ConvertView: View {
                     StepChip(number: 3, title: "Set", symbol: "iphone")
                 }
 
-                PhotosPicker(selection: $selection, matching: .videos, preferredItemEncoding: .current) {
-                    Label(pickerTitle, systemImage: "photo.badge.plus")
+                VStack(spacing: 10) {
+                    PhotosPicker(selection: $selection, matching: .videos, preferredItemEncoding: .current) {
+                        Label(pickerTitle, systemImage: "photo.badge.plus")
+                    }
+                    .buttonStyle(KineticButtonStyle())
+
+                    HStack(spacing: 10) {
+                        Button { choosesFile = true } label: {
+                            Label("Files", systemImage: "folder").frame(maxWidth: .infinity)
+                        }
+                        Button { pastesLink = true } label: {
+                            Label("Paste Link", systemImage: "link").frame(maxWidth: .infinity)
+                        }
+                    }
+                    .buttonStyle(GlassPillButtonStyle())
                 }
-                .buttonStyle(KineticButtonStyle())
                 .disabled(isImporting)
 
-                allowanceLabel
-                    .font(.labelMedium.weight(.semibold))
-                    .foregroundStyle(Theme.accent)
-
                 if conversions.access == .ad {
-                    Button(purchases.unlockTitle, systemImage: "lock.open") {
+                    Button(purchases.unlockTitle, systemImage: "infinity") {
                         Task { await purchases.buyUnlimitedConversions() }
                     }
                     .buttonStyle(GlassPillButtonStyle(tint: Theme.accent))
@@ -107,17 +136,26 @@ struct ConvertView: View {
         .scrollIndicators(.hidden)
     }
 
-    /// How the next save is paid for, so an ad never comes as a surprise.
-    @ViewBuilder private var allowanceLabel: some View {
-        switch conversions.access {
-        case .unlimited:
-            Label("Free forever · No watermark", systemImage: "checkmark.seal.fill")
-        case .free(let remaining):
-            Label(remaining == 1 ? "1 free conversion left · No watermark" : "\(remaining) free conversions left · No watermark", systemImage: "gift.fill")
-        case .ad:
-            Label("Free with a short ad · No watermark", systemImage: "play.rectangle.fill")
-        case .unlocked:
-            Label("Unlimited · No watermark", systemImage: "checkmark.seal.fill")
+    /// Two sheets can't be up at once, so the picker waits for the link sheet to go.
+    private func openPhotosIfRequested() {
+        guard opensPhotosAfterLink else { return }
+        opensPhotosAfterLink = false
+        choosesPhoto = true
+    }
+
+    /// Opens a video the app already holds a copy of, replacing anything left in Trim Studio.
+    private func open(_ url: URL) {
+        close()
+        editor = ConvertEditor(sourceURL: url, library: CreationLibrary(context: modelContext), allowance: conversions)
+    }
+
+    private func importFile(_ result: Result<URL, any Error>) async {
+        isImporting = true
+        defer { isImporting = false }
+        do {
+            open(try await ImportedVideos.copy(result.get()))
+        } catch {
+            importError = error.localizedDescription
         }
     }
 
@@ -129,7 +167,7 @@ struct ConvertView: View {
                 importError = "The selected item isn't a video."
                 return
             }
-            editor = ConvertEditor(sourceURL: video.url, library: CreationLibrary(context: modelContext), allowance: conversions)
+            open(video.url)
         } catch {
             importError = error.localizedDescription
         }
@@ -181,6 +219,39 @@ struct ConvertFlowView: View {
         default:
             TrimStudioView(editor: editor, onClose: onClose)
                 .transition(.screen(reduceMotion: reduceMotion))
+        }
+    }
+}
+
+/// How the next save is paid for, so an ad never comes as a surprise.
+private struct AllowanceBadge: View {
+    let access: ConversionAllowance.Access
+
+    var body: some View {
+        Label(text, systemImage: symbol)
+            .font(.labelMedium.weight(.semibold))
+            .foregroundStyle(Theme.accent)
+            .padding(.horizontal, 12)
+            .frame(minHeight: 30)
+            .liquidGlass(in: Capsule(), tint: Theme.accent.opacity(0.16))
+            .contentTransition(.numericText())
+            .animation(.spring(duration: 0.3), value: access)
+    }
+
+    private var text: String {
+        switch access {
+        case .unlimited: "Free · No watermark"
+        case .free(let remaining): "\(remaining) of \(ConversionAllowance.freeConversions) free left · No watermark"
+        case .ad: "Free with a short ad · No watermark"
+        case .unlocked: "Unlimited · No watermark"
+        }
+    }
+
+    private var symbol: String {
+        switch access {
+        case .unlimited, .unlocked: "checkmark.seal.fill"
+        case .free: "gift.fill"
+        case .ad: "play.rectangle.fill"
         }
     }
 }

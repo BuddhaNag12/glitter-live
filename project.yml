@@ -26,6 +26,12 @@ targets:
     sources: [LiveWall]
     dependencies:
       - package: GoogleMobileAds
+      - target: LiveWallShare
+    entitlements:
+      path: LiveWall/LiveWall.entitlements
+      properties:
+        # Shared with the Share extension, which leaves videos there for the app.
+        com.apple.security.application-groups: [group.dev.distinction.livewall]
     info:
       path: LiveWall/Info.plist
       properties:
@@ -110,6 +116,32 @@ targets:
         # Replace with the AdMob app ID before turning ads on for release.
         Release:
           GAD_APPLICATION_ID: ca-app-pub-3940256099942544~1458002511
+  LiveWallShare:
+    type: app-extension
+    platform: iOS
+    sources:
+      - LiveWallShare
+      - LiveWall/Core/Import/SharedInbox.swift
+    entitlements:
+      path: LiveWallShare/LiveWallShare.entitlements
+      properties:
+        com.apple.security.application-groups: [group.dev.distinction.livewall]
+    info:
+      path: LiveWallShare/Info.plist
+      properties:
+        CFBundleDisplayName: Glitter Live
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
+          NSExtensionAttributes:
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsMovieWithMaxCount: 1
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.distinction.livewall.share
+        TARGETED_DEVICE_FAMILY: "1"
   LiveWallTests:
     type: bundle.unit-test
     platform: iOS

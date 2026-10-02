@@ -7,9 +7,9 @@ struct TrimStudioView: View {
     /// Pan and pinch only reframe while this is on, so the page can scroll the rest of the time.
     @State private var isFraming = false
     @State private var confirmsDiscard = false
-    @State private var choosesPayment = false
+    @State private var showsUnlock = false
+    @State private var unlockChoice: UnlockConversionsSheet.Choice?
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @Environment(Purchases.self) private var purchases
     private let ads = RewardedAds.shared
 
     var body: some View {
@@ -41,22 +41,12 @@ struct TrimStudioView: View {
         } message: {
             Text("Your trim, framing and cover photo will be lost.")
         }
-        .confirmationDialog("You've used your \(ConversionAllowance.freeConversions) free conversions", isPresented: $choosesPayment, titleVisibility: .visible) {
-            Button("Watch a Short Ad") {
-                Task {
-                    guard await ads.present() else { return }
-                    editor.adWatched()
-                    await editor.export()
-                }
+        // The ad plays once the sheet has gone, so it never appears on top of it.
+        .sheet(isPresented: $showsUnlock, onDismiss: continueAfterUnlock) {
+            UnlockConversionsSheet { choice in
+                unlockChoice = choice
+                showsUnlock = false
             }
-            Button(purchases.unlockTitle) {
-                Task {
-                    guard await purchases.buyUnlimitedConversions() else { return }
-                    await editor.export()
-                }
-            }
-        } message: {
-            Text("Watch a short ad to save this one, or unlock unlimited conversions with a one-time purchase.")
         }
         .alert("Something went wrong", isPresented: .constant(editor.errorMessage != nil)) {
             Button("OK") { editor.errorMessage = nil }
@@ -220,10 +210,22 @@ struct TrimStudioView: View {
     private func convert() {
         isFraming = false
         guard !editor.needsPayment else {
-            choosesPayment = true
+            showsUnlock = true
             return
         }
         Task { await editor.export() }
+    }
+
+    private func continueAfterUnlock() {
+        guard let choice = unlockChoice else { return }
+        unlockChoice = nil
+        Task {
+            if choice == .ad {
+                guard await ads.present() else { return }
+                editor.adWatched()
+            }
+            await editor.export()
+        }
     }
 
     static func speedLabel(_ speed: Double) -> String {
