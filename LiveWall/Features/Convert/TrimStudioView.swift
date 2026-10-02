@@ -10,7 +10,7 @@ struct TrimStudioView: View {
     @State private var choosesPayment = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(Purchases.self) private var purchases
-    private let ads: any RewardedAdPresenter = PendingRewardedAds()
+    private let ads = RewardedAds.shared
 
     var body: some View {
         ScrollView {
@@ -28,10 +28,14 @@ struct TrimStudioView: View {
         .scrollDisabled(isFraming)
         .task { await editor.load() }
         .overlay {
-            if editor.phase == .exporting { exportingOverlay }
+            if editor.phase == .exporting {
+                progressOverlay("Creating Live Photo…")
+            } else if ads.isPreparing {
+                progressOverlay("Loading ad…")
+            }
         }
         .animation(.spring(duration: 0.3), value: isFraming)
-        .animation(.easeOut(duration: 0.2), value: editor.phase == .exporting)
+        .animation(.easeOut(duration: 0.2), value: editor.phase == .exporting || ads.isPreparing)
         .confirmationDialog("Discard your edits?", isPresented: $confirmsDiscard, titleVisibility: .visible) {
             Button("Discard", role: .destructive, action: onClose)
         } message: {
@@ -200,12 +204,12 @@ struct TrimStudioView: View {
         .sensoryFeedback(.selection, trigger: isOn.wrappedValue)
     }
 
-    private var exportingOverlay: some View {
+    private func progressOverlay(_ title: String) -> some View {
         ZStack {
             Color.black.opacity(0.5).ignoresSafeArea()
             VStack(spacing: 14) {
                 ProgressView().controlSize(.large).tint(Theme.accent)
-                Text("Creating Live Photo…").typography(.titleMedium).foregroundStyle(Theme.textPrimary)
+                Text(title).typography(.titleMedium).foregroundStyle(Theme.textPrimary)
             }
             .padding(28)
             .glass(.floating, cornerRadius: 26)

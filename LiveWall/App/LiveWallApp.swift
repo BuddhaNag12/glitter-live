@@ -44,6 +44,7 @@ struct LiveWallApp: App {
             .environment(conversions)
             .environment(purchases)
             .task { await purchases.load() }
+            .task { if FeatureFlags.showsAds { await RewardedAds.shared.warmUp() } }
         }
         .modelContainer(modelContainer)
     }

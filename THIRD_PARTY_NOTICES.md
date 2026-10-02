@@ -35,3 +35,7 @@ The bundled Inter font files are licensed under the SIL Open Font License; see `
 ## Depth Anything V2
 
 Create's parallax motion uses Depth Anything V2 Small, converted to Core ML by Apple (https://huggingface.co/apple/coreml-depth-anything-v2-small), from Depth Anything V2 by Lihe Yang et al. (https://github.com/DepthAnything/Depth-Anything-V2). Licensed under the Apache License, Version 2.0 (https://www.apache.org/licenses/LICENSE-2.0). The model is used unmodified.
+
+## Google Mobile Ads SDK and User Messaging Platform
+
+Rewarded ads and the ad consent form use Google's Mobile Ads SDK (https://developers.google.com/admob/ios) and User Messaging Platform SDK (https://developers.google.com/admob/ios/privacy), distributed by Google as binaries through Swift Package Manager under the Google Mobile Ads SDK terms (https://developers.google.com/admob/terms).
