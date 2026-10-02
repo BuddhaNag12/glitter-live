@@ -22,7 +22,7 @@ nonisolated enum ImportedVideos {
 /// Videos handed over by the Share extension. They wait in the App Group container until the app next opens.
 /// Compiled into both the app and the extension.
 nonisolated enum SharedInbox {
-    static let appGroup = "group.dev.distinction.livewall"
+    static let appGroup = "group.com.buddhanag.glitterlive"
 
     private static var directory: URL? {
         FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup)?

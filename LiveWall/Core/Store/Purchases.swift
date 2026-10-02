@@ -6,7 +6,7 @@ import SwiftUI
 /// signed in to the same Apple Account, with no account of our own.
 @Observable
 final class Purchases {
-    static let unlimitedConversionsID = "dev.distinction.livewall.convert.unlimited"
+    static let unlimitedConversionsID = "com.buddhanag.glitterlive.convert.unlimited"
 
     private(set) var unlimitedConversions: Product?
     private(set) var ownsUnlimitedConversions = false

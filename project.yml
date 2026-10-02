@@ -1,6 +1,6 @@
 name: LiveWall
 options:
-  bundleIdPrefix: dev.distinction
+  bundleIdPrefix: com.buddhanag
   deploymentTarget:
     iOS: "17.0"
   createIntermediateGroups: true
@@ -31,7 +31,7 @@ targets:
       path: LiveWall/LiveWall.entitlements
       properties:
         # Shared with the Share extension, which leaves videos there for the app.
-        com.apple.security.application-groups: [group.dev.distinction.livewall]
+        com.apple.security.application-groups: [group.com.buddhanag.glitterlive]
     info:
       path: LiveWall/Info.plist
       properties:
@@ -48,8 +48,9 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         NSPhotoLibraryAddUsageDescription: Glitter Live saves the live wallpapers you create to your photo library.
         NSUserTrackingUsageDescription: Your choice only changes which ads you see. Glitter Live shows an ad only when you choose to watch one.
-        # Debug builds use Google's sample app ID; release takes the real one from GAD_APPLICATION_ID.
+        # Debug builds use Google's sample IDs; release takes the real ones from the Release settings below.
         GADApplicationIdentifier: $(GAD_APPLICATION_ID)
+        GADRewardedAdUnitID: $(GAD_REWARDED_AD_UNIT_ID)
         # Google's list of ad networks allowed to attribute installs from its ads.
         SKAdNetworkItems:
           - SKAdNetworkIdentifier: cstr6suwn9.skadnetwork
@@ -105,17 +106,19 @@ targets:
         UIAppFonts: [Inter-Light.ttf, Inter-Regular.ttf, Inter-Medium.ttf, Inter-SemiBold.ttf, Inter-Bold.ttf]
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.distinction.livewall
+        PRODUCT_BUNDLE_IDENTIFIER: com.buddhanag.glitterlive
         TARGETED_DEVICE_FAMILY: "1"
         # Compiles the Metal files as Core Image kernels (DepthParallax.metal).
         MTL_COMPILER_FLAGS: -fcikernel
         MTLLINKER_FLAGS: -cikernel
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GAD_APPLICATION_ID: ca-app-pub-3940256099942544~1458002511
+        GAD_REWARDED_AD_UNIT_ID: ca-app-pub-3940256099942544/1712485313
       configs:
-        # Replace with the AdMob app ID before turning ads on for release.
+        # Replace both with the real AdMob app and rewarded unit IDs before turning ads on for release.
         Release:
           GAD_APPLICATION_ID: ca-app-pub-3940256099942544~1458002511
+          GAD_REWARDED_AD_UNIT_ID: ca-app-pub-3940256099942544/1712485313
   LiveWallShare:
     type: app-extension
     platform: iOS
@@ -125,7 +128,7 @@ targets:
     entitlements:
       path: LiveWallShare/LiveWallShare.entitlements
       properties:
-        com.apple.security.application-groups: [group.dev.distinction.livewall]
+        com.apple.security.application-groups: [group.com.buddhanag.glitterlive]
     info:
       path: LiveWallShare/Info.plist
       properties:
@@ -140,7 +143,7 @@ targets:
               NSExtensionActivationSupportsMovieWithMaxCount: 1
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.distinction.livewall.share
+        PRODUCT_BUNDLE_IDENTIFIER: com.buddhanag.glitterlive.share
         TARGETED_DEVICE_FAMILY: "1"
   LiveWallTests:
     type: bundle.unit-test
@@ -150,7 +153,7 @@ targets:
       - target: LiveWall
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.distinction.livewall.tests
+        PRODUCT_BUNDLE_IDENTIFIER: com.buddhanag.glitterlive.tests
         GENERATE_INFOPLIST_FILE: YES
   LiveWallUITests:
     type: bundle.ui-testing
@@ -160,7 +163,7 @@ targets:
       - target: LiveWall
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.distinction.livewall.uitests
+        PRODUCT_BUNDLE_IDENTIFIER: com.buddhanag.glitterlive.uitests
         GENERATE_INFOPLIST_FILE: YES
         SWIFT_DEFAULT_ACTOR_ISOLATION: nonisolated
         TEST_TARGET_NAME: LiveWall
