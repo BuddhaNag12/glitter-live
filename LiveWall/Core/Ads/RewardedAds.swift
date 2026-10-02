@@ -10,7 +10,7 @@ import UserMessagingPlatform
 final class RewardedAds: NSObject, RewardedAdPresenter {
     static let shared = RewardedAds()
 
-    /// From `GAD_REWARDED_AD_UNIT_ID` in project.yml: Google's sample unit in debug, the real one in release.
+    /// From `GAD_REWARDED_AD_UNIT_ID` in Config/: Google's sample unit in debug, the real one in release.
     private static let adUnitID = Bundle.main.object(forInfoDictionaryKey: "GADRewardedAdUnitID") as? String ?? ""
 
     /// A release build still carrying Google's sample IDs would show "Test Ad" to real people and earn nothing,
