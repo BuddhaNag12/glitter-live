@@ -8,7 +8,30 @@ struct LibraryView: View {
 
     @Query(sort: \Creation.createdAt, order: .reverse) private var creations: [Creation]
     @State private var selection: Creation?
+    @State private var category = Category.all
     @Namespace private var zoom
+
+    enum Category: String, CaseIterable, Identifiable {
+        case all = "All", live = "Live", stills = "Stills"
+        var id: Self { self }
+    }
+
+    private var visibleCreations: [Creation] {
+        switch category {
+        case .all: creations
+        case .live: creations.filter(\.isLive)
+        case .stills: creations.filter { !$0.isLive }
+        }
+    }
+
+    private var countTitle: String {
+        let count = visibleCreations.count
+        switch category {
+        case .all: return count == 1 ? "1 wallpaper" : "\(count) wallpapers"
+        case .live: return count == 1 ? "1 live wallpaper" : "\(count) live wallpapers"
+        case .stills: return count == 1 ? "1 still" : "\(count) stills"
+        }
+    }
 
     private let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
 
@@ -21,17 +44,28 @@ struct LibraryView: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 14) {
                             HStack(alignment: .firstTextBaseline) {
-                                Text(creations.count == 1 ? "1 live wallpaper" : "\(creations.count) live wallpapers")
+                                Text(countTitle)
                                     .typography(.headlineSmall)
                                     .foregroundStyle(Theme.textPrimary)
+                                    .contentTransition(.numericText())
                                 Spacer()
                                 Button(action: onConvert) {
                                     Label("New", systemImage: "plus")
                                 }
                                 .buttonStyle(GlassPillButtonStyle(tint: Theme.accent))
                             }
+                            categoryChips
+                            if visibleCreations.isEmpty {
+                                Text(category == .stills
+                                     ? "Wallpapers you save from Create without motion appear here."
+                                     : "Live wallpapers you make appear here.")
+                                    .typography(.bodyMedium)
+                                    .foregroundStyle(Theme.textSecondary)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.top, 40)
+                            }
                             LazyVGrid(columns: columns, spacing: 12) {
-                                ForEach(creations) { creation in
+                                ForEach(visibleCreations) { creation in
                                     Button { selection = creation } label: {
                                         CreationCard(creation: creation)
                                     }
@@ -56,6 +90,21 @@ struct LibraryView: View {
         #if DEBUG
         .task { await seedDemoLibraryIfRequested() }
         #endif
+    }
+
+    private var categoryChips: some View {
+        GlassGroup(spacing: 8) {
+            HStack(spacing: 8) {
+                ForEach(Category.allCases) { option in
+                    Button(option.rawValue) {
+                        withAnimation(.spring(duration: 0.3)) { category = option }
+                    }
+                    .buttonStyle(GlassPillButtonStyle(tint: category == option ? Theme.accent : nil))
+                    .accessibilityAddTraits(category == option ? .isSelected : [])
+                }
+            }
+        }
+        .sensoryFeedback(.selection, trigger: category)
     }
 
     #if DEBUG
@@ -95,8 +144,14 @@ private struct CreationCard: View {
                 }
             }
             .overlay(alignment: .topLeading) {
-                StatusPill(text: "\(creation.duration.formatted(.number.precision(.fractionLength(1))))s", dot: Theme.signalYellow)
-                    .padding(10)
+                Group {
+                    if creation.isLive {
+                        StatusPill(text: "\(creation.duration.formatted(.number.precision(.fractionLength(1))))s", dot: Theme.signalYellow)
+                    } else {
+                        StatusPill(text: "STILL", dot: Theme.slate, symbol: "photo")
+                    }
+                }
+                .padding(10)
             }
             .overlay(alignment: .topTrailing) {
                 if creation.savedToPhotos {
@@ -126,7 +181,7 @@ private struct CreationCard: View {
             // Wallpaper tiles are always dark media, so their glass badges stay dark too.
             .environment(\.colorScheme, .dark)
             .task(id: creation.id) {
-                thumbnail = await Thumbnail.load(creation.livePhoto.imageURL, maxPixelSize: 600)
+                thumbnail = await Thumbnail.load(creation.imageURL, maxPixelSize: 600)
             }
     }
 }

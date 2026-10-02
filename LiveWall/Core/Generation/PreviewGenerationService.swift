@@ -3,8 +3,8 @@ import CoreGraphics
 import ImageIO
 import UniformTypeIdentifiers
 
-/// Stands in for the server until it exists: paints soft light in the style's colors and animates it with a
-/// slow push-in, so the whole Create flow can be used on device without AI accounts.
+/// Paints soft light in the style's colors and animates any image with a slow push-in. Stands in for the AI
+/// server offline and in screenshot runs (`-previewGenerator`), and is the motion fallback when the depth model is missing.
 nonisolated struct PreviewGenerationService: GenerationService {
     private static let size = (width: 720, height: 1560)
 
@@ -87,8 +87,10 @@ nonisolated struct PreviewGenerationService: GenerationService {
                 bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
             ) {
                 let eased = 0.5 - cos(Double(frame) / Double(frameCount - 1) * .pi) / 2
-                let scale = 1 + 0.08 * eased
-                let drawn = CGSize(width: CGFloat(width) * scale, height: CGFloat(height) * scale)
+                // Fills the frame without stretching, so a square AI image is cropped to the sides rather than squashed.
+                let fill = max(CGFloat(width) / CGFloat(image.width), CGFloat(height) / CGFloat(image.height))
+                let scale = fill * (1 + 0.08 * eased)
+                let drawn = CGSize(width: CGFloat(image.width) * scale, height: CGFloat(image.height) * scale)
                 let origin = CGPoint(x: (CGFloat(width) - drawn.width) / 2, y: (CGFloat(height) - drawn.height) / 2 - 24 * eased)
                 context.interpolationQuality = .high
                 context.draw(image, in: CGRect(origin: origin, size: drawn))

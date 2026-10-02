@@ -13,8 +13,11 @@ final class Creation {
     var videoFileName: String
     var duration: Double
     var savedToPhotos: Bool
+    /// False for generated wallpapers saved without motion, which have no movie. Defaults to true, so
+    /// wallpapers saved before stills existed migrate as live ones.
+    var isLive: Bool = true
 
-    init(id: UUID, pairingIdentifier: String, imageFileName: String, videoFileName: String, duration: Double, savedToPhotos: Bool = false) {
+    init(id: UUID, pairingIdentifier: String, imageFileName: String, videoFileName: String, duration: Double, savedToPhotos: Bool = false, isLive: Bool = true) {
         self.id = id
         self.createdAt = .now
         self.pairingIdentifier = pairingIdentifier
@@ -22,6 +25,11 @@ final class Creation {
         self.videoFileName = videoFileName
         self.duration = duration
         self.savedToPhotos = savedToPhotos
+        self.isLive = isLive
+    }
+
+    var imageURL: URL {
+        CreationLibrary.directory(for: id).appending(path: imageFileName)
     }
 
     var livePhoto: LivePhotoResult {
@@ -77,6 +85,21 @@ struct CreationLibrary {
         for folder in folders where !known.contains(folder.lastPathComponent) {
             try? FileManager.default.removeItem(at: folder)
         }
+    }
+
+    /// Copies a still into the library. It's only added once it's in Photos, so it's marked saved.
+    @discardableResult
+    func addStill(_ imageURL: URL) throws -> Creation {
+        let id = UUID()
+        let directory = Self.directory(for: id)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let name = imageURL.lastPathComponent
+        try FileManager.default.copyItem(at: imageURL, to: directory.appending(path: name))
+
+        let creation = Creation(id: id, pairingIdentifier: "", imageFileName: name, videoFileName: "", duration: 0, savedToPhotos: true, isLive: false)
+        context.insert(creation)
+        try context.save()
+        return creation
     }
 
     /// Removes the app's copy only; anything already saved to Photos stays there.

@@ -82,9 +82,12 @@ The table is created by [`supabase/migrations/0001_wallpapers.sql`](supabase/mig
 
 ```bash
 brew install xcodegen
+./scripts/fetch-depth-model.sh
 xcodegen generate
 open LiveWall.xcodeproj
 ```
+
+`fetch-depth-model.sh` downloads Apple's Core ML Depth Anything V2 (about 19 MB), which Create uses for parallax motion. Without it the app still builds and falls back to a plain push-in. Building the parallax kernel needs Xcode's Metal Toolchain (`xcodebuild -downloadComponent MetalToolchain`).
 
 Set your own development team in `project.yml` (`DEVELOPMENT_TEAM`), or under Signing & Capabilities in Xcode, then run on an iPhone. The Simulator can't show Lock Screen wallpapers, so test motion on a real device.
 
@@ -132,7 +135,7 @@ supabase/         Database migrations
 
 ### Next
 
-- **Create** (in progress, [plan](docs/create-plan.md)): type a prompt, get a wallpaper image from FLUX.1 schnell, bring it to life as a 3-second clip with LTX-Video, and save it straight to the Library and Photos as a Live wallpaper. Hidden behind `FeatureFlags.aiGeneration` in release builds until it works end to end.
+- **Create** (in progress, [plan](docs/create-plan.md)): type a prompt and get a wallpaper image from FLUX.1 schnell, then save it as a still or add motion on the phone (depth parallax) to save it as a Live wallpaper. AI video motion (LTX-Video) is ready on the server for later. Hidden behind `FeatureFlags.aiGeneration` in release builds until it works end to end.
 - **Pricing**: one subscription. The first 5 generations are free, then each generation unlocks with a short rewarded ad (up to 10 a day). **Glitter Live Pro** (₹299 a month) removes ads and allows up to 100 generations a month. Explore and Convert stay free with no ads.
 - **Explore extras** from the mockup: search, sort by New, and later like counts and Free/VIP badges (likes need backend support; badges need pricing).
 - **Trim Studio**: video stabilization (the mockup's Stabilize toggle).
@@ -142,6 +145,7 @@ supabase/         Database migrations
 
 - [LivePaper](https://github.com/Yuyang16Z/LivePaper) (MIT) for documenting the Lock Screen's Live Photo requirements. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 - [Inter](https://rsms.me/inter/) typeface (SIL Open Font License).
+- [Depth Anything V2](https://github.com/DepthAnything/Depth-Anything-V2) Small, in [Apple's Core ML conversion](https://huggingface.co/apple/coreml-depth-anything-v2-small) (Apache-2.0), for Create's parallax motion.
 
 ## License
 

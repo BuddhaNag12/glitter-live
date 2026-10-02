@@ -32,6 +32,20 @@ struct CreationLibraryTests {
         #expect(!FileManager.default.fileExists(atPath: CreationLibrary.directory(for: creation.id).path(percentEncoded: false)))
         #expect(try container.mainContext.fetchCount(FetchDescriptor<Creation>()) == 0)
     }
+
+    @Test func addStillKeepsACopyMarkedAsSavedAndNotLive() throws {
+        let container = try ModelContainer(for: Creation.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let library = CreationLibrary(context: container.mainContext)
+        let source = URL.temporaryDirectory.appending(path: "still-\(UUID().uuidString).jpg")
+        try Data("jpeg".utf8).write(to: source)
+
+        let creation = try library.addStill(source)
+        #expect(!creation.isLive)
+        #expect(creation.savedToPhotos)
+        #expect(FileManager.default.fileExists(atPath: creation.imageURL.path(percentEncoded: false)))
+        // The original stays put; Create may still save it again or animate it.
+        #expect(FileManager.default.fileExists(atPath: source.path(percentEncoded: false)))
+    }
 }
 
 struct OrphanCleanupTests {
