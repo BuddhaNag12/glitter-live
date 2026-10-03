@@ -4,6 +4,16 @@ import SwiftUI
 struct LockScreenOverlay: View {
     var showsMotionBadge = false
 
+    /// The time shown on the mock clock. `-lockScreenTime 9:41` pins it for App Store screenshots and previews,
+    /// so it matches the simulator's overridden status bar. It's a launch argument, so it works in release builds too.
+    private var shownDate: Date {
+        guard let pinned = UserDefaults.standard.string(forKey: "lockScreenTime"),
+              let colon = pinned.firstIndex(of: ":"),
+              let hour = Int(pinned[..<colon]), let minute = Int(pinned[pinned.index(after: colon)...])
+        else { return .now }
+        return Calendar.current.date(bySettingHour: hour, minute: minute, second: 0, of: .now) ?? .now
+    }
+
     var body: some View {
         GeometryReader { geometry in
             let scale = geometry.size.width / 393
@@ -11,9 +21,9 @@ struct LockScreenOverlay: View {
                 Image(systemName: "lock.fill")
                     .font(.system(size: 18 * scale, weight: .semibold))
                     .padding(.bottom, 8 * scale)
-                Text(Date.now, format: .dateTime.weekday(.wide).month(.abbreviated).day())
+                Text(shownDate, format: .dateTime.weekday(.wide).month(.abbreviated).day())
                     .font(.custom(InterWeight.medium.rawValue, fixedSize: 21 * scale))
-                Text(Date.now, format: .dateTime.hour(.defaultDigits(amPM: .omitted)).minute())
+                Text(shownDate, format: .dateTime.hour(.defaultDigits(amPM: .omitted)).minute())
                     .font(.custom(InterWeight.light.rawValue, fixedSize: 100 * scale))
                     .tracking(-2 * scale)
                     .monospacedDigit()
