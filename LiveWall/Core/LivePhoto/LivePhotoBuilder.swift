@@ -106,27 +106,39 @@ nonisolated enum LivePhotoBuilder {
         }
 
         do {
+            var forwardTimes: [CMTime] = []
             let forward = try FrameReader(asset: composition, track: track, videoComposition: videoComposition)
             while let frame = try forward.next() {
                 try await append(frame.buffer, at: frame.time)
+                forwardTimes.append(frame.time)
             }
 
-            if request.bounces {
-                // A forward frame at t plays again at 2·D − frameDuration − t, so the reversed half
-                // starts right where the forward half ends.
-                let mirror = forwardDuration + forwardDuration - frameDuration
+            if request.bounces, let lastForwardTime = forwardTimes.last {
+                // A forward frame at t plays again at 2·last + frameDuration − t, so the reversed half
+                // starts right where the forward half ends. Each reversed frame takes the time of the
+                // forward frame it matches: a reader started mid-clip also renders frames between them,
+                // and the writer fails on any timestamp that isn't strictly increasing.
+                let mirror = lastForwardTime + lastForwardTime + frameDuration
+                let halfFrame = CMTimeMultiplyByRatio(frameDuration, multiplier: 1, divisor: 2)
+                var remaining = forwardTimes.count
                 var chunkEnd = forwardDuration
-                while chunkEnd > .zero {
+                while chunkEnd > .zero, remaining > 0 {
                     let chunkStart = CMTimeMaximum(.zero, chunkEnd - reverseChunk)
                     let chunk = CMTimeRange(start: chunkStart, end: chunkEnd)
                     let reader = try FrameReader(asset: composition, track: track, videoComposition: videoComposition, timeRange: chunk)
-                    var frames: [(buffer: CVPixelBuffer, time: CMTime)] = []
+                    var matches: [Int: (buffer: CVPixelBuffer, offset: Double)] = [:]
                     while let frame = try reader.next() {
-                        if frame.time >= chunkStart, frame.time < chunkEnd { frames.append(frame) }
+                        guard frame.time >= chunkStart, frame.time < chunkEnd,
+                              let index = forwardTimes[..<remaining].firstIndex(where: { $0 + halfFrame > frame.time }),
+                              forwardTimes[index] - halfFrame <= frame.time
+                        else { continue }
+                        let offset = abs((forwardTimes[index] - frame.time).seconds)
+                        if offset < matches[index]?.offset ?? .infinity { matches[index] = (frame.buffer, offset) }
                     }
-                    for frame in frames.reversed() {
-                        try await append(frame.buffer, at: mirror - frame.time)
+                    for index in matches.keys.sorted(by: >) {
+                        try await append(matches[index]!.buffer, at: mirror - forwardTimes[index])
                     }
+                    remaining = matches.keys.min() ?? remaining
                     chunkEnd = chunkStart
                 }
             }
