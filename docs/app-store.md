@@ -15,6 +15,7 @@ Copy for App Store Connect. Character limits are Apple's; counts are noted where
 | Copyright | 2026 Buddha Nag |
 | Privacy Policy URL | https://github.com/BuddhaNag12/glitter-live/blob/main/docs/privacy.md |
 | Support URL | https://github.com/BuddhaNag12/glitter-live/blob/main/docs/support.md |
+| Marketing URL | https://buddhanag12.github.io |
 
 ## Promotional text (170)
 
@@ -131,7 +132,7 @@ Everything in the app is ready; these are the account steps, in order.
 
 1. **AdMob**: add the app (iOS, linked to the App Store listing once it exists), create one **Rewarded** ad unit, and set the app's maximum ad content rating to **G** so the 4+ age rating holds. Send the app ID (`ca-app-pub-…~…`) and the ad unit ID (`ca-app-pub-…/…`); both are public and end up inside the app.
 2. **AdMob → Privacy & messaging**: create a **European regulations** (GDPR) message for the app, so the consent form appears in the EU and UK. Optionally add an **IDFA explainer** before the tracking prompt.
-3. **app-ads.txt**: AdMob verifies the app through an `app-ads.txt` file at the root of the developer website listed on the App Store page. GitHub blob links can't serve one, so publish it with GitHub Pages (a repository named `BuddhaNag12.github.io`) and use that site as the Marketing URL.
+3. **app-ads.txt**: AdMob verifies the app through an `app-ads.txt` file at the root of the developer website listed on the App Store page. GitHub blob links can't serve one, so it's published with GitHub Pages at https://buddhanag12.github.io/app-ads.txt (repository `BuddhaNag12.github.io`), and that site is the Marketing URL. After the app goes live, link it in AdMob and use **Check for updates** on app-ads.txt.
 4. **App Store Connect**: sign the Paid Apps agreement and add banking and tax details, then create the in-app purchase above with its review screenshot.
 5. **In the app**: done. The real IDs are in `Config/AdMob.secrets.xcconfig`, which isn't committed because the repository is public; keep a copy somewhere safe, since a release built without it shows no ads.
 6. **Archive**, generate the privacy report, fill in App Privacy from it, and submit the build together with the in-app purchase.
