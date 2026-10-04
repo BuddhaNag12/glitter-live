@@ -5,8 +5,9 @@ nonisolated enum WallpaperFormat {
     static let outputSize = CGSize(width: 886, height: 1920)
     /// The widest iPhone screen (Pro Max); a sharper cover photo than this can't be seen.
     static let maximumStillWidth: CGFloat = 1320
-    /// The Lock Screen rejects a cover frame at 0 s.
-    static let minimumCoverTime = 0.2
+    /// The Lock Screen reports "Motion not available" for a cover frame up to about 0.33 s into the
+    /// movie, whatever its length; 0.5 s works (measured on an iPhone 17 Pro).
+    static let minimumCoverTime = 0.5
     static var aspectRatio: CGFloat { outputSize.width / outputSize.height }
     static let frameRate: Int32 = 30
     /// Lock-screen motion is most reliable with short clips.

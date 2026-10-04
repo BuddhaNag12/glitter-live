@@ -80,6 +80,23 @@ struct LivePhotoBuilderTests {
         #expect(abs(duration - seconds / speed * 2) < 0.15)
     }
 
+    @Test func keepsTheCoverFrameLateEnoughForLockScreenMotion() async throws {
+        let source = try await SyntheticVideo.make(size: CGSize(width: 720, height: 1280), seconds: 4)
+        var request = request(source: source)
+        request.keyFrameOffset = CMTime(seconds: 0.1, preferredTimescale: 600)
+        let result = try await LivePhotoBuilder.build(request, in: outputDirectory())
+
+        // The still-image-time track is one 1/600 s sample at the cover frame.
+        let tracks = try await AVURLAsset(url: result.videoURL).loadTracks(withMediaType: .metadata)
+        var stillTimes: [Double] = []
+        for track in tracks {
+            let range = try await track.load(.timeRange)
+            if range.duration.seconds < 1 { stillTimes.append(range.end.seconds - 1.0 / 600) }
+        }
+        let stillTime = try #require(stillTimes.first)
+        #expect(stillTime >= WallpaperFormat.minimumCoverTime - 0.001)
+    }
+
     @Test func photosAcceptsThePair() async throws {
         let source = try await SyntheticVideo.make(size: CGSize(width: 1280, height: 720), seconds: 4)
         let result = try await LivePhotoBuilder.build(request(source: source), in: outputDirectory())

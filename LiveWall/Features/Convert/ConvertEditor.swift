@@ -68,7 +68,11 @@ final class ConvertEditor {
 
     private var outputToSource: Double { speed / (bounces ? 2 : 1) }
     var maxClipLength: Double { min(duration, Self.outputDurationRange.upperBound * outputToSource) }
-    var minClipLength: Double { min(maxClipLength, Self.outputDurationRange.lowerBound * outputToSource) }
+    /// A bounced clip's forward half must also be long enough to hold a cover frame the Lock Screen accepts.
+    var minClipLength: Double {
+        let shortestForward = (WallpaperFormat.minimumCoverTime + 0.1) * speed
+        return min(maxClipLength, max(Self.outputDurationRange.lowerBound * outputToSource, shortestForward))
+    }
 
     private var clipRange: CMTimeRange {
         CMTimeRange(start: CMTime(seconds: clipStart, preferredTimescale: 600), duration: CMTime(seconds: clipLength, preferredTimescale: 600))
