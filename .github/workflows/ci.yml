@@ -65,7 +65,14 @@ jobs:
             -only-testing:LiveWallTests \
             -parallel-testing-enabled NO \
             -collect-test-diagnostics never \
-            -resultBundlePath TestResults.xcresult
+            -resultBundlePath TestResults.xcresult 2>&1 | tee test.log
+
+      - name: Show where the tests stopped
+        # Annotations appear on the pull request's checks, so the end of the run is visible without the full log.
+        if: failure()
+        run: |
+          summary=$(grep -E '(✔|✘|◇|↳) |: error:|Testing failed|\*\* TEST' test.log | tail -n 40 | sed 's/%/%25/g' | awk '{ printf "%s%%0A", $0 }')
+          echo "::error title=Last test output::$summary"
 
       - uses: actions/upload-artifact@v4
         if: failure()
