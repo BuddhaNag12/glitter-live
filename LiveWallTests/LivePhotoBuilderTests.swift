@@ -4,6 +4,8 @@ import Photos
 import Testing
 @testable import LiveWall
 
+// Each test encodes HEVC video, which is slow on CI's GPU-less virtual Macs; the limit turns a stall into a failure.
+@Suite(.timeLimit(.minutes(5)))
 struct LivePhotoBuilderTests {
 
     @Test func pairsStillAndMovieWithSharedIdentifier() async throws {
@@ -74,6 +76,8 @@ struct LivePhotoBuilderTests {
         request.keyFrameOffset = CMTime(seconds: seconds / 2, preferredTimescale: 600)
         request.speed = speed
         request.bounces = true
+        // Timing is what's under test, so a small frame keeps the encode quick.
+        request.outputSize = CGSize(width: 222, height: 480)
         let result = try await LivePhotoBuilder.build(request, in: outputDirectory())
 
         let duration = try await AVURLAsset(url: result.videoURL).load(.duration).seconds

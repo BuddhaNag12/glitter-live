@@ -3,6 +3,7 @@ import ImageIO
 import Testing
 @testable import LiveWall
 
+@Suite(.timeLimit(.minutes(5)))
 struct CoverPhotoTests {
     @Test func stillUsesTheSourceResolutionUpToTheLargestScreen() {
         let output = WallpaperFormat.outputSize
