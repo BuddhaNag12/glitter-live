@@ -107,7 +107,7 @@ xcodebuild test -project LiveWall.xcodeproj -scheme LiveWall \
 
 | Workflow | Runs on | Does |
 | --- | --- | --- |
-| [CI](.github/workflows/ci.yml) | every pull request and push to `main` | builds the app and runs `LiveWallTests` on an iPhone simulator (Xcode 26.6); type-checks the Supabase function |
+| [CI](.github/workflows/ci.yml) | every pull request and push to `main` | builds the app and runs `LiveWallTests` on an iPhone simulator (Xcode 26.6), except the suites that encode video, which are too slow on GitHub's GPU-less runners; type-checks the Supabase function |
 | [Deploy Supabase functions](.github/workflows/deploy-functions.yml) | pushes to `main` that change `supabase/functions/`, or by hand | deploys `generate`; needs the `SUPABASE_ACCESS_TOKEN` repository secret |
 | [Release](.github/workflows/release.yml) | pushing a `v*` tag | checks the tag matches `MARKETING_VERSION` and creates a GitHub release with notes from the merged pull requests |
 | Xcode Cloud | `v*` tags, once set up in App Store Connect | archives and uploads to TestFlight; [`ci_scripts/ci_post_clone.sh`](ci_scripts/ci_post_clone.sh) generates the project, fetches the depth model and writes the AdMob IDs from the `GAD_APPLICATION_ID` and `GAD_REWARDED_AD_UNIT_ID` secret environment variables |

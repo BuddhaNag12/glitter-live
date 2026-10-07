@@ -14,7 +14,7 @@ jobs:
     name: Build and unit tests
     # Xcode 27 is only on a preview image; the app builds with the iOS 26 SDK.
     runs-on: macos-26
-    timeout-minutes: 60
+    timeout-minutes: 45
     env:
       DESTINATION: platform=iOS Simulator,name=iPhone 17 Pro,OS=latest
     steps:
@@ -51,9 +51,10 @@ jobs:
             CODE_SIGNING_ALLOWED=NO
 
       - name: Run unit tests
-        timeout-minutes: 25
-        # One test at a time: the video tests compete for the runner's three cores. Diagnostics are off
-        # because Xcode takes the slow video tests for hung and stalls collecting them.
+        timeout-minutes: 15
+        # The suites that encode video take over 25 minutes on GitHub's GPU-less runners, against about
+        # 3 on a Mac, so they're left to local and Xcode Cloud runs. Diagnostics are off because Xcode
+        # takes slow tests for hung and stalls collecting them.
         run: |
           set -o pipefail
           xcodebuild test-without-building \
@@ -63,7 +64,10 @@ jobs:
             -derivedDataPath DerivedData \
             -clonedSourcePackagesDirPath .spm \
             -only-testing:LiveWallTests \
-            -parallel-testing-enabled NO \
+            -skip-testing:LiveWallTests/LivePhotoBuilderTests \
+            -skip-testing:LiveWallTests/CoverPhotoTests \
+            -skip-testing:LiveWallTests/CreationLibraryTests \
+            -skip-testing:LiveWallTests/CatalogTests \
             -collect-test-diagnostics never \
             -resultBundlePath TestResults.xcresult 2>&1 | tee test.log
 
