@@ -135,5 +135,6 @@ Everything in the app is ready; these are the account steps, in order.
 3. **app-ads.txt**: AdMob verifies the app through an `app-ads.txt` file at the root of the developer website listed on the App Store page. GitHub blob links can't serve one, so it's published with GitHub Pages at https://buddhanag12.github.io/app-ads.txt (repository `BuddhaNag12.github.io`), and that site is the Marketing URL. After the app goes live, link it in AdMob and use **Check for updates** on app-ads.txt.
 4. **App Store Connect**: sign the Paid Apps agreement and add banking and tax details, then create the in-app purchase above with its review screenshot.
 5. **In the app**: done. The real IDs are in `Config/AdMob.secrets.xcconfig`, which isn't committed because the repository is public; keep a copy somewhere safe, since a release built without it shows no ads.
-6. **Archive**, generate the privacy report, fill in App Privacy from it, and submit the build together with the in-app purchase.
+6. **Xcode Cloud** (optional, replaces archiving by hand): in Xcode, Product → Xcode Cloud → Create Workflow for the `LiveWall` scheme. Add an **Archive** action (iOS, App Store Connect distribution) with a **TestFlight Internal Testing** post-action, start it on tags matching `v*` (see Releasing in the README), and add `GAD_APPLICATION_ID` and `GAD_REWARDED_AD_UNIT_ID` as **secret** environment variables. `ci_scripts/ci_post_clone.sh` does the rest.
+7. **Archive**, generate the privacy report, fill in App Privacy from it, and submit the build together with the in-app purchase.
 

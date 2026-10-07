@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: Build and unit tests
+    # Xcode 27 is only on a preview image; the app builds with the iOS 26 SDK.
+    runs-on: macos-26
+    timeout-minutes: 45
+    env:
+      DESTINATION: platform=iOS Simulator,name=iPhone 17 Pro,OS=latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app
+
+      - name: Generate the Xcode project
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Install the Metal toolchain
+        # DepthParallax.metal needs it, and Xcode doesn't include it.
+        run: xcodebuild -downloadComponent MetalToolchain
+
+      - uses: actions/cache@v4
+        with:
+          path: .spm
+          key: spm-${{ runner.os }}-${{ hashFiles('project.yml') }}
+
+      - name: Build for testing
+        timeout-minutes: 30
+        run: |
+          set -o pipefail
+          xcodebuild build-for-testing \
+            -project LiveWall.xcodeproj \
+            -scheme LiveWall \
+            -destination "$DESTINATION" \
+            -derivedDataPath DerivedData \
+            -clonedSourcePackagesDirPath .spm \
+            -quiet \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Run unit tests
+        timeout-minutes: 15
+        # The suites that encode video take over 25 minutes on GitHub's GPU-less runners, against about
+        # 3 on a Mac, so they're left to local and Xcode Cloud runs. Diagnostics are off because Xcode
+        # takes slow tests for hung and stalls collecting them.
+        run: |
+          set -o pipefail
+          xcodebuild test-without-building \
+            -project LiveWall.xcodeproj \
+            -scheme LiveWall \
+            -destination "$DESTINATION" \
+            -derivedDataPath DerivedData \
+            -clonedSourcePackagesDirPath .spm \
+            -only-testing:LiveWallTests \
+            -skip-testing:LiveWallTests/LivePhotoBuilderTests \
+            -skip-testing:LiveWallTests/CoverPhotoTests \
+            -skip-testing:LiveWallTests/CreationLibraryTests \
+            -skip-testing:LiveWallTests/CatalogTests \
+            -collect-test-diagnostics never \
+            -resultBundlePath TestResults.xcresult 2>&1 | tee test.log
+
+      - name: Show where the tests stopped
+        # Annotations appear on the pull request's checks, so the end of the run is visible without the full log.
+        if: failure()
+        run: |
+          summary=$(grep -E '(✔|✘|◇|↳) |: error:|Testing failed|\*\* TEST' test.log | tail -n 40 | sed 's/%/%25/g' | awk '{ printf "%s%%0A", $0 }')
+          echo "::error title=Last test output::$summary"
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: TestResults
+          path: TestResults.xcresult
+
+  function:
+    name: Type-check the Supabase function
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: deno check supabase/functions/generate/index.ts
