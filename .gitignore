@@ -28,3 +28,4 @@ LiveWall/Resources/Models/
 
 # Real AdMob IDs (see Config/Release.xcconfig)
 Config/*.secrets.xcconfig
+graphify-out
