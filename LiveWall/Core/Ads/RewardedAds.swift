@@ -33,11 +33,11 @@ final class RewardedAds: NSObject, RewardedAdPresenter {
     @ObservationIgnored private var hasStartedSDK = false
     @ObservationIgnored private var dismissal: CheckedContinuation<Bool, Never>?
 
-    /// Refreshes consent quietly at launch, without showing any form, so the first ad loads sooner.
+    /// Refreshes consent quietly at launch, without showing any form, so Settings knows whether to offer privacy choices.
+    /// The SDK itself waits for the first ad someone chooses, after the consent and tracking prompts.
     func warmUp() async {
         try? await ConsentInformation.shared.requestConsentInfoUpdate(with: RequestParameters())
         offersPrivacyChoices = ConsentInformation.shared.privacyOptionsRequirementStatus == .required
-        startSDKIfAllowed()
     }
 
     /// True once the ad has been watched to the end. Also true when no ad can be had (offline, no fill), so a
@@ -90,6 +90,8 @@ final class RewardedAds: NSObject, RewardedAdPresenter {
     private func startSDKIfAllowed() {
         guard !hasStartedSDK, ConsentInformation.shared.canRequestAds else { return }
         hasStartedSDK = true
+        // Keeps ads within the App Store age rating; raise it only if the rating goes up.
+        MobileAds.shared.requestConfiguration.maxAdContentRating = .general
         MobileAds.shared.start(completionHandler: nil)
     }
 
