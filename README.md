@@ -109,7 +109,7 @@ xcodebuild test -project LiveWall.xcodeproj -scheme LiveWall \
 | --- | --- | --- |
 | [Deploy Supabase functions](.github/workflows/deploy-functions.yml) | pushes to `main` that change `supabase/functions/`, or by hand | deploys `generate`; needs the `SUPABASE_ACCESS_TOKEN` repository secret |
 | [Release](.github/workflows/release.yml) | pushing a `v*` tag | checks the tag matches `MARKETING_VERSION` and creates a GitHub release with notes from the merged pull requests |
-| Xcode Cloud | every push to `main`, once set up in App Store Connect | archives and uploads to TestFlight; [`ci_scripts/ci_post_clone.sh`](ci_scripts/ci_post_clone.sh) generates the project, fetches the depth model and writes the AdMob IDs from the `GAD_APPLICATION_ID` and `GAD_REWARDED_AD_UNIT_ID` secret environment variables |
+| Xcode Cloud | every push to `main` | archives and uploads to TestFlight; [`ci_scripts/ci_post_clone.sh`](ci_scripts/ci_post_clone.sh) generates the project, fetches the depth model and writes the AdMob IDs from the `GAD_APPLICATION_ID` and `GAD_REWARDED_AD_UNIT_ID` secret environment variables |
 
 Database migrations aren't deployed automatically; run `supabase db push` after reviewing them.
 
