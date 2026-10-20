@@ -7,7 +7,8 @@ cd "$CI_PRIMARY_REPOSITORY_PATH"
 brew install xcodegen
 xcodegen generate
 ./scripts/fetch-depth-model.sh
-xcodebuild -downloadComponent MetalToolchain
+# Xcode Cloud images may already have it, and then this exits with an error; a truly missing toolchain still fails the build.
+xcodebuild -downloadComponent MetalToolchain || echo "Metal Toolchain already installed"
 
 # Secret environment variables set on the Xcode Cloud workflow. Without them a release shows no ads.
 if [ -n "$GAD_APPLICATION_ID" ] && [ -n "$GAD_REWARDED_AD_UNIT_ID" ]; then
