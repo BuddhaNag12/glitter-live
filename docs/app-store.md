@@ -124,7 +124,22 @@ iPhone only (the app is iPhone-only). App Store Connect needs the 6.9" size, 132
 xcodebuild test -project LiveWall.xcodeproj -scheme LiveWall -destination 'platform=iOS Simulator,name=iPhone 18 Pro Max' -only-testing:LiveWallUITests
 ```
 
-Suggested order: Explore, Trim Studio, Trim Studio controls, Result, Library, Onboarding welcome.
+The store assets in `docs/store-assets/` frame the dark captures on the brand background with a headline: six screenshots at 6.9" (1320 × 2868) and 6.3" (1206 × 2622), the product page header (3840 × 1646) and the search results asset (1920 × 1280). Pin the simulator's status bar first (`xcrun simctl status_bar <device> override --time 9:41 --batteryState charged --batteryLevel 100`), export the test's attachments (`xcrun xcresulttool export attachments --path <bundle>.xcresult --output-path <captures>`, named as in `ScreenshotTests`), then:
+
+```bash
+swift scripts/render-icon.swift docs/store-assets store <captures>
+```
+
+| # | Screen | Headline |
+| --- | --- | --- |
+| 1 | Explore | Wallpapers that come alive |
+| 2 | Trim Studio | Turn any video into a live wallpaper |
+| 3 | Trim Studio controls | Pick the perfect moment |
+| 4 | Result | Moves every time you wake your iPhone |
+| 5 | Explore detail | Hand-picked live wallpapers |
+| 6 | Library | Everything you make, kept in one place |
+
+Keep Convert's start screen out: it shows the ad offer and the price, which screenshots can't.
 
 ## Release checklist
 
