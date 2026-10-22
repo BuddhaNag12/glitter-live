@@ -3,7 +3,7 @@ import CoreGraphics
 import ImageIO
 import UniformTypeIdentifiers
 
-// Usage: swift scripts/render-icon.swift <output-dir> [icon|logo|appbar|svg]
+// Usage: swift scripts/render-icon.swift <output-dir> [icon|logo|appbar|svg|store <captures-dir>]
 let outputDir = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
 try? FileManager.default.createDirectory(at: outputDir, withIntermediateDirectories: true)
 
@@ -352,8 +352,154 @@ enum SVG {
 
 // MARK: - Entry point
 
+// MARK: - App Store screenshots, product page header and search results
+
+/// Opaque, so App Store Connect accepts the PNGs (it rejects any alpha channel).
+func storeContext(_ width: Int, _ height: Int) -> CGContext {
+    CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0, space: space, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
+}
+
+/// The app's night sky: brand blue and silver glows with a few glints.
+func drawStoreBackground(_ ctx: CGContext, _ size: CGSize) {
+    ctx.setFillColor(rgb(night))
+    ctx.fill(CGRect(origin: .zero, size: size))
+    let reach = max(size.width, size.height)
+    for (hex, alpha, x, y, radius) in [(brandBlue, 0.45, 0.12, 0.92, 0.75), (0x94A3B8, 0.18, 0.92, 0.2, 0.7)] as [(UInt32, CGFloat, CGFloat, CGFloat, CGFloat)] {
+        let glow = CGGradient(colorsSpace: space, colors: [rgb(hex, alpha), rgb(hex, 0)] as CFArray, locations: [0, 1])!
+        let center = CGPoint(x: x * size.width, y: y * size.height)
+        ctx.drawRadialGradient(glow, startCenter: center, startRadius: 0, endCenter: center, endRadius: radius * reach, options: [])
+    }
+    for (x, y, r, alpha) in [(0.08, 0.6, 0.012, 0.5), (0.9, 0.78, 0.016, 0.6), (0.82, 0.45, 0.008, 0.4), (0.035, 0.1, 0.01, 0.35)] as [(CGFloat, CGFloat, CGFloat, CGFloat)] {
+        drawSparkle(ctx, at: CGPoint(x: x * size.width, y: y * size.height), radius: r * reach, color: CGColor(gray: 1, alpha: alpha))
+    }
+}
+
+/// A real app screen in a rounded slate frame. Drawn, not Apple's device art, so there's no rights question.
+func drawPhone(_ ctx: CGContext, _ image: CGImage, center: CGPoint, width: CGFloat, angle: CGFloat = 0) {
+    let height = width * CGFloat(image.height) / CGFloat(image.width)
+    let bezel = width * 0.022, radius = width * 0.14
+    let outer = CGRect(x: -width / 2 - bezel, y: -height / 2 - bezel, width: width + bezel * 2, height: height + bezel * 2)
+    ctx.saveGState()
+    ctx.translateBy(x: center.x, y: center.y)
+    ctx.rotate(by: angle)
+    ctx.setShadow(offset: CGSize(width: 0, height: -width * 0.03), blur: width * 0.12, color: CGColor(gray: 0, alpha: 0.6))
+    ctx.addPath(CGPath(roundedRect: outer, cornerWidth: radius + bezel, cornerHeight: radius + bezel, transform: nil))
+    ctx.setFillColor(rgb(0x1E293B))
+    ctx.fillPath()
+    ctx.setShadow(offset: .zero, blur: 0)
+    ctx.addPath(CGPath(roundedRect: outer.insetBy(dx: bezel * 0.15, dy: bezel * 0.15), cornerWidth: radius + bezel, cornerHeight: radius + bezel, transform: nil))
+    ctx.setStrokeColor(rgb(0x475569))
+    ctx.setLineWidth(bezel * 0.3)
+    ctx.strokePath()
+    let screen = CGRect(x: -width / 2, y: -height / 2, width: width, height: height)
+    ctx.addPath(CGPath(roundedRect: screen, cornerWidth: radius, cornerHeight: radius, transform: nil))
+    ctx.clip()
+    ctx.interpolationQuality = .high
+    ctx.draw(image, in: screen)
+    ctx.restoreGState()
+}
+
+/// Wrapped Inter Bold, top-aligned in `rect`.
+func drawText(_ ctx: CGContext, _ text: String, in rect: CGRect, size: CGFloat, color: CGColor, centered: Bool = true) {
+    var alignment: CTTextAlignment = centered ? .center : .left
+    var spacing = size * 0.08
+    let style = withUnsafePointer(to: &alignment) { a in
+        withUnsafePointer(to: &spacing) { s in
+            CTParagraphStyleCreate([
+                CTParagraphStyleSetting(spec: .alignment, valueSize: MemoryLayout<CTTextAlignment>.size, value: a),
+                CTParagraphStyleSetting(spec: .lineSpacingAdjustment, valueSize: MemoryLayout<CGFloat>.size, value: s),
+            ], 2)
+        }
+    }
+    let string = NSAttributedString(string: text, attributes: [
+        .init(kCTFontAttributeName as String): CTFontCreateWithName("Inter-Bold" as CFString, size, nil),
+        .init(kCTForegroundColorAttributeName as String): color,
+        .init(kCTParagraphStyleAttributeName as String): style,
+    ])
+    let frame = CTFramesetterCreateFrame(CTFramesetterCreateWithAttributedString(string), CFRange(location: 0, length: 0), CGPath(rect: rect, transform: nil), nil)
+    CTFrameDraw(frame, ctx)
+}
+
+func drawLockup(_ ctx: CGContext, origin: CGPoint, height: CGFloat) {
+    let scale = height / wordmarkSize
+    ctx.saveGState()
+    ctx.translateBy(x: origin.x, y: origin.y)
+    ctx.scaleBy(x: scale, y: scale)
+    drawLogoMark(ctx, center: CGPoint(x: wordmarkSize * 0.55, y: wordmarkSize * 0.36), scale: wordmarkSize * 1.1 / 1024, onDark: true)
+    drawWordmark(ctx, origin: CGPoint(x: wordmarkSize * 1.3, y: 0), theme: .dark)
+    ctx.restoreGState()
+}
+
+func loadImage(_ url: URL) -> CGImage {
+    guard let source = CGImageSourceCreateWithURL(url as CFURL, nil), let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+        fatalError("Can't read \(url.path)")
+    }
+    return image
+}
+
+/// Headline on top, the screen below, running off the bottom edge. Laid out on the 6.9" canvas and scaled.
+func renderStoreShot(_ capture: CGImage, caption: String, width: Int, height: Int, name: String) {
+    let ctx = storeContext(width, height)
+    let size = CGSize(width: width, height: height)
+    let s = size.width / 1320
+    drawStoreBackground(ctx, size)
+    drawText(ctx, caption, in: CGRect(x: 110 * s, y: size.height - 600 * s, width: size.width - 220 * s, height: 440 * s), size: 104 * s, color: CGColor(gray: 1, alpha: 1))
+    let phoneWidth = 1000 * s
+    let phoneHeight = phoneWidth * CGFloat(capture.height) / CGFloat(capture.width)
+    drawPhone(ctx, capture, center: CGPoint(x: size.width / 2, y: size.height - 640 * s - phoneHeight / 2), width: phoneWidth)
+    writePNG(ctx, name)
+}
+
+let tagline = "Turn any video into a live wallpaper"
+
+/// 21:9. Brand on the left, three screens fanned on the right.
+func renderHeader(_ screens: [CGImage], name: String) {
+    let size = CGSize(width: 3840, height: 1646)
+    let ctx = storeContext(Int(size.width), Int(size.height))
+    drawStoreBackground(ctx, size)
+    drawLockup(ctx, origin: CGPoint(x: 200, y: 930), height: 150)
+    drawText(ctx, tagline, in: CGRect(x: 200, y: 330, width: 1100, height: 520), size: 120, color: CGColor(gray: 1, alpha: 1), centered: false)
+    let center = CGPoint(x: 2440, y: 760)
+    drawPhone(ctx, screens[0], center: CGPoint(x: center.x - 700, y: center.y - 90), width: 600, angle: 0.07)
+    drawPhone(ctx, screens[2], center: CGPoint(x: center.x + 700, y: center.y - 90), width: 600, angle: -0.07)
+    drawPhone(ctx, screens[1], center: center, width: 680)
+    writePNG(ctx, name)
+}
+
+/// 3:2. The brand and line on the left, two screens on the right.
+func renderSearch(_ screens: [CGImage], name: String) {
+    let size = CGSize(width: 1920, height: 1280)
+    let ctx = storeContext(Int(size.width), Int(size.height))
+    drawStoreBackground(ctx, size)
+    drawLockup(ctx, origin: CGPoint(x: 110, y: 820), height: 96)
+    drawText(ctx, tagline, in: CGRect(x: 110, y: 300, width: 760, height: 460), size: 88, color: CGColor(gray: 1, alpha: 1), centered: false)
+    drawPhone(ctx, screens[1], center: CGPoint(x: 1640, y: 560), width: 470, angle: -0.06)
+    drawPhone(ctx, screens[0], center: CGPoint(x: 1230, y: 600), width: 500, angle: 0.03)
+    writePNG(ctx, name)
+}
+
 let mode = CommandLine.arguments.count > 2 ? CommandLine.arguments[2] : "icon"
-if mode == "logo" {
+if mode == "store" {
+    // Usage: swift scripts/render-icon.swift <output-dir> store <captures-dir> (dark captures from ScreenshotTests)
+    registerInter()
+    let captures = URL(fileURLWithPath: CommandLine.arguments[3], isDirectory: true)
+    func capture(_ name: String) -> CGImage { loadImage(captures.appendingPathComponent("\(name)-dark.png")) }
+    let shots = [
+        ("explore", "Wallpapers that come alive"),
+        ("trim-studio", "Turn any video into a live wallpaper"),
+        ("trim-studio-3", "Pick the perfect moment"),
+        ("result", "Moves every time you wake your iPhone"),
+        ("explore-detail", "Hand-picked live wallpapers"),
+        ("library-grid", "Everything you make, kept in one place"),
+    ]
+    for (index, (screen, caption)) in shots.enumerated() {
+        let image = capture(screen)
+        renderStoreShot(image, caption: caption, width: 1320, height: 2868, name: "iphone-6.9-\(index + 1)-\(screen).png")
+        renderStoreShot(image, caption: caption, width: 1206, height: 2622, name: "iphone-6.3-\(index + 1)-\(screen).png")
+    }
+    renderHeader([capture("explore"), capture("trim-studio"), capture("result")], name: "header-3840x1646.png")
+    renderSearch([capture("trim-studio"), capture("result")], name: "search-1920x1280.png")
+} else if mode == "logo" {
     registerInter()
     renderLogo(layout: .horizontal, theme: .light, background: true, name: "GlitterLive-Logo-Horizontal-Light.png")
     renderLogo(layout: .horizontal, theme: .dark, background: true, name: "GlitterLive-Logo-Horizontal-Dark.png")

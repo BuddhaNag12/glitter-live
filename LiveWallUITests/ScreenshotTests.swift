@@ -24,7 +24,8 @@ final class ScreenshotTests: XCTestCase {
     @MainActor
     private func launch(_ appearance: String, _ arguments: [String]) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = arguments + ["-appearance", appearance]
+        // Release hides unfinished features; the screenshots show only what ships.
+        app.launchArguments = arguments + ["-appearance", appearance, "-releaseFeatures"]
         app.launch()
         return app
     }
@@ -33,10 +34,11 @@ final class ScreenshotTests: XCTestCase {
     private func captureOnboarding(_ appearance: String) {
         let app = launch(appearance, ["-hasCompletedOnboarding", "NO"])
         XCTAssertTrue(app.buttons["Continue"].waitForExistence(timeout: 10))
-        for page in 1...3 {
+        for page in 1...4 {
             Thread.sleep(forTimeInterval: 2)
             attach(app, name: "onboarding-\(page)-\(appearance)")
-            if page < 3 { app.buttons["Continue"].tap() }
+            // Google's consent library keeps a hidden web form with its own "Continue" button; the app's comes first.
+            if page < 4 { app.buttons["Continue"].firstMatch.tap() }
         }
         XCTAssertTrue(app.buttons["Start Creating"].exists)
         app.terminate()
