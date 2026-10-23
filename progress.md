@@ -1,10 +1,10 @@
 # Progress
 
-Last updated 2026-10-13. `main` at the merge of #21. Version 1.0.0.
+Last updated 2026-10-23. `main` at the merge of #25; store assets on the `store-assets` branch (PR open). Version 1.0.0.
 
 ## Status
 
-**Convert is ready to release in code.** Release waits on the Apple Developer Program enrollment. Create works but isn't ready to ship (see Next).
+**1.0 is in App Review (submitted 2026-10-23).** Build 1.0.0 (6) from Xcode Cloud, with real AdMob IDs (test ad confirmed on a device), and the Unlimited Conversions in-app purchase. App Privacy, age rating 4+, content rights, listing text, screenshots, header and search assets are all in App Store Connect. Create works but isn't ready to ship (see Next).
 
 ## Done
 
@@ -19,16 +19,26 @@ Last updated 2026-10-13. `main` at the merge of #21. Version 1.0.0.
 | #19 | Real AdMob IDs from the uncommitted `Config/AdMob.secrets.xcconfig` |
 | #20 | Bounce saves no longer fail; cover frame kept 0.5 s or later so Lock Screen motion works; result screen fits the iPhone SE |
 | #21 | CI on every pull request, automatic deploys of the `generate` function, tagged GitHub releases |
+| #22 | Ignore `graphify-out` |
+| #23 | App Review fixes: build number 2, the ad SDK starts on the first chosen ad (after consent and tracking prompts), max ad content rating G; GitHub Actions build removed in favour of Xcode Cloud |
+| #24 | README: Xcode Cloud builds every push to `main` |
+| #25 | `Package.resolved` tracked so Xcode Cloud can resolve packages; post-clone script tolerates a preinstalled Metal Toolchain |
+| `store-assets` | App Store screenshots (6.9" and 6.3"), product page header and search asset from `scripts/render-icon.swift store`; `-releaseFeatures` hides Create in screenshot runs |
 
 The developer website (https://buddhanag12.github.io) and its `app-ads.txt` are live.
 
-## Waiting on enrollment
+## In review
 
-1. Change `DEVELOPMENT_TEAM` in `project.yml` to the paid team's ID and rebuild with `-allowProvisioningUpdates`.
-2. App Store Connect: create the app, sign the Paid Apps agreement, create the in-app purchase. Listing text is in [app-store.md](app-store.md).
-3. Xcode Cloud: create the workflow and add the `GAD_APPLICATION_ID` and `GAD_REWARDED_AD_UNIT_ID` secrets (release checklist step 6).
-4. AdMob: the EU/UK consent message; after launch, link the app and check `app-ads.txt`.
-5. Archive, fill in App Privacy from the privacy report, submit with the in-app purchase, then tag `v1.0.0`.
+Check App Store Connect → App Review for questions or a rejection. Keep the Explore catalog published while it's in review.
+
+Not confirmed when submitting: the Paid Apps agreement is **Active** (tax form), the AdMob EU/UK consent message is published, and China mainland (no ICP filing) and the EU (DSA trader verification pending) are out of availability if needed.
+
+## After approval
+
+1. Release (if manual), then `git tag v1.0.0 && git push origin v1.0.0`.
+2. AdMob: link the App Store listing so real ads serve, check `app-ads.txt`, and remove the test iPhone from Test devices.
+3. Merge the `store-assets` PR; delete the local `review-screenshots/` folder.
+4. Move a wallpaper into the `Featured` category; that filter is empty since Coastal Ride (Nike logo) was removed.
 
 ## Next
 
@@ -41,7 +51,8 @@ The developer website (https://buddhanag12.github.io) and its `app-ads.txt` are 
 ## Backlog
 
 - Explore search and sort by newest
-- Refresh the README and App Store screenshots
+- Refresh the README screenshots
+- App preview video (optional)
 - Warm up the depth model before first use
 - Scroll performance profiling
 - The shared screen header truncates "Convert" at the largest text sizes
@@ -49,6 +60,7 @@ The developer website (https://buddhanag12.github.io) and its `app-ads.txt` are 
 
 ## Notes
 
-- CI skips the four test suites that encode video; GitHub's runners have no GPU and they take over 25 minutes there. Run the full suite locally before a release (30 tests, about 4 minutes):
+- No CI runs tests now; run the full suite locally before a release (30 tests, about 4 minutes):
   `xcodebuild test -project LiveWall.xcodeproj -scheme LiveWall -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -only-testing:LiveWallTests -collect-test-diagnostics never`
-- Releasing: bump `MARKETING_VERSION` in a pull request, merge, then `git tag vX.Y.Z && git push origin vX.Y.Z`.
+- Releasing: every merge to `main` goes to TestFlight through Xcode Cloud (it sets the build number). For a release, bump `MARKETING_VERSION` in a pull request, merge, then `git tag vX.Y.Z && git push origin vX.Y.Z` for the GitHub release.
+- Xcode 27.1 can fail to create Xcode Cloud workflows ("Could not find item", or asking to connect the `googleads` org). Luminux's workflow was created by generating its project without the Google packages just for the setup.
