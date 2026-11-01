@@ -7,6 +7,9 @@ enum FeatureFlags {
     #if DEBUG
     /// `-releaseFeatures` hides it in debug too, so App Store screenshots match what ships.
     static let aiGeneration = !ProcessInfo.processInfo.arguments.contains("-releaseFeatures")
+    #elseif AI_BETA
+    /// Internal TestFlight builds from the "AI beta" Xcode Cloud workflow; App Store builds never set AI_BETA.
+    static let aiGeneration = true
     #else
     static let aiGeneration = false
     #endif
