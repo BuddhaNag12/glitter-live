@@ -5,6 +5,9 @@ struct CreateView: View {
     @State private var model = CreateModel()
     @FocusState private var isPromptFocused: Bool
     @State private var showsStyles = false
+    /// Guideline 5.1.2(i): say which AI provider gets the description, and ask before the first one is sent.
+    @AppStorage("create.acceptedAINotice") private var acceptedAINotice = false
+    @State private var showsAINotice = false
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -162,12 +165,25 @@ struct CreateView: View {
     private var generateButton: some View {
         Button {
             isPromptFocused = false
-            Task { await model.generate() }
+            if acceptedAINotice {
+                Task { await model.generate() }
+            } else {
+                showsAINotice = true
+            }
         } label: {
             Label(generateTitle, systemImage: generateSymbol)
         }
         .buttonStyle(KineticButtonStyle())
         .disabled(!model.canGenerate || RewardedAds.shared.isPreparing)
+        .alert("Create with AI", isPresented: $showsAINotice) {
+            Button("Continue") {
+                acceptedAINotice = true
+                Task { await model.generate() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Your description is sent to Cloudflare Workers AI, which checks it and paints the image. Glitter Live doesn't keep it, so avoid including personal details.")
+        }
     }
 
     private var generateTitle: String {
@@ -231,9 +247,9 @@ private struct AllowanceBanner: View {
         switch access {
         case .unlimited: "No limits or ads in this build."
         case .free: "After that, a short ad unlocks each one."
-        case .ad(let remaining): "\(remaining) left today. Pro removes ads."
+        case .ad(let remaining): "\(remaining) left today."
         case .pro(let remaining): "No ads. \(remaining) left this month."
-        case .dailyLimitReached: "\(GenerationAllowance.dailyAdGenerations) more tomorrow, or go Pro for \(GenerationAllowance.monthlyProGenerations) a month without ads."
+        case .dailyLimitReached: "\(GenerationAllowance.dailyAdGenerations) more tomorrow."
         case .monthlyLimitReached: "Your \(GenerationAllowance.monthlyProGenerations) generations refill next month."
         }
     }

@@ -1,8 +1,8 @@
 # Glitter Live Privacy Policy
 
-_Effective 3 October 2026_
+_Effective 1 November 2026_
 
-Glitter Live turns videos into Live Photo wallpapers. Your videos and photos never leave your iPhone. The app has no account. The only data that leaves the device is what the ads need, and only when you choose to watch one.
+Glitter Live turns videos into Live Photo wallpapers. Your videos and photos never leave your iPhone. The app has no account. Apart from Explore's catalog downloads, the only data that leaves the device is what the ads need, and the descriptions you type in Create.
 
 ## Your videos and photos
 
@@ -37,6 +37,17 @@ Purchases are handled entirely by Apple. We never see your payment details. Appl
 ## Explore
 
 The wallpapers in Explore are downloaded from our catalog, which is hosted by [Supabase](https://supabase.com). As with any download, the request includes technical details such as your IP address, which the hosting provider may log briefly to run the service. We don't use these details to identify you, and nothing about what you browse or save is sent back to us.
+
+## Create (AI wallpapers)
+
+Create is in testing builds of Glitter Live (TestFlight) and not yet in the App Store version.
+
+- **What's sent.** When you tap Generate, the description you typed and the style you picked are sent to our server, which passes them to [Cloudflare Workers AI](https://www.cloudflare.com/privacypolicy/). Cloudflare checks the description for unsafe content and paints the image, which comes back to your iPhone. The app asks before the first description is sent.
+- **What isn't.** Nothing else from your device, your photos or your videos. The motion is added on your iPhone.
+- **Storage.** Our server doesn't store your descriptions or images. Generated wallpapers are kept in your Library on your iPhone.
+- **Limits.** The number of generations you've used is counted on your iPhone.
+
+Don't include personal information in your descriptions.
 
 ## Children
 
