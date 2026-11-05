@@ -34,10 +34,21 @@ final class RewardedAds: NSObject, RewardedAdPresenter {
     @ObservationIgnored private var dismissal: CheckedContinuation<Bool, Never>?
 
     /// Refreshes consent quietly at launch, without showing any form, so Settings knows whether to offer privacy choices.
-    /// The SDK itself waits for the first ad someone chooses, after the consent and tracking prompts.
+    /// The SDK itself waits for `askForPermissions()`, after the consent and tracking prompts.
     func warmUp() async {
         try? await ConsentInformation.shared.requestConsentInfoUpdate(with: RequestParameters())
         offersPrivacyChoices = ConsentInformation.shared.privacyOptionsRequirementStatus == .required
+    }
+
+    /// Once onboarding is done: the consent form where the law requires it, then the tracking prompt, before the SDK
+    /// starts. App Review expects the prompt up front rather than at the first ad, which can be five conversions away.
+    func askForPermissions() async {
+        guard Self.hasRealAdUnit else { return }
+        #if DEBUG
+        // Screenshot runs: system prompts would cover the screens.
+        if ProcessInfo.processInfo.arguments.contains("-noPrompts") { return }
+        #endif
+        await gatherConsent()
     }
 
     /// True once the ad has been watched to the end. Also true when no ad can be had (offline, no fill), so a

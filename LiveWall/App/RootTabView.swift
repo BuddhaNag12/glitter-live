@@ -36,6 +36,11 @@ struct RootTabView: View {
         .tint(Theme.accent)
         .modifier(MinimizingTabBar())
         .task { CreationLibrary(context: modelContext).removeOrphanedFiles() }
+        // After onboarding and the launch intro, so the prompts don't cover them; does nothing once answered.
+        .task(id: hasCompletedOnboarding && !isLaunchIntroPlaying) {
+            guard hasCompletedOnboarding, !isLaunchIntroPlaying, FeatureFlags.showsAds else { return }
+            await RewardedAds.shared.askForPermissions()
+        }
         // A video shared from another app opens in Convert the next time the app comes forward.
         .onChange(of: scenePhase, initial: true) { _, phase in
             if phase == .active, incoming.checkInbox() { selection = .convert }

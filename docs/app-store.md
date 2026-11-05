@@ -112,7 +112,7 @@ Before submitting, check these against the privacy report Xcode builds from the 
 - Glitter Live asks for add-only Photos access the first time a wallpaper is saved; it never reads the library.
 - Explore needs an internet connection. Convert works offline: tap Choose from Photos, pick any video, then Save Live Photo.
 - The first 5 conversions are free. After that, Save in Trim Studio offers a rewarded ad or the Unlimited Conversions purchase. Ads never appear on their own. Restore Purchases is in Settings.
-- The App Tracking Transparency prompt appears only when the reviewer first chooses to watch an ad.
+- On a fresh install, the App Tracking Transparency prompt appears right after the welcome screens (tap Continue through them, then Start Creating), before the ad SDK starts or any ad loads. Where the law requires it, Google's consent form comes first.
 - Paste Link downloads direct links to video files only. Links to YouTube, Instagram and similar sites are refused with steps for saving the video from that app instead, so the app doesn't download media from third-party services.
 - To check Lock Screen motion: in Photos, open the saved Live Photo, tap Share → Use as Wallpaper, make sure the Live Photo button is on, then Add. The app explains these steps under "How to set a live wallpaper" in Settings.
 

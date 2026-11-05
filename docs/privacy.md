@@ -15,7 +15,7 @@ Glitter Live turns videos into Live Photo wallpapers. Your videos and photos nev
 
 Your first 5 conversions are free. After that, you can watch a short ad to save each wallpaper, or unlock unlimited conversions with a one-time purchase. Ads only appear when you choose to watch one.
 
-Ads are provided by Google AdMob. When an ad loads, Google's Mobile Ads SDK collects:
+Ads are provided by Google AdMob. Google's Mobile Ads SDK starts only after you've answered the tracking prompt (and, where the law requires it, Google's consent form). When an ad loads, Google's Mobile Ads SDK collects:
 
 - a device identifier, such as the advertising identifier (IDFA) if you allow tracking
 - your approximate location, estimated from your IP address
@@ -26,7 +26,7 @@ Google uses this to show and measure ads, to prevent fraud and to improve its se
 
 **Your choices**
 
-- **Tracking.** The first time you watch an ad, iOS asks whether Glitter Live may track you across other apps and websites. If you choose Ask App Not to Track, the advertising identifier isn't shared, and you may see less relevant ads. You can change this at any time in Settings → Privacy & Security → Tracking.
+- **Tracking.** After the welcome screens, before any ad can load, iOS asks whether Glitter Live may track you across other apps and websites. If you choose Ask App Not to Track, the advertising identifier isn't shared, and you may see less relevant ads. You can change this at any time in Settings → Privacy & Security → Tracking.
 - **Consent in the EU, UK and similar regions.** Where the law requires it, Google's consent form asks for your choices before any ad loads. You can change them later in Glitter Live under Settings → Ad privacy choices.
 - **No ads at all.** The one-time Unlimited Conversions purchase removes ads from Convert.
 
