@@ -5,7 +5,8 @@ struct CreateView: View {
     @State private var model = CreateModel()
     @FocusState private var isPromptFocused: Bool
     @State private var showsStyles = false
-    /// Guideline 5.1.2(i): say which AI provider gets the description, and ask before the first one is sent.
+    /// Guideline 5.1.2(i): say the description goes to a third-party AI service, and ask before the first one is sent.
+    /// The privacy policy names the provider.
     @AppStorage("create.acceptedAINotice") private var acceptedAINotice = false
     @State private var showsAINotice = false
     @Environment(\.modelContext) private var modelContext
@@ -182,7 +183,7 @@ struct CreateView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Your description is sent to Cloudflare Workers AI, which checks it and paints the image. Glitter Live doesn't keep it, so avoid including personal details.")
+            Text("To create your wallpaper, your description is sent to a third-party AI service. Glitter Live doesn't store it, so please don't include personal information.")
         }
     }
 
