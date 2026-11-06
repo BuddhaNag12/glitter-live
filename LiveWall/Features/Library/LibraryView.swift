@@ -232,16 +232,13 @@ private struct CreationRow: View {
                 Text(creation.createdAt, format: .dateTime.month(.abbreviated).day())
                     .typography(.titleMedium)
                     .foregroundStyle(Theme.textPrimary)
-                HStack {
-                    Text(creation.createdAt, format: .dateTime.hour().minute())
-                    Spacer(minLength: 8)
-                    Label(kind, systemImage: creation.isLive ? "livephoto" : "photo")
-                        .labelStyle(.titleAndIcon)
-                }
-                .font(.labelMedium)
-                .foregroundStyle(Theme.textSecondary)
+                Text(creation.createdAt, format: .dateTime.hour().minute())
+                    .font(.labelMedium)
+                    .foregroundStyle(Theme.textSecondary)
             }
             .lineLimit(1)
+
+            Spacer(minLength: 8)
 
             if let selection {
                 Image(systemName: selection ? "checkmark.circle.fill" : "circle")
@@ -249,12 +246,17 @@ private struct CreationRow: View {
                     .foregroundStyle(selection ? Theme.accentFill : Theme.textTertiary)
                     .accessibilityHidden(true)
             } else {
-                // Whether this wallpaper is already in Photos, or still needs saving from its detail sheet.
-                Image(systemName: creation.savedToPhotos ? "photo.badge.checkmark" : "photo.badge.arrow.down")
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(creation.savedToPhotos ? Theme.accent : Theme.textTertiary)
-                    .frame(width: 36, height: 36)
-                    .accessibilityLabel(creation.savedToPhotos ? "Saved to Photos" : "Not in Photos")
+                // Live badge in the corner; the Photos status as a tag below it.
+                VStack(alignment: .trailing) {
+                    if creation.isLive {
+                        Image(systemName: "livephoto")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Theme.signalYellow)
+                            .accessibilityLabel("Live, \(creation.duration.formatted(.number.precision(.fractionLength(1)))) seconds")
+                    }
+                    Spacer(minLength: 0)
+                    PhotosTag(isSaved: creation.savedToPhotos)
+                }
             }
         }
         .padding(.horizontal, 12)
@@ -273,9 +275,21 @@ private struct CreationRow: View {
         }
     }
 
-    private var kind: String {
-        guard creation.isLive else { return "Still" }
-        return "Live · \(creation.duration.formatted(.number.precision(.fractionLength(1))))s"
+}
+
+/// Whether a wallpaper is in Photos yet: a blue "In Photos" tag, or a muted "Not saved" one.
+private struct PhotosTag: View {
+    let isSaved: Bool
+
+    var body: some View {
+        Label(isSaved ? "In Photos" : "Not saved", systemImage: isSaved ? "checkmark" : "arrow.down")
+            .labelStyle(.titleAndIcon)
+            .font(.labelSmall)
+            .foregroundStyle(isSaved ? Theme.accent : Theme.textSecondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(isSaved ? Theme.accentFill.opacity(0.18) : Theme.fill, in: Capsule())
+            .overlay(Capsule().strokeBorder(isSaved ? .clear : Theme.border, lineWidth: 1))
     }
 }
 
