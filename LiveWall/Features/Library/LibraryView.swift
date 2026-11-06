@@ -52,7 +52,12 @@ struct LibraryView: View {
             if creations.isEmpty {
                 LibraryEmptyView(onConvert: onConvert)
             } else {
-                Group {
+                // The header sits above both layouts, so switching never moves it.
+                VStack(spacing: 0) {
+                    header
+                        .padding(.horizontal, 16)
+                        .padding(.top, 4)
+                        .padding(.bottom, 10)
                     switch layout {
                     case .list: listLayout
                     case .grid: gridLayout
@@ -93,10 +98,6 @@ struct LibraryView: View {
     /// A List rather than a scroll view, for the system's swipe-to-delete.
     private var listLayout: some View {
         List {
-            header
-                .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 6, trailing: 16))
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
             ForEach(Array(visibleCreations.enumerated()), id: \.element.id) { index, creation in
                 item(creation, index: index)
                     .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
@@ -118,6 +119,7 @@ struct LibraryView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .scrollIndicators(.hidden)
+        .contentMargins(.top, 0, for: .scrollContent)
         .contentMargins(.bottom, 88, for: .scrollContent)
         .transition(.opacity)
     }
@@ -125,7 +127,6 @@ struct LibraryView: View {
     private var gridLayout: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                header
                 LazyVGrid(columns: gridColumns, spacing: 10) {
                     ForEach(Array(visibleCreations.enumerated()), id: \.element.id) { index, creation in
                         item(creation, index: index)
@@ -133,7 +134,8 @@ struct LibraryView: View {
                 }
                 countFooter.padding(.top, 6)
             }
-            .padding(16)
+            .padding(.horizontal, 16)
+            .padding(.top, 4)
             .padding(.bottom, 88)
         }
         .scrollIndicators(.hidden)
@@ -159,7 +161,14 @@ struct LibraryView: View {
                     Button("Done", action: endSelecting)
                         .buttonStyle(GlassPillButtonStyle(tint: Theme.accent))
                 } else {
-                    CategoryPicker(selection: $category)
+                    // The system segmented control: on iOS 26 it's Liquid Glass, like the tab bar.
+                    Picker("Show", selection: $category.animation(.spring(duration: 0.3))) {
+                        ForEach(Category.allCases) { Text($0.rawValue).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .controlSize(.large)
+                    .fixedSize()
+                    .sensoryFeedback(.selection, trigger: category)
                     Spacer(minLength: 0)
                     // Selecting one wallpaper is just a swipe or a long-press, so Select needs two or more.
                     if visibleCreations.count > 1 {
@@ -285,40 +294,6 @@ struct LibraryView: View {
     #endif
 }
 
-/// All · Live · Stills as one segmented capsule, the highlight sliding to the chosen one.
-private struct CategoryPicker: View {
-    @Binding var selection: LibraryView.Category
-    @Namespace private var highlight
-
-    var body: some View {
-        HStack(spacing: 0) {
-            ForEach(LibraryView.Category.allCases) { option in
-                let isChosen = selection == option
-                Button {
-                    withAnimation(.spring(duration: 0.3)) { selection = option }
-                } label: {
-                    Text(option.rawValue)
-                        .font(.labelMedium.weight(.semibold))
-                        .foregroundStyle(isChosen ? Theme.accent : Theme.textSecondary)
-                        .padding(.horizontal, 14)
-                        .frame(height: 32)
-                        .background {
-                            if isChosen {
-                                Capsule().fill(Theme.accentFill.opacity(0.22)).matchedGeometryEffect(id: "chosen", in: highlight)
-                            }
-                        }
-                        .contentShape(Capsule())
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(isChosen ? .isSelected : [])
-            }
-        }
-        .padding(4)
-        .liquidGlass(in: Capsule())
-        .sensoryFeedback(.selection, trigger: selection)
-    }
-}
-
 /// One wallpaper in the Library list: its thumbnail, kind and length, when it was made, and whether it's in Photos.
 private struct CreationRow: View {
     let creation: Creation
@@ -368,7 +343,7 @@ private struct CreationRow: View {
                     if creation.isLive {
                         Image(systemName: "livephoto")
                             .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(Theme.signalYellow)
+                            .foregroundStyle(Theme.accent)
                             .accessibilityLabel("Live, \(creation.duration.formatted(.number.precision(.fractionLength(1)))) seconds")
                     }
                     Spacer(minLength: 0)
@@ -432,7 +407,7 @@ private struct CreationTile: View {
                 if creation.isLive {
                     Image(systemName: "livephoto")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Theme.signalYellow)
+                        .foregroundStyle(Theme.accent)
                         .padding(6)
                         .background(.black.opacity(0.45), in: Circle())
                         .padding(6)
@@ -497,9 +472,12 @@ private struct AppearsIn: ViewModifier {
             .opacity(isShown ? 1 : 0)
             .scaleEffect(isMoving ? 0.94 : 1)
             .offset(y: isMoving ? 14 : 0)
-            .onAppear {
+            // A task rather than onAppear: a List cell appears before it's drawn, which would skip the animation.
+            .task {
+                guard !isShown else { return }
                 // Later items appear as they're scrolled to, without waiting behind the first screenful.
-                withAnimation(.spring(duration: 0.45, bounce: 0.15).delay(index < 12 ? Double(index) * 0.035 : 0)) { isShown = true }
+                try? await Task.sleep(for: .milliseconds(40 + (index < 12 ? index * 35 : 0)))
+                withAnimation(.spring(duration: 0.45, bounce: 0.15)) { isShown = true }
             }
     }
 }
