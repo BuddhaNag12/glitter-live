@@ -9,6 +9,8 @@ struct GeneratedImageView: View {
     @State private var image: UIImage?
     @State private var isSaving = false
     @State private var showsGuide = false
+    @State private var showsReportReasons = false
+    @State private var isReported = false
 
     var body: some View {
         ScrollView {
@@ -73,13 +75,32 @@ struct GeneratedImageView: View {
                 }
                 .padding(16)
                 .glass(.floating, cornerRadius: 30)
+
+                Button(isReported ? "Reported" : "Report This Image", systemImage: isReported ? "checkmark" : "flag") {
+                    showsReportReasons = true
+                }
+                .font(.labelMedium)
+                .foregroundStyle(Theme.textSecondary)
+                .disabled(isReported)
+                .padding(.top, 4)
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 24)
         }
         .scrollIndicators(.hidden)
         .task(id: imageURL) {
+            isReported = false
             image = UIImage(contentsOfFile: imageURL.path(percentEncoded: false))
+        }
+        .confirmationDialog("What's wrong with this image?", isPresented: $showsReportReasons, titleVisibility: .visible) {
+            ForEach(GenerationReport.Reason.allCases) { reason in
+                Button(reason.title) {
+                    Task { isReported = await model.report(reason) }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Your description is sent with the report so we can improve the filters. The image isn't.")
         }
         .sheet(isPresented: $showsGuide) {
             SetWallpaperGuideView(isLive: false)
