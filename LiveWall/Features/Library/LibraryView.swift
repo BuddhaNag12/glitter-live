@@ -161,14 +161,7 @@ struct LibraryView: View {
                     Button("Done", action: endSelecting)
                         .buttonStyle(GlassPillButtonStyle(tint: Theme.accent))
                 } else {
-                    // The system segmented control: on iOS 26 it's Liquid Glass, like the tab bar.
-                    Picker("Show", selection: $category.animation(.spring(duration: 0.3))) {
-                        ForEach(Category.allCases) { Text($0.rawValue).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                    .controlSize(.large)
-                    .fixedSize()
-                    .sensoryFeedback(.selection, trigger: category)
+                    CategoryPicker(selection: $category)
                     Spacer(minLength: 0)
                     // Selecting one wallpaper is just a swipe or a long-press, so Select needs two or more.
                     if visibleCreations.count > 1 {
@@ -292,6 +285,44 @@ struct LibraryView: View {
         }
     }
     #endif
+}
+
+/// All · Live · Stills styled like the tab bar: one glass capsule, the chosen option in a lighter
+/// pill that slides between them, its label in the accent colour.
+private struct CategoryPicker: View {
+    @Binding var selection: LibraryView.Category
+    @Namespace private var highlight
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(LibraryView.Category.allCases) { option in
+                let isChosen = selection == option
+                Button {
+                    withAnimation(.spring(duration: 0.35, bounce: 0.2)) { selection = option }
+                } label: {
+                    Text(option.rawValue)
+                        .font(.labelMedium.weight(.semibold))
+                        .foregroundStyle(isChosen ? Theme.accent : Theme.textPrimary)
+                        .padding(.horizontal, 14)
+                        .frame(height: 32)
+                        .background {
+                            if isChosen {
+                                Capsule()
+                                    .fill(Theme.fill)
+                                    .overlay(Capsule().fill(Theme.textPrimary.opacity(0.06)))
+                                    .matchedGeometryEffect(id: "chosen", in: highlight)
+                            }
+                        }
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(isChosen ? .isSelected : [])
+            }
+        }
+        .padding(4)
+        .liquidGlass(in: Capsule())
+        .sensoryFeedback(.selection, trigger: selection)
+    }
 }
 
 /// One wallpaper in the Library list: its thumbnail, kind and length, when it was made, and whether it's in Photos.
