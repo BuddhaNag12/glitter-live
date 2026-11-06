@@ -217,7 +217,7 @@ private struct CreationRow: View {
     @State private var thumbnail: UIImage?
 
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 12) {
             Color.black
                 .aspectRatio(9 / 16, contentMode: .fit)
                 .frame(width: 50)
@@ -233,7 +233,7 @@ private struct CreationRow: View {
                 // The detail sheet zooms out of the thumbnail.
                 .zoomSource(id: creation.id, in: zoom, cornerRadius: 10)
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text(creation.isLive ? "Live wallpaper" : "Still wallpaper")
                     .typography(.titleMedium)
                     .foregroundStyle(Theme.textPrimary)
@@ -266,7 +266,7 @@ private struct CreationRow: View {
                     .accessibilityHidden(true)
             }
         }
-        .padding(12)
+        .padding(10)
         .background(selection == true ? Theme.accentFill.opacity(0.12) : .clear)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
