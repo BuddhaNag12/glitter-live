@@ -72,8 +72,8 @@ struct ExploreView: View {
 
     @State private var model = ExploreModel()
     @State private var opened: Opened?
-    /// The carousel page in view; only its card plays.
-    @State private var featuredPage: Wallpaper.ID?
+    /// The carousel position in view, counting across the repeated laps; only its card plays.
+    @State private var featuredPage: Int?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
     /// True while a finger is on the carousel, so auto-advance never fights a swipe.
@@ -163,30 +163,38 @@ struct ExploreView: View {
     /// Featured wallpapers like albums on a shelf: the centre card is full size, its neighbours peek in
     /// smaller and turned towards it, and swiping hands the size over smoothly. Only the centre card plays.
     private func carousel(_ featured: [Wallpaper]) -> some View {
-        // Opens on the middle card, so there's a neighbour on each side to swipe to.
-        let middle = featured[featured.count / 2].id
-        let current = featuredPage ?? middle
+        let count = featured.count
+        // Endless: the cards repeat lap after lap, so the first always follows the last in either direction.
+        // shortcut: 200 laps, not truly infinite; auto-advance recentres at the end, and nobody swipes that far.
+        // VoiceOver gets a single lap, so it doesn't list every card 200 times.
+        let laps = count > 1 && !voiceOver ? 200 : 1
+        let total = laps * count
+        // Opens on the middle card of the middle lap, so there's a neighbour on each side to swipe to.
+        let start = laps / 2 * count + count / 2
+        let current = min(featuredPage ?? start, total - 1)
         // Moving content is hard to follow with VoiceOver and unwanted with Reduce Motion.
         let autoAdvances = featured.count > 1 && isVisible && opened == nil && !isTouchingCarousel && !reduceMotion && !voiceOver
         return VStack(spacing: 12) {
             ScrollView(.horizontal) {
                 LazyHStack(spacing: 0) {
-                    ForEach(featured) { wallpaper in
+                    ForEach(0..<total, id: \.self) { position in
+                        let wallpaper = featured[position % count]
                         Button {
-                            if wallpaper.id == current {
-                                opened = Opened(wallpaper: wallpaper, source: "featured/\(wallpaper.id)")
+                            if position == current {
+                                opened = Opened(wallpaper: wallpaper, source: "featured/\(position)")
                             } else {
                                 // A side card slides to the centre first, like picking up the next album.
-                                withAnimation(.smooth(duration: 0.45)) { featuredPage = wallpaper.id }
+                                withAnimation(.smooth(duration: 0.45)) { featuredPage = position }
                             }
                         } label: {
                             FeaturedCard(
                                 wallpaper: wallpaper,
-                                isPlaying: isVisible && opened == nil && current == wallpaper.id && UIAccessibility.isVideoAutoplayEnabled
+                                isPlaying: isVisible && opened == nil && current == position && UIAccessibility.isVideoAutoplayEnabled
                             )
                         }
                         .buttonStyle(CardPressStyle())
-                        .zoomSource(id: "featured/\(wallpaper.id)", in: zoom, cornerRadius: 28)
+                        // By position, since with two wallpapers the same one sits on both sides.
+                        .zoomSource(id: "featured/\(position)", in: zoom, cornerRadius: 28)
                         .containerRelativeFrame(.horizontal)
                         .scrollTransition(.interactive, axis: .horizontal) { card, phase in
                             // phase.value runs -1 (off to the left) … 0 (centre) … 1 (off to the right).
@@ -211,22 +219,27 @@ struct ExploreView: View {
             .contentMargins(.horizontal, 56, for: .scrollContent)
             .scrollTargetBehavior(.viewAligned)
             .scrollPosition(id: $featuredPage)
-            .onAppear { if featuredPage == nil { featuredPage = middle } }
+            .onAppear { if featuredPage == nil { featuredPage = start } }
             .tracksScrollInteraction($isTouchingCarousel)
             // Restarts on every page change, so a swipe gets a full 5 s before the next card slides in.
             .task(id: autoAdvances ? current : nil) {
-                guard autoAdvances, let index = featured.firstIndex(where: { $0.id == current }) else { return }
+                guard autoAdvances else { return }
                 try? await Task.sleep(for: .seconds(5))
                 guard !Task.isCancelled else { return }
-                withAnimation(.smooth(duration: 0.8)) { featuredPage = featured[(index + 1) % featured.count].id }
+                if current + 1 < total {
+                    withAnimation(.smooth(duration: 0.8)) { featuredPage = current + 1 }
+                } else {
+                    // Out of laps: jump unseen to the same card in the middle lap; the next advance slides on from there.
+                    featuredPage = laps / 2 * count + current % count
+                }
             }
             .scrollIndicators(.hidden)
             .fullBleed()
             if featured.count > 1 {
                 HStack(spacing: 6) {
-                    ForEach(featured) { wallpaper in
+                    ForEach(featured.indices, id: \.self) { index in
                         Circle()
-                            .fill(wallpaper.id == current ? Theme.textPrimary : Theme.textTertiary.opacity(0.5))
+                            .fill(index == current % count ? Theme.textPrimary : Theme.textTertiary.opacity(0.5))
                             .frame(width: 6, height: 6)
                     }
                 }
