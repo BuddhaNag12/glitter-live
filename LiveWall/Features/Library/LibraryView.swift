@@ -227,18 +227,21 @@ private struct CreationRow: View {
                 // The detail sheet zooms out of the thumbnail.
                 .zoomSource(id: creation.id, in: zoom, cornerRadius: 8)
 
-            VStack(alignment: .leading, spacing: 5) {
-                Text(creation.createdAt, format: .dateTime.month(.abbreviated).day().hour().minute())
+            // Date on top; the time below it, with the kind and length at the far end of that line.
+            VStack(alignment: .leading, spacing: 10) {
+                Text(creation.createdAt, format: .dateTime.month(.abbreviated).day())
                     .typography(.titleMedium)
                     .foregroundStyle(Theme.textPrimary)
-                Label(kind, systemImage: creation.isLive ? "livephoto" : "photo")
-                    .font(.labelMedium)
-                    .foregroundStyle(Theme.textSecondary)
-                    .labelStyle(.titleAndIcon)
+                HStack {
+                    Text(creation.createdAt, format: .dateTime.hour().minute())
+                    Spacer(minLength: 8)
+                    Label(kind, systemImage: creation.isLive ? "livephoto" : "photo")
+                        .labelStyle(.titleAndIcon)
+                }
+                .font(.labelMedium)
+                .foregroundStyle(Theme.textSecondary)
             }
             .lineLimit(1)
-
-            Spacer(minLength: 0)
 
             if let selection {
                 Image(systemName: selection ? "checkmark.circle.fill" : "circle")
