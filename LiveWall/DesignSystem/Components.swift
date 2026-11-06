@@ -274,18 +274,17 @@ extension View {
     }
 
     /// Legible text over media: a dark gradient rising from the bottom edge, as in Photos.
-    func mediaCaption(inset: CGFloat = 14) -> some View {
-        modifier(MediaCaption(inset: inset))
+    func mediaCaption() -> some View {
+        modifier(MediaCaption())
     }
 }
 
 private struct MediaCaption: ViewModifier {
-    var inset: CGFloat
     @Environment(\.colorSchemeContrast) private var contrast
 
     func body(content: Content) -> some View {
         content
-            .padding(.horizontal, inset)
+            .padding(.horizontal, 14)
             .padding(.top, 40)
             .padding(.bottom, 14)
             .frame(maxWidth: .infinity, alignment: .leading)
