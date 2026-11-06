@@ -92,11 +92,19 @@ struct CreateView: View {
                 Button("Surprise Me", systemImage: "dice", action: model.surprise)
                     .buttonStyle(GlassPillButtonStyle(tint: Theme.accent))
             }
-            TextField("Bioluminescent koi in liquid starlight…", text: $model.prompt, axis: .vertical)
+            TextField("", text: $model.prompt, axis: .vertical)
                 .lineLimit(3...6)
                 .typography(.bodyLarge)
                 .foregroundStyle(Theme.textPrimary)
                 .focused($isPromptFocused)
+                .overlay(alignment: .topLeading) {
+                    // Out of the way once the user starts typing, so it never sits beside the real caret.
+                    if model.prompt.isEmpty && !isPromptFocused {
+                        TypingPlaceholder(phrases: SurprisePrompts.all)
+                            .allowsHitTesting(false)
+                            .transition(.opacity)
+                    }
+                }
                 // Prompts are one paragraph, so Return finishes typing instead of starting a new line.
                 .submitLabel(.done)
                 .onChange(of: model.prompt) { _, prompt in
@@ -331,6 +339,64 @@ private struct GenerationProgressView: View {
         .task(id: imageURL) {
             guard let imageURL else { return image = nil }
             image = UIImage(contentsOfFile: imageURL.path(percentEncoded: false))
+        }
+    }
+}
+
+/// The empty prompt's placeholder: example scenes written in word by word, held, then blurred away as the
+/// next arrives. Reduce Motion shows each whole, fading from one to the next.
+private struct TypingPlaceholder: View {
+    let phrases: [String]
+    @State private var phrase = ""
+    /// How many of the phrase's words are showing.
+    @State private var revealed = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            Text(attributed)
+                .contentTransition(.interpolate)
+                .id(phrase)
+                .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
+        }
+        .typography(.bodyLarge)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityHidden(true)
+        .task { await play() }
+    }
+
+    /// Every word laid out from the start, so the lines never reflow; unrevealed ones are just clear.
+    private var attributed: AttributedString {
+        var result = AttributedString()
+        for (index, word) in phrase.split(separator: " ").enumerated() {
+            var piece = AttributedString(index == 0 ? String(word) : " " + word)
+            piece.foregroundColor = index < revealed ? Theme.textTertiary : .clear
+            result += piece
+        }
+        return result
+    }
+
+    private func play() async {
+        var queue: [String] = []
+        do {
+            while true {
+                if queue.isEmpty { queue = phrases.shuffled() }
+                let next = queue.removeLast()
+                let words = next.split(separator: " ").count
+                withAnimation(.smooth(duration: 0.5)) {
+                    phrase = next
+                    revealed = reduceMotion ? words : 0
+                }
+                if !reduceMotion {
+                    for count in 1...words {
+                        try await Task.sleep(for: .milliseconds(110))
+                        withAnimation(.easeOut(duration: 0.35)) { revealed = count }
+                    }
+                }
+                try await Task.sleep(for: .seconds(2.6))
+            }
+        } catch {
+            // Cancelled: the view went away or the user started typing.
         }
     }
 }

@@ -18,12 +18,8 @@ enum FeatureFlags {
     /// and the phone animates it with depth parallax, which costs nothing.
     static let aiMotion = false
 
-    /// The free, ad and Pro limits on Create. Off in debug builds while generation is being tested.
-    #if DEBUG
-    static let generationLimits = false
-    #else
+    /// The ad and Pro limits on Create: an ad before each generation, 3 a day. On in debug too, so the ad flow gets tested.
     static let generationLimits = true
-    #endif
 
     /// Convert's 5 free conversions, then an ad or the one-time unlock.
     static let conversionLimits = true

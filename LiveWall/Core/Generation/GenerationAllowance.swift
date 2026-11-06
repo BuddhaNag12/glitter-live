@@ -5,8 +5,9 @@ import Observation
 /// of truth once it exists, since anything stored here resets with a reinstall.
 @Observable
 final class GenerationAllowance {
-    static let freeGenerations = 5
-    static let dailyAdGenerations = 10
+    /// None free: every generation is unlocked with a rewarded ad, up to the daily limit, which keeps AI costs bounded.
+    static let freeGenerations = 0
+    static let dailyAdGenerations = 3
     static let monthlyProGenerations = 100
 
     enum Access: Equatable {

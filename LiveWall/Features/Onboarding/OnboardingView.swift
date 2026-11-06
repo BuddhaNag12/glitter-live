@@ -210,7 +210,7 @@ private struct ReadyPage: View {
                 IncludedRow(symbol: "infinity", title: "Free conversions", detail: "Turn as many videos into live wallpapers as you like.")
             }
             if FeatureFlags.aiGeneration {
-                IncludedRow(symbol: "wand.and.stars", title: "AI Generator", detail: "\(GenerationAllowance.freeGenerations) free generations, then free with a short ad.")
+                IncludedRow(symbol: "wand.and.stars", title: "AI Generator", detail: "\(GenerationAllowance.dailyAdGenerations) a day, each free with a short ad.")
             }
             IncludedRow(symbol: "photo.on.rectangle.angled", title: "Your Library", detail: "Everything you make is kept, ready to save or set again.")
         }
