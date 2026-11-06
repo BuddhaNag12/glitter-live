@@ -275,6 +275,13 @@ struct ExploreView: View {
                         CatalogCardButton(wallpaper: wallpaper, source: "\(section.id)/\(wallpaper.id)", zoom: zoom) { opened = $0 }
                             // Three cards and a peek of the fourth, so more of each row and more rows fit on screen.
                             .containerRelativeFrame(.horizontal, count: 10, span: 3, spacing: 10)
+                            // Cards at the edges sit smaller and faded, so new ones seem to rise from behind as they slide in.
+                            .scrollTransition(.interactive, axis: .horizontal) { card, phase in
+                                let distance = reduceMotion ? 0 : min(abs(phase.value), 1)
+                                return card
+                                    .scaleEffect(1 - distance * 0.2, anchor: phase.value > 0 ? .leading : .trailing)
+                                    .opacity(1 - distance * 0.45)
+                            }
                     }
                 }
                 .scrollTargetLayout()
@@ -570,9 +577,10 @@ private struct CatalogCard: View {
             .overlay(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(wallpaper.title).typography(.labelLarge).foregroundStyle(.white).lineLimit(1).minimumScaleFactor(0.8)
-                    Text(wallpaper.category).font(.labelSmall).foregroundStyle(Theme.onMediaSecondary).lineLimit(1)
+                    Text(wallpaper.category).font(.labelSmall).foregroundStyle(Theme.onMediaSecondary).lineLimit(1).minimumScaleFactor(0.8)
                 }
-                .mediaCaption()
+                // A narrower inset than the featured card's, so category names like "Glitter Originals" fit on one line.
+                .mediaCaption(inset: 10)
             }
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Theme.specularRim, lineWidth: 1))

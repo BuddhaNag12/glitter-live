@@ -44,9 +44,13 @@ private struct LiquidGlass<S: InsettableShape>: ViewModifier {
     @Environment(\.isOnGlass) private var isOnGlass
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorScheme) private var colorScheme
 
     func body(content: Content) -> some View {
         let increasedContrast = contrast == .increased
+        // Light mode tints untinted chrome lilac so it reads against the blue-grey canvas.
+        let isChrome = tint == nil && colorScheme == .light
+        let surfaceTint = isChrome ? Theme.chromeTint : tint
         if isOnGlass {
             content
                 .background(tint ?? Theme.fill, in: shape)
@@ -57,20 +61,21 @@ private struct LiquidGlass<S: InsettableShape>: ViewModifier {
                 .background {
                     shape
                         .fill(Theme.surface)
-                        .overlay(shape.fill(tint ?? .clear))
+                        .overlay(shape.fill(surfaceTint ?? .clear))
                         .overlay(shape.strokeBorder(Theme.border, lineWidth: 1))
                 }
         } else if #available(iOS 26, *) {
             content
                 .environment(\.isOnGlass, true)
-                .glassEffect(Glass.regular.tint(tint).interactive(interactive), in: shape)
+                .glassEffect(Glass.regular.tint(surfaceTint).interactive(interactive), in: shape)
+                .overlay { if isChrome { shape.strokeBorder(Theme.chromeRim, lineWidth: 0.75).allowsHitTesting(false) } }
         } else {
             content
                 .environment(\.isOnGlass, true)
                 .background {
                     shape
                         .fill(.ultraThinMaterial)
-                        .overlay(shape.fill((tint ?? Theme.surface).opacity(0.35)))
+                        .overlay(shape.fill((surfaceTint ?? Theme.surface).opacity(0.35)))
                         .overlay(shape.strokeBorder(Theme.specularRim, lineWidth: 1))
                 }
         }
@@ -97,7 +102,7 @@ private struct GlassPanel: ViewModifier {
             .overlay {
                 // The frosted fallback already draws its own rim.
                 if #available(iOS 26, *), !isOnGlass {
-                    shape.strokeBorder(Theme.specularRim, lineWidth: 0.75).allowsHitTesting(false)
+                    shape.strokeBorder(tier == .floating ? Theme.panelRim : Theme.specularRim, lineWidth: 0.75).allowsHitTesting(false)
                 }
             }
             // Light mode lifts every tier off the pale background; dark mode shadows only floating panels.
@@ -109,7 +114,7 @@ private struct GlassPanel: ViewModifier {
 // MARK: - Buttons
 
 /// The primary call to action: the blue-to-slate brand gradient, with a silver shine sweeping across once when it appears.
-/// Disabled, it becomes an outlined slate capsule, still visible on any background but plainly not tappable.
+/// Disabled, it becomes a washed-out blue, still visible on any background but plainly not tappable.
 struct KineticButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         KineticButton(configuration: configuration)
@@ -123,7 +128,7 @@ struct KineticButtonStyle: ButtonStyle {
             let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
             configuration.label
                 .font(.inter(18, .semibold, relativeTo: .headline))
-                .foregroundStyle(isEnabled ? Theme.onAccent : Theme.textSecondary)
+                .foregroundStyle(isEnabled ? Theme.onAccent : Theme.accent.opacity(0.55))
                 .frame(maxWidth: .infinity, minHeight: 58)
                 .padding(.horizontal, 16)
                 .background { if isEnabled { shape.fill(Theme.accentGradient) } else { DisabledFill(shape: shape) } }
@@ -165,6 +170,16 @@ struct CircleIconButtonStyle: ButtonStyle {
     }
 }
 
+/// A bare glyph button that only dips when pressed, such as the header's Settings gear.
+struct PressScaleButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.88 : 1)
+            .opacity(configuration.isPressed ? 0.7 : 1)
+            .animation(.spring(duration: 0.2), value: configuration.isPressed)
+    }
+}
+
 /// Compact blue capsule, as used for "Save" in the Trim Studio toolbar.
 struct AccentCapsuleButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
@@ -178,7 +193,7 @@ struct AccentCapsuleButtonStyle: ButtonStyle {
         var body: some View {
             configuration.label
                 .typography(.titleMedium)
-                .foregroundStyle(isEnabled ? Theme.onAccent : Theme.textSecondary)
+                .foregroundStyle(isEnabled ? Theme.onAccent : Theme.accent.opacity(0.55))
                 .padding(.horizontal, 18)
                 .frame(height: 44)
                 .background { if isEnabled { Capsule().fill(Theme.accentGradient) } else { DisabledFill(shape: Capsule()) } }
@@ -188,14 +203,15 @@ struct AccentCapsuleButtonStyle: ButtonStyle {
     }
 }
 
-/// A faded gradient still reads as tappable, so disabled main buttons drop the color for a slate tint and outline.
+/// Disabled main buttons keep the brand blue but wash it out: a pale fill, a faint outline and a muted label,
+/// so they read as the same button, not ready yet, rather than a grey slab.
 private struct DisabledFill<S: InsettableShape>: View {
     let shape: S
 
     var body: some View {
         shape
-            .fill(Theme.slate.opacity(0.16))
-            .overlay(shape.strokeBorder(Theme.slate.opacity(0.4), lineWidth: 1))
+            .fill(Theme.accentFill.opacity(0.12))
+            .overlay(shape.strokeBorder(Theme.accentFill.opacity(0.25), lineWidth: 1))
     }
 }
 
@@ -258,17 +274,18 @@ extension View {
     }
 
     /// Legible text over media: a dark gradient rising from the bottom edge, as in Photos.
-    func mediaCaption() -> some View {
-        modifier(MediaCaption())
+    func mediaCaption(inset: CGFloat = 14) -> some View {
+        modifier(MediaCaption(inset: inset))
     }
 }
 
 private struct MediaCaption: ViewModifier {
+    var inset: CGFloat
     @Environment(\.colorSchemeContrast) private var contrast
 
     func body(content: Content) -> some View {
         content
-            .padding(.horizontal, 14)
+            .padding(.horizontal, inset)
             .padding(.top, 40)
             .padding(.bottom, 14)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -317,9 +334,13 @@ private struct ScreenHeader: View {
                 .frame(height: 30)
                 .accessibilityLabel("Glitter Live")
             Button(action: showSettings.callAsFunction) {
-                Image(systemName: "gearshape")
+                Image(systemName: "gearshape.fill")
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(Theme.textSecondary)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
-            .buttonStyle(CircleIconButtonStyle())
+            .buttonStyle(PressScaleButtonStyle())
             .accessibilityLabel("Settings")
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
