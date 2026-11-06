@@ -38,8 +38,6 @@ struct LibraryView: View {
         }
     }
 
-    private let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
-
     var body: some View {
         Group {
             if creations.isEmpty {
@@ -66,22 +64,30 @@ struct LibraryView: View {
                                     .frame(maxWidth: .infinity)
                                     .padding(.top, 40)
                             }
-                            LazyVGrid(columns: columns, spacing: 12) {
-                                ForEach(visibleCreations) { creation in
-                                    let isSelected = selectedIDs.contains(creation.id)
-                                    Button { tap(creation) } label: {
-                                        CreationCard(creation: creation, selection: isSelecting ? isSelected : nil)
-                                    }
-                                    .buttonStyle(.plain)
-                                    .zoomSource(id: creation.id, in: zoom, cornerRadius: 24)
-                                    .accessibilityIdentifier("creation-card")
-                                    .accessibilityAddTraits(isSelecting && isSelected ? .isSelected : [])
-                                    .contextMenu {
-                                        if !isSelecting {
-                                            Button("Delete", systemImage: "trash", role: .destructive) { pendingDeletion = [creation] }
+                            if !visibleCreations.isEmpty {
+                                // A compact list: a small thumbnail and its details per row, so many fit on one screen.
+                                LazyVStack(spacing: 0) {
+                                    ForEach(visibleCreations) { creation in
+                                        let isSelected = selectedIDs.contains(creation.id)
+                                        Button { tap(creation) } label: {
+                                            CreationRow(creation: creation, selection: isSelecting ? isSelected : nil, zoom: zoom)
+                                        }
+                                        .buttonStyle(.plain)
+                                        .accessibilityIdentifier("creation-card")
+                                        .accessibilityAddTraits(isSelecting && isSelected ? .isSelected : [])
+                                        .contextMenu {
+                                            if !isSelecting {
+                                                Button("Delete", systemImage: "trash", role: .destructive) { pendingDeletion = [creation] }
+                                            }
+                                        }
+                                        if creation.id != visibleCreations.last?.id {
+                                            Divider().overlay(Theme.border).padding(.leading, 76)
                                         }
                                     }
                                 }
+                                // Keeps a selected row's tint inside the panel's rounded corners.
+                                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                                .glass(.surface, cornerRadius: 22)
                             }
                         }
                         .padding(16)
@@ -202,75 +208,77 @@ struct LibraryView: View {
     #endif
 }
 
-private struct CreationCard: View {
+/// One wallpaper in the Library list: its thumbnail, kind and length, when it was made, and whether it's in Photos.
+private struct CreationRow: View {
     let creation: Creation
-    /// nil outside selection mode; otherwise whether this card is selected.
+    /// nil outside selection mode; otherwise whether this row is selected.
     var selection: Bool? = nil
+    let zoom: Namespace.ID
     @State private var thumbnail: UIImage?
 
     var body: some View {
-        Color.black
-            .aspectRatio(9 / 16, contentMode: .fit)
-            .overlay {
-                if let thumbnail {
-                    Image(uiImage: thumbnail).resizable().scaledToFill()
-                } else {
-                    AuroraView(isAnimated: false).opacity(0.35)
-                }
-            }
-            .overlay(alignment: .topLeading) {
-                Group {
-                    if creation.isLive {
-                        StatusPill(text: "\(creation.duration.formatted(.number.precision(.fractionLength(1))))s", dot: Theme.signalYellow)
+        HStack(spacing: 14) {
+            Color.black
+                .aspectRatio(9 / 16, contentMode: .fit)
+                .frame(width: 50)
+                .overlay {
+                    if let thumbnail {
+                        Image(uiImage: thumbnail).resizable().scaledToFill()
                     } else {
-                        StatusPill(text: "STILL", dot: Theme.slate, symbol: "photo")
+                        AuroraView(isAnimated: false).opacity(0.35)
                     }
                 }
-                .padding(10)
-            }
-            .overlay {
-                if selection == true {
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .strokeBorder(Theme.accentFill, lineWidth: 3)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Theme.specularRim, lineWidth: 1))
+                // The detail sheet zooms out of the thumbnail.
+                .zoomSource(id: creation.id, in: zoom, cornerRadius: 10)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(creation.isLive ? "Live wallpaper" : "Still wallpaper")
+                    .typography(.titleMedium)
+                    .foregroundStyle(Theme.textPrimary)
+                Text(details)
+                    .font(.labelMedium)
+                    .foregroundStyle(Theme.textSecondary)
+                Group {
+                    if creation.savedToPhotos {
+                        Label("Saved to Photos", systemImage: "checkmark.circle.fill").foregroundStyle(Theme.accent)
+                    } else {
+                        Label("Not in Photos", systemImage: "arrow.down.circle").foregroundStyle(Theme.textTertiary)
+                    }
                 }
+                .font(.labelSmall)
+                .labelStyle(.titleAndIcon)
             }
-            .overlay(alignment: .topTrailing) {
-                if let selection {
-                    Image(systemName: selection ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 24, weight: .semibold))
-                        .symbolRenderingMode(.palette)
-                        .foregroundStyle(.white, selection ? Theme.accentFill : .black.opacity(0.25))
-                        .padding(10)
-                        .accessibilityHidden(true)
-                } else if creation.savedToPhotos {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Theme.accent)
-                        .frame(width: 28, height: 28)
-                        .liquidGlass(in: Circle())
-                        .padding(10)
-                        .accessibilityLabel("Saved to Photos")
-                }
+            .lineLimit(1)
+
+            Spacer(minLength: 0)
+
+            if let selection {
+                Image(systemName: selection ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(selection ? Theme.accentFill : Theme.textTertiary)
+                    .accessibilityHidden(true)
+            } else {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.textTertiary)
+                    .accessibilityHidden(true)
             }
-            .overlay(alignment: .bottom) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(creation.createdAt, format: .dateTime.month(.abbreviated).day())
-                        .typography(.titleMedium)
-                        .foregroundStyle(.white)
-                    Text(creation.createdAt, format: .dateTime.hour().minute())
-                        .font(.labelMedium.weight(.semibold))
-                        .foregroundStyle(Theme.onMediaSecondary)
-                }
-                .mediaCaption()
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Theme.specularRim, lineWidth: 1))
-            .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            // Wallpaper tiles are always dark media, so their glass badges stay dark too.
-            .environment(\.colorScheme, .dark)
-            .task(id: creation.id) {
-                thumbnail = await Thumbnail.load(creation.imageURL, maxPixelSize: 600)
-            }
+        }
+        .padding(12)
+        .background(selection == true ? Theme.accentFill.opacity(0.12) : .clear)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .task(id: creation.id) {
+            thumbnail = await Thumbnail.load(creation.imageURL, maxPixelSize: 300)
+        }
+    }
+
+    private var details: String {
+        let made = creation.createdAt.formatted(.dateTime.month(.abbreviated).day().hour().minute())
+        guard creation.isLive else { return made }
+        return "\(creation.duration.formatted(.number.precision(.fractionLength(1))))s · \(made)"
     }
 }
 
