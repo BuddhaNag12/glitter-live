@@ -9,7 +9,12 @@ struct LibraryView: View {
     @Query(sort: \Creation.createdAt, order: .reverse) private var creations: [Creation]
     @State private var selection: Creation?
     @State private var category = Category.all
+    @State private var isSelecting = false
+    @State private var selectedIDs: Set<UUID> = []
+    /// Waiting for the delete confirmation: from the Delete bar or a card's long-press menu.
+    @State private var pendingDeletion: [Creation] = []
     @Namespace private var zoom
+    @Environment(\.modelContext) private var modelContext
 
     enum Category: String, CaseIterable, Identifiable {
         case all = "All", live = "Live", stills = "Stills"
@@ -49,10 +54,7 @@ struct LibraryView: View {
                                     .foregroundStyle(Theme.textPrimary)
                                     .contentTransition(.numericText())
                                 Spacer()
-                                Button(action: onConvert) {
-                                    Label("New", systemImage: "plus")
-                                }
-                                .buttonStyle(GlassPillButtonStyle(tint: Theme.accent))
+                                headerButtons
                             }
                             categoryChips
                             if visibleCreations.isEmpty {
@@ -66,12 +68,19 @@ struct LibraryView: View {
                             }
                             LazyVGrid(columns: columns, spacing: 12) {
                                 ForEach(visibleCreations) { creation in
-                                    Button { selection = creation } label: {
-                                        CreationCard(creation: creation)
+                                    let isSelected = selectedIDs.contains(creation.id)
+                                    Button { tap(creation) } label: {
+                                        CreationCard(creation: creation, selection: isSelecting ? isSelected : nil)
                                     }
                                     .buttonStyle(.plain)
                                     .zoomSource(id: creation.id, in: zoom, cornerRadius: 24)
                                     .accessibilityIdentifier("creation-card")
+                                    .accessibilityAddTraits(isSelecting && isSelected ? .isSelected : [])
+                                    .contextMenu {
+                                        if !isSelecting {
+                                            Button("Delete", systemImage: "trash", role: .destructive) { pendingDeletion = [creation] }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -80,9 +89,24 @@ struct LibraryView: View {
                     }
                     .scrollIndicators(.hidden)
                 }
+                .safeAreaInset(edge: .bottom) {
+                    if isSelecting { deleteBar.transition(.move(edge: .bottom).combined(with: .opacity)) }
+                }
                 .screenHeader("Library")
             }
         }
+        .animation(.spring(duration: 0.3), value: isSelecting)
+        .confirmationDialog(
+            pendingDeletion.count == 1 ? "Delete this wallpaper from Glitter Live?" : "Delete \(pendingDeletion.count) wallpapers from Glitter Live?",
+            isPresented: Binding(get: { !pendingDeletion.isEmpty }, set: { if !$0 { pendingDeletion = [] } }),
+            titleVisibility: .visible
+        ) {
+            Button(pendingDeletion.count == 1 ? "Delete" : "Delete \(pendingDeletion.count)", role: .destructive, action: deletePending)
+        } message: {
+            Text("Any copy you saved to Photos stays there.")
+        }
+        .sensoryFeedback(.success, trigger: creations.count) { old, new in new < old }
+        .onChange(of: creations.isEmpty) { _, isEmpty in if isEmpty { endSelecting() } }
         .sheet(item: $selection) { creation in
             CreationDetailView(creation: creation)
                 .zoomTransition(from: creation.id, in: zoom)
@@ -90,6 +114,57 @@ struct LibraryView: View {
         #if DEBUG
         .task { await seedDemoLibraryIfRequested() }
         #endif
+    }
+
+    @ViewBuilder
+    private var headerButtons: some View {
+        if isSelecting {
+            let visibleIDs = Set(visibleCreations.map(\.id))
+            let allSelected = !visibleIDs.isEmpty && visibleIDs.isSubset(of: selectedIDs)
+            Button(allSelected ? "Deselect All" : "Select All") {
+                if allSelected { selectedIDs.subtract(visibleIDs) } else { selectedIDs.formUnion(visibleIDs) }
+            }
+            .buttonStyle(GlassPillButtonStyle())
+            Button("Done", action: endSelecting)
+                .buttonStyle(GlassPillButtonStyle(tint: Theme.accent))
+        } else {
+            Button("Select") { isSelecting = true }
+                .buttonStyle(GlassPillButtonStyle())
+            Button(action: onConvert) {
+                Label("New", systemImage: "plus")
+            }
+            .buttonStyle(GlassPillButtonStyle(tint: Theme.accent))
+        }
+    }
+
+    private var deleteBar: some View {
+        Button {
+            pendingDeletion = creations.filter { selectedIDs.contains($0.id) }
+        } label: {
+            Label(selectedIDs.isEmpty ? "Select wallpapers to delete" : "Delete \(selectedIDs.count)", systemImage: "trash")
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(GlassPillButtonStyle(tint: Theme.danger))
+        .disabled(selectedIDs.isEmpty)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 8)
+    }
+
+    private func tap(_ creation: Creation) {
+        guard isSelecting else { return selection = creation }
+        if selectedIDs.contains(creation.id) { selectedIDs.remove(creation.id) } else { selectedIDs.insert(creation.id) }
+    }
+
+    private func endSelecting() {
+        isSelecting = false
+        selectedIDs = []
+    }
+
+    private func deletePending() {
+        let doomed = pendingDeletion
+        pendingDeletion = []
+        try? CreationLibrary(context: modelContext).delete(doomed)
+        endSelecting()
     }
 
     private var categoryChips: some View {
@@ -108,8 +183,6 @@ struct LibraryView: View {
     }
 
     #if DEBUG
-    @Environment(\.modelContext) private var modelContext
-
     private func seedDemoLibraryIfRequested() async {
         guard DemoLaunch.seedsLibrary, creations.isEmpty else { return }
         let library = CreationLibrary(context: modelContext)
@@ -131,6 +204,8 @@ struct LibraryView: View {
 
 private struct CreationCard: View {
     let creation: Creation
+    /// nil outside selection mode; otherwise whether this card is selected.
+    var selection: Bool? = nil
     @State private var thumbnail: UIImage?
 
     var body: some View {
@@ -153,8 +228,21 @@ private struct CreationCard: View {
                 }
                 .padding(10)
             }
+            .overlay {
+                if selection == true {
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .strokeBorder(Theme.accentFill, lineWidth: 3)
+                }
+            }
             .overlay(alignment: .topTrailing) {
-                if creation.savedToPhotos {
+                if let selection {
+                    Image(systemName: selection ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 24, weight: .semibold))
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(.white, selection ? Theme.accentFill : .black.opacity(0.25))
+                        .padding(10)
+                        .accessibilityHidden(true)
+                } else if creation.savedToPhotos {
                     Image(systemName: "checkmark")
                         .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(Theme.accent)

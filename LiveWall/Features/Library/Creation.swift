@@ -104,8 +104,15 @@ struct CreationLibrary {
 
     /// Removes the app's copy only; anything already saved to Photos stays there.
     func delete(_ creation: Creation) throws {
-        try? FileManager.default.removeItem(at: Self.directory(for: creation.id))
-        context.delete(creation)
+        try delete(CollectionOfOne(creation))
+    }
+
+    /// Removes several at once with a single save, for multi-select in the Library.
+    func delete(_ creations: some Sequence<Creation>) throws {
+        for creation in creations {
+            try? FileManager.default.removeItem(at: Self.directory(for: creation.id))
+            context.delete(creation)
+        }
         try context.save()
     }
 }
