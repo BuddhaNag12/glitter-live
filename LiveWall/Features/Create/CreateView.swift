@@ -343,27 +343,37 @@ private struct GenerationProgressView: View {
     }
 }
 
-/// The empty prompt's placeholder: example scenes typed out one after another with a blinking caret,
-/// then erased. Reduce Motion shows each whole, fading from one to the next.
+/// The empty prompt's placeholder: example scenes written in word by word, held, then blurred away as the
+/// next arrives. Reduce Motion shows each whole, fading from one to the next.
 private struct TypingPlaceholder: View {
     let phrases: [String]
-    @State private var shown = ""
-    @State private var caretOn = true
+    @State private var phrase = ""
+    /// How many of the phrase's words are showing.
+    @State private var revealed = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        (Text(shown) + Text(reduceMotion ? "" : "|").foregroundStyle(Theme.accent.opacity(caretOn ? 1 : 0)))
-            .typography(.bodyLarge)
-            .foregroundStyle(Theme.textTertiary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityHidden(true)
-            .task { await play() }
-            .task(id: reduceMotion) {
-                while !reduceMotion, !Task.isCancelled {
-                    try? await Task.sleep(for: .milliseconds(530))
-                    caretOn.toggle()
-                }
-            }
+        ZStack(alignment: .topLeading) {
+            Text(attributed)
+                .contentTransition(.interpolate)
+                .id(phrase)
+                .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
+        }
+        .typography(.bodyLarge)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityHidden(true)
+        .task { await play() }
+    }
+
+    /// Every word laid out from the start, so the lines never reflow; unrevealed ones are just clear.
+    private var attributed: AttributedString {
+        var result = AttributedString()
+        for (index, word) in phrase.split(separator: " ").enumerated() {
+            var piece = AttributedString(index == 0 ? String(word) : " " + word)
+            piece.foregroundColor = index < revealed ? Theme.textTertiary : .clear
+            result += piece
+        }
+        return result
     }
 
     private func play() async {
@@ -371,23 +381,19 @@ private struct TypingPlaceholder: View {
         do {
             while true {
                 if queue.isEmpty { queue = phrases.shuffled() }
-                let phrase = queue.removeLast()
-                if reduceMotion {
-                    withAnimation(.easeInOut(duration: 0.4)) { shown = phrase }
-                    try await Task.sleep(for: .seconds(3))
-                    continue
+                let next = queue.removeLast()
+                let words = next.split(separator: " ").count
+                withAnimation(.smooth(duration: 0.5)) {
+                    phrase = next
+                    revealed = reduceMotion ? words : 0
                 }
-                for count in 1...phrase.count {
-                    shown = String(phrase.prefix(count))
-                    // A touch of unevenness reads as typing rather than a ticker.
-                    try await Task.sleep(for: .milliseconds(Int.random(in: 35...70)))
+                if !reduceMotion {
+                    for count in 1...words {
+                        try await Task.sleep(for: .milliseconds(110))
+                        withAnimation(.easeOut(duration: 0.35)) { revealed = count }
+                    }
                 }
-                try await Task.sleep(for: .seconds(2.2))
-                while !shown.isEmpty {
-                    shown.removeLast()
-                    try await Task.sleep(for: .milliseconds(16))
-                }
-                try await Task.sleep(for: .milliseconds(350))
+                try await Task.sleep(for: .seconds(2.6))
             }
         } catch {
             // Cancelled: the view went away or the user started typing.
