@@ -8,7 +8,8 @@ struct CatalogTests {
         let json = """
         [{"id":"09829bfe-fe0e-4167-939e-fcccbeb19b41","kind":"live","title":"Silver Shimmer","category":"Glitter Originals",
           "video_path":"videos/09829bfe.mp4","image_path":null,"thumbnail_path":"thumbnails/09829bfe.jpg","duration_seconds":4,
-          "width":1080,"height":1920,"creator_name":"Glitter Live","creator_url":null,"is_featured":false}]
+          "width":1080,"height":1920,"creator_name":"Glitter Live","creator_url":null,"is_featured":false,
+          "created_at":"2026-09-30T11:00:39.530395+00:00"}]
         """
         let wallpapers = try JSONDecoder().decode([Wallpaper].self, from: Data(json.utf8))
         let wallpaper = try #require(wallpapers.first)
@@ -17,6 +18,8 @@ struct CatalogTests {
         #expect(wallpaper.isLive)
         #expect(wallpaper.videoURL?.absoluteString == "https://jusrioirjfpaocgmsbbv.supabase.co/storage/v1/object/public/wallpapers/videos/09829bfe.mp4")
         #expect(wallpaper.mediaURL == wallpaper.videoURL)
+        let created = try #require(wallpaper.createdDate)
+        #expect(abs(created.timeIntervalSince(try Date.ISO8601FormatStyle().parse("2026-09-30T11:00:39Z")) - 0.53) < 0.01)
     }
 
     @Test func decodesAStillRow() throws {

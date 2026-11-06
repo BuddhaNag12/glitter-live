@@ -33,6 +33,8 @@ nonisolated struct Wallpaper: Codable, Identifiable, Hashable, Sendable {
     let creatorName: String?
     let creatorURL: URL?
     let isFeatured: Bool
+    /// Kept as text, so a timestamp format change can't fail the whole catalog's decoding.
+    let createdAt: String?
 
     enum CodingKeys: String, CodingKey {
         case id, kind, title, category, width, height
@@ -43,6 +45,7 @@ nonisolated struct Wallpaper: Codable, Identifiable, Hashable, Sendable {
         case creatorName = "creator_name"
         case creatorURL = "creator_url"
         case isFeatured = "is_featured"
+        case createdAt = "created_at"
     }
 
     var isLive: Bool { kind == .live }
@@ -50,6 +53,13 @@ nonisolated struct Wallpaper: Codable, Identifiable, Hashable, Sendable {
     /// The video for a live wallpaper, the full-size image for a still.
     var mediaURL: URL { CatalogConfig.publicFileURL(videoPath ?? imagePath ?? thumbnailPath) }
     var thumbnailURL: URL { CatalogConfig.publicFileURL(thumbnailPath) }
+
+    /// Postgres leaves out the fraction when it's zero, so both forms are read.
+    var createdDate: Date? {
+        guard let createdAt else { return nil }
+        return (try? Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(createdAt))
+            ?? (try? Date.ISO8601FormatStyle().parse(createdAt))
+    }
 }
 
 nonisolated enum CatalogError: LocalizedError {
@@ -68,7 +78,7 @@ nonisolated enum CatalogService {
         // A change that would break this decoder needs a new view (`catalog_v2`), not an edit to this one.
         var components = URLComponents(url: CatalogConfig.projectURL.appending(path: "rest/v1/catalog"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
-            URLQueryItem(name: "select", value: "id,kind,title,category,video_path,image_path,thumbnail_path,duration_seconds,width,height,creator_name,creator_url,is_featured"),
+            URLQueryItem(name: "select", value: "id,kind,title,category,video_path,image_path,thumbnail_path,duration_seconds,width,height,creator_name,creator_url,is_featured,created_at"),
             URLQueryItem(name: "order", value: "sort_order.asc,created_at.desc"),
         ]
         var request = URLRequest(url: components.url!)
