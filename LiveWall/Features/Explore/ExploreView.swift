@@ -301,7 +301,9 @@ private struct FeaturedCard: View {
             .aspectRatio(4 / 5, contentMode: .fit)
             .overlay {
                 WallpaperThumbnail(wallpaper: wallpaper)
-                    .overlay { LoopingVideoView(url: wallpaper.videoURL, isPlaying: isPlaying) }
+                    .overlay {
+                        if let videoURL = wallpaper.videoURL { LoopingVideoView(url: videoURL, isPlaying: isPlaying) }
+                    }
             }
             .overlay(alignment: .topLeading) {
                 StatusPill(text: "FEATURED", dot: Theme.signalYellow, symbol: "star.fill")
@@ -324,7 +326,7 @@ private struct FeaturedCard: View {
     }
 
     private var subtitle: String {
-        let length = "\(wallpaper.durationSeconds.formatted(.number.precision(.fractionLength(1))))s live wallpaper"
+        let length = wallpaper.durationSeconds.map { "\($0.formatted(.number.precision(.fractionLength(1))))s live wallpaper" } ?? "Still wallpaper"
         guard let creator = wallpaper.creatorName else { return length }
         return "\(length) · by \(creator)"
     }
@@ -339,11 +341,12 @@ private struct CatalogCard: View {
             .aspectRatio(9 / 16, contentMode: .fit)
             .overlay {
                 WallpaperThumbnail(wallpaper: wallpaper)
-                    .overlay { LoopingVideoView(url: wallpaper.videoURL, isPlaying: isPreviewing) }
+                    .overlay {
+                        if let videoURL = wallpaper.videoURL { LoopingVideoView(url: videoURL, isPlaying: isPreviewing) }
+                    }
             }
             .overlay(alignment: .topLeading) {
-                StatusPill(text: "\(wallpaper.durationSeconds.formatted(.number.precision(.fractionLength(1))))s", dot: Theme.signalYellow)
-                    .padding(10)
+                KindPill(wallpaper: wallpaper).padding(10)
             }
             .overlay(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -360,5 +363,18 @@ private struct CatalogCard: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("\(wallpaper.title), \(wallpaper.category)")
             .accessibilityAddTraits(.isButton)
+    }
+}
+
+/// A live wallpaper's length, or STILL for one without motion.
+private struct KindPill: View {
+    let wallpaper: Wallpaper
+
+    var body: some View {
+        if let seconds = wallpaper.durationSeconds {
+            StatusPill(text: "\(seconds.formatted(.number.precision(.fractionLength(1))))s", dot: Theme.signalYellow)
+        } else {
+            StatusPill(text: "STILL", symbol: "photo")
+        }
     }
 }

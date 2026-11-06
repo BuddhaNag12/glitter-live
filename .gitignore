@@ -31,3 +31,7 @@ LiveWall/Resources/Models/
 # Real AdMob IDs (see Config/Release.xcconfig)
 Config/*.secrets.xcconfig
 graphify-out
+
+# Test dependencies for supabase/tests
+supabase/tests/node_modules/
+supabase/tests/package*.json

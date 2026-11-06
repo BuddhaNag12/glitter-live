@@ -2,7 +2,7 @@ import AVFoundation
 import SwiftData
 import SwiftUI
 
-/// Downloads a catalog wallpaper and turns it into a Lock Screen-ready Live Photo.
+/// Downloads a catalog wallpaper and turns it into a Lock Screen-ready Live Photo, or a framed still.
 @Observable
 final class WallpaperSaver {
     enum Phase: Equatable { case idle, downloading, creating, saving, saved, failed(String) }
@@ -14,7 +14,9 @@ final class WallpaperSaver {
     func save(_ wallpaper: Wallpaper, library: CreationLibrary) async {
         do {
             phase = .downloading
-            let video = try await CatalogService.downloadVideo(wallpaper)
+            let media = try await CatalogService.downloadMedia(wallpaper)
+            guard wallpaper.isLive else { return try await saveStill(media, library: library) }
+            let video = media
             phase = .creating
             let info = try await VideoInfo.load(video)
             let request = LivePhotoRequest.filling(source: video, uprightSize: info.uprightSize, duration: info.duration)
@@ -29,6 +31,17 @@ final class WallpaperSaver {
         } catch {
             phase = .failed(error.localizedDescription)
         }
+    }
+
+    /// The same chain as saving a generated still in Create.
+    private func saveStill(_ image: URL, library: CreationLibrary) async throws {
+        phase = .creating
+        let still = try WallpaperStill.make(from: image)
+        phase = .saving
+        try await LivePhotoSaver.saveStill(still)
+        // A library failure shouldn't undo a save that already reached Photos.
+        try? library.addStill(still)
+        phase = .saved
     }
 }
 
@@ -48,8 +61,18 @@ struct WallpaperDetailView: View {
                 VStack(spacing: 16) {
                     DeviceFrame {
                         Theme.lockScreen
-                            .overlay { PlayerLayerView(player: player) }
-                            .overlay { LockScreenOverlay(showsMotionBadge: true) }
+                            .overlay {
+                                if wallpaper.isLive {
+                                    PlayerLayerView(player: player)
+                                } else {
+                                    AsyncImage(url: wallpaper.mediaURL) { image in
+                                        image.resizable().scaledToFill()
+                                    } placeholder: {
+                                        ProgressView()
+                                    }
+                                }
+                            }
+                            .overlay { LockScreenOverlay(showsMotionBadge: wallpaper.isLive) }
                     }
                     .containerRelativeFrame(.horizontal) { width, _ in width * 0.56 }
 
@@ -115,7 +138,11 @@ struct WallpaperDetailView: View {
                             Text(progressTitle)
                         }
                     } else {
-                        Label("Save as Live Wallpaper", systemImage: "livephoto")
+                        if wallpaper.isLive {
+                            Label("Save as Live Wallpaper", systemImage: "livephoto")
+                        } else {
+                            Label("Save as Wallpaper", systemImage: "photo")
+                        }
                     }
                 }
                 .buttonStyle(KineticButtonStyle())
@@ -139,16 +166,17 @@ struct WallpaperDetailView: View {
     private var progressTitle: String {
         switch saver.phase {
         case .downloading: "Downloading…"
-        case .creating: "Creating Live Photo…"
+        case .creating: wallpaper.isLive ? "Creating Live Photo…" : "Preparing…"
         case .saving: "Saving…"
         default: ""
         }
     }
 
     private func startPreview() {
+        guard let videoURL = wallpaper.videoURL else { return }
         guard looper == nil else { return player.play() }
         player.isMuted = true
-        looper = AVPlayerLooper(player: player, templateItem: AVPlayerItem(url: wallpaper.videoURL))
+        looper = AVPlayerLooper(player: player, templateItem: AVPlayerItem(url: videoURL))
         player.play()
     }
 }
