@@ -88,18 +88,21 @@ private struct GlassPanel: ViewModifier {
     var tier: GlassTier
     var cornerRadius: CGFloat
     @Environment(\.isOnGlass) private var isOnGlass
+    @Environment(\.colorScheme) private var colorScheme
 
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         content
-            .liquidGlass(in: shape, tint: isOnGlass ? nil : tier == .surface ? Theme.surface.opacity(0.6) : Theme.elevated.opacity(0.6))
+            .liquidGlass(in: shape, tint: isOnGlass ? nil : tier == .surface ? Theme.glassSurface : Theme.glassFloating)
             .overlay {
                 // The frosted fallback already draws its own rim.
                 if #available(iOS 26, *), !isOnGlass {
                     shape.strokeBorder(Theme.specularRim, lineWidth: 0.75).allowsHitTesting(false)
                 }
             }
-            .shadow(color: .black.opacity(tier == .floating && !isOnGlass ? 0.12 : 0), radius: 16, y: 8)
+            // Light mode lifts every tier off the pale background; dark mode shadows only floating panels.
+            .shadow(color: .black.opacity(isOnGlass ? 0 : colorScheme == .light ? 0.06 : tier == .floating ? 0.12 : 0),
+                    radius: colorScheme == .light ? 18 : 16, y: colorScheme == .light ? 6 : 8)
     }
 }
 

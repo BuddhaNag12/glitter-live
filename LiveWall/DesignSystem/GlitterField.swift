@@ -15,9 +15,10 @@ struct GlitterField: View {
             let time = context.date.timeIntervalSinceReferenceDate
             Canvas { canvas, size in
                 let isDark = colorScheme == .dark
-                let tint = isDark ? Color.white : Color(hex: 0x64748B)
-                let strength = isDark ? 0.75 : 0.3
+                let strength = isDark ? 0.75 : 0.45
                 for speck in Speck.all {
+                    // Light mode mixes brand blue and slate specks; the phase splits them at random.
+                    let tint = isDark ? Color.white : Color(hex: speck.phase < .pi ? 0x3B82F6 : 0x64748B)
                     let twinkle = holdsStill ? 0.6 : 0.5 + 0.5 * sin(time * speck.speed + speck.phase)
                     let center = CGPoint(x: speck.x * size.width, y: speck.y * size.height)
                     let path = speck.isSparkle
