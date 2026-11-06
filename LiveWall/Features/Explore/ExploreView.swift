@@ -4,24 +4,44 @@ import SwiftUI
 final class ExploreModel {
     enum State: Equatable { case loading, loaded, failed(String) }
 
+    /// One editorial row, which See all opens as a grid.
+    struct Section: Identifiable, Hashable {
+        let id: String
+        let title: String
+        let wallpapers: [Wallpaper]
+    }
+
     private(set) var state: State = .loading
-    private(set) var wallpapers: [Wallpaper] = []
-    var selectedCategory: String?
+    private(set) var wallpapers: [Wallpaper]
 
-    var categories: [String] {
+    init(wallpapers: [Wallpaper] = []) {
+        self.wallpapers = wallpapers
+    }
+
+    /// Leads Explore as a carousel: wallpapers flagged as featured, or else the catalog's Featured category.
+    var featured: [Wallpaper] {
+        let flagged = wallpapers.filter(\.isFeatured)
+        guard flagged.isEmpty else { return flagged }
+        return wallpapers.filter { $0.category.localizedCaseInsensitiveCompare("Featured") == .orderedSame }
+    }
+
+    /// New, then live and still, then one row per category in the catalog's order. Empty rows are left out.
+    func sections(now: Date = .now) -> [Section] {
+        let cutoff = now.addingTimeInterval(-14 * 24 * 60 * 60)
         var seen = Set<String>()
-        return wallpapers.map(\.category).filter { seen.insert($0).inserted }
-    }
-
-    /// Leads "All" as a large, playing card; the first wallpaper in the catalog's Featured category.
-    var featured: Wallpaper? {
-        guard selectedCategory == nil else { return nil }
-        return wallpapers.first { $0.category.localizedCaseInsensitiveCompare("Featured") == .orderedSame }
-    }
-
-    var visibleWallpapers: [Wallpaper] {
-        guard let selectedCategory else { return wallpapers.filter { $0.id != featured?.id } }
-        return wallpapers.filter { $0.category == selectedCategory }
+        let categories = wallpapers.map(\.category).filter { seen.insert($0).inserted }
+        let carousel = featured.map(\.id)
+        let fixed = [
+            Section(id: "new", title: "New this week", wallpapers: wallpapers.filter { ($0.createdDate ?? .distantPast) > cutoff }),
+            Section(id: "live", title: "Live wallpapers", wallpapers: wallpapers.filter(\.isLive)),
+            Section(id: "still", title: "Still wallpapers", wallpapers: wallpapers.filter { !$0.isLive }),
+        ]
+        let byCategory = categories.map { category in
+            Section(id: "category:\(category)", title: category, wallpapers: wallpapers.filter { $0.category == category })
+        }
+        // A Featured category that already fills the carousel would only repeat it.
+        .filter { $0.wallpapers.map(\.id) != carousel }
+        return (fixed + byCategory).filter { !$0.wallpapers.isEmpty }
     }
 
     func load() async {
@@ -38,39 +58,50 @@ final class ExploreModel {
     }
 }
 
+/// An opened wallpaper and the card it opened from. The same wallpaper can sit in several rows,
+/// and the zoom needs the card that was actually tapped.
+private struct Opened: Identifiable {
+    let wallpaper: Wallpaper
+    let source: String
+    var id: String { source }
+}
+
 struct ExploreView: View {
     /// Waits out the launch intro, which would otherwise hide the cards arriving.
     var holdsReveal = false
 
     @State private var model = ExploreModel()
-    @State private var selection: Wallpaper?
-    /// The card being held down to preview its motion.
-    @State private var previewing: Wallpaper.ID?
-    /// The release that ends a preview also counts as a tap, which shouldn't open the wallpaper.
-    /// Marked when the preview starts, because the tap fires before the preview's end is seen.
-    @State private var previewedCard: Wallpaper.ID?
+    @State private var opened: Opened?
+    /// The carousel page in view; only its card plays.
+    @State private var featuredPage: Wallpaper.ID?
     @State private var isVisible = false
     /// Fast loads skip the placeholders, so they don't flash for a split second.
     @State private var showsPlaceholders = false
-    /// Flips once the first catalog arrives, so the cards on screen rise in one by one; cards scrolled to later just appear.
+    /// Flips once the first catalog arrives, so the sections on screen rise in one by one; ones scrolled to later just appear.
     @State private var isRevealed = false
     @Namespace private var zoom
 
-    private let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
-
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                content
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 28) {
+                    content
+                }
+                .animation(.easeOut(duration: 0.3), value: model.state)
+                .shimmerCoordinateSpace()
+                .padding(16)
+                .padding(.bottom, 24)
             }
-            .animation(.easeOut(duration: 0.3), value: model.state)
-            .shimmerCoordinateSpace()
-            .padding(16)
-            .padding(.bottom, 24)
+            .scrollIndicators(.hidden)
+            .refreshable { await model.load() }
+            .screenHeader("Explore")
+            .toolbar(.hidden, for: .navigationBar)
+            // A navigation stack paints over the tab's background, so it carries its own.
+            .background { AppBackground() }
+            .navigationDestination(for: ExploreModel.Section.self) { section in
+                SectionGrid(section: section, zoom: zoom) { opened = $0 }
+            }
         }
-        .scrollIndicators(.hidden)
-        .refreshable { await model.load() }
-        .screenHeader("Explore")
         .task { await model.load() }
         .task {
             try? await Task.sleep(for: .milliseconds(300))
@@ -80,21 +111,9 @@ struct ExploreView: View {
         .onChange(of: holdsReveal, revealIfReady)
         .onAppear { isVisible = true }
         .onDisappear { isVisible = false }
-        .sensoryFeedback(.impact(weight: .light), trigger: previewing) { _, id in id != nil }
-        .onChange(of: previewing) { old, new in
-            if let new {
-                previewedCard = new
-            } else if let old {
-                // A drag off the card ends the preview without a tap, so the mark can't wait for one.
-                Task {
-                    try? await Task.sleep(for: .milliseconds(300))
-                    if previewedCard == old { previewedCard = nil }
-                }
-            }
-        }
-        .sheet(item: $selection) { wallpaper in
-            WallpaperDetailView(wallpaper: wallpaper)
-                .zoomTransition(from: wallpaper.id, in: zoom)
+        .sheet(item: $opened) { opened in
+            WallpaperDetailView(wallpaper: opened.wallpaper)
+                .zoomTransition(from: opened.source, in: zoom)
         }
     }
 
@@ -106,7 +125,7 @@ struct ExploreView: View {
     private var content: some View {
         switch model.state {
         case .loading:
-            if showsPlaceholders { ExploreSkeleton(columns: columns) }
+            if showsPlaceholders { ExploreSkeleton() }
         case .failed(let message):
             ContentUnavailableView {
                 Label("Couldn't load wallpapers", systemImage: "wifi.exclamationmark")
@@ -121,67 +140,165 @@ struct ExploreView: View {
             ContentUnavailableView("New wallpapers are on the way", systemImage: "sparkles", description: Text("Check back soon."))
                 .padding(.top, 60)
         case .loaded:
-            categoryChips
-                .staggeredReveal(0, isRevealed: isRevealed)
-            if let featured = model.featured {
-                Button { selection = featured } label: {
-                    FeaturedCard(wallpaper: featured, isPlaying: isVisible && selection == nil && UIAccessibility.isVideoAutoplayEnabled)
-                }
-                .buttonStyle(CardPressStyle())
-                .zoomSource(id: featured.id, in: zoom, cornerRadius: 28)
-                .staggeredReveal(1, isRevealed: isRevealed)
-                .accessibilityIdentifier("featured-card")
+            let featured = model.featured
+            if !featured.isEmpty {
+                carousel(featured)
+                    .staggeredReveal(0, isRevealed: isRevealed)
             }
-            LazyVGrid(columns: columns, spacing: 12) {
-                ForEach(Array(model.visibleWallpapers.enumerated()), id: \.element.id) { index, wallpaper in
-                    Button {
-                        if previewedCard == wallpaper.id { previewedCard = nil } else { selection = wallpaper }
-                    } label: {
-                        CatalogCard(wallpaper: wallpaper, isPreviewing: previewing == wallpaper.id)
+            ForEach(Array(model.sections().enumerated()), id: \.element.id) { index, section in
+                row(section)
+                    .staggeredReveal(1 + index, isRevealed: isRevealed)
+            }
+            Label("Touch and hold a wallpaper to preview its motion", systemImage: "hand.tap")
+                .font(.labelMedium)
+                .foregroundStyle(Theme.textSecondary)
+                .frame(maxWidth: .infinity)
+        }
+    }
+
+    /// Featured wallpapers, a page at a time, with only the one in view playing.
+    private func carousel(_ featured: [Wallpaper]) -> some View {
+        let current = featuredPage ?? featured.first?.id
+        return VStack(spacing: 12) {
+            ScrollView(.horizontal) {
+                LazyHStack(spacing: 12) {
+                    ForEach(featured) { wallpaper in
+                        Button { opened = Opened(wallpaper: wallpaper, source: "featured/\(wallpaper.id)") } label: {
+                            FeaturedCard(
+                                wallpaper: wallpaper,
+                                isPlaying: isVisible && opened == nil && current == wallpaper.id && UIAccessibility.isVideoAutoplayEnabled
+                            )
+                        }
+                        .buttonStyle(CardPressStyle())
+                        .zoomSource(id: "featured/\(wallpaper.id)", in: zoom, cornerRadius: 28)
+                        .containerRelativeFrame(.horizontal)
+                        .accessibilityIdentifier("featured-card")
                     }
-                    // The button's own press, unlike an added gesture, gives way to scrolling.
-                    .buttonStyle(CardPressStyle { isHeld in
-                        if isHeld { previewing = wallpaper.id } else if previewing == wallpaper.id { previewing = nil }
-                    })
-                    .zoomSource(id: wallpaper.id, in: zoom, cornerRadius: 24)
-                    // Row plus column, so the cards arrive in a diagonal wave like the loading sheen.
-                    .staggeredReveal(2 + index / 2 + index % 2, isRevealed: isRevealed)
-                    .accessibilityIdentifier("catalog-card")
                 }
+                .scrollTargetLayout()
             }
-            if !model.visibleWallpapers.isEmpty {
-                Label("Touch and hold a wallpaper to preview its motion", systemImage: "hand.tap")
-                    .font(.labelMedium)
-                    .foregroundStyle(Theme.textSecondary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 4)
+            // View-aligned rather than paging, so each card snaps inside the page margins.
+            .scrollTargetBehavior(.viewAligned)
+            .scrollPosition(id: $featuredPage)
+            .scrollIndicators(.hidden)
+            .fullBleed()
+            if featured.count > 1 {
+                HStack(spacing: 6) {
+                    ForEach(featured) { wallpaper in
+                        Circle()
+                            .fill(wallpaper.id == current ? Theme.textPrimary : Theme.textTertiary.opacity(0.5))
+                            .frame(width: 6, height: 6)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .animation(.easeOut(duration: 0.2), value: current)
+                .accessibilityHidden(true)
             }
         }
     }
 
-    private var categoryChips: some View {
-        ScrollView(.horizontal) {
-            GlassGroup(spacing: 8) {
-                HStack(spacing: 8) {
-                    chip("All", selected: model.selectedCategory == nil) { model.selectedCategory = nil }
-                    ForEach(model.categories, id: \.self) { category in
-                        chip(category, selected: model.selectedCategory == category) { model.selectedCategory = category }
+    private func row(_ section: ExploreModel.Section) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(section.title)
+                    .typography(.headlineSmall)
+                    .foregroundStyle(Theme.textPrimary)
+                    .lineLimit(1)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer()
+                NavigationLink(value: section) {
+                    HStack(spacing: 2) {
+                        Text("See all")
+                        Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold))
+                    }
+                    .font(.labelLarge)
+                    .foregroundStyle(Theme.accent)
+                }
+                .accessibilityLabel("See all \(section.title)")
+            }
+            ScrollView(.horizontal) {
+                LazyHStack(spacing: 12) {
+                    ForEach(section.wallpapers) { wallpaper in
+                        CatalogCardButton(wallpaper: wallpaper, source: "\(section.id)/\(wallpaper.id)", zoom: zoom) { opened = $0 }
+                            .frame(width: 148)
                     }
                 }
+                .scrollTargetLayout()
             }
+            .scrollTargetBehavior(.viewAligned)
+            .scrollIndicators(.hidden)
+            .fullBleed()
+        }
+    }
+}
+
+/// A section's wallpapers in two columns, opened from See all.
+private struct SectionGrid: View {
+    let section: ExploreModel.Section
+    let zoom: Namespace.ID
+    let open: (Opened) -> Void
+
+    private let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
+
+    var body: some View {
+        ScrollView {
+            LazyVGrid(columns: columns, spacing: 12) {
+                ForEach(section.wallpapers) { wallpaper in
+                    CatalogCardButton(wallpaper: wallpaper, source: "grid/\(wallpaper.id)", zoom: zoom, open: open)
+                }
+            }
+            .padding(16)
+            .padding(.bottom, 24)
         }
         .scrollIndicators(.hidden)
-        // A scroll view clips to its frame, which would cut off the glass rim and its press effect.
-        .scrollClipDisabled()
-        // Full bleed, so chips scroll off the screen edge instead of stopping at the page margin.
-        .contentMargins(.horizontal, 16, for: .scrollContent)
-        .padding(.horizontal, -16)
+        .background { AppBackground() }
+        .navigationTitle(section.title)
+        .navigationBarTitleDisplayMode(.inline)
     }
+}
 
-    private func chip(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
-        Button(title) { withAnimation(.spring(duration: 0.3)) { action() } }
-            .buttonStyle(GlassPillButtonStyle(tint: selected ? Theme.accent : nil))
-            .accessibilityAddTraits(selected ? .isSelected : [])
+/// A wallpaper card that opens on tap and, for a live one, plays while held.
+private struct CatalogCardButton: View {
+    let wallpaper: Wallpaper
+    let source: String
+    let zoom: Namespace.ID
+    let open: (Opened) -> Void
+
+    @State private var isPreviewing = false
+    /// The release that ends a preview also counts as a tap, which shouldn't open the wallpaper.
+    /// Marked when the preview starts, because the tap fires before the preview's end is seen.
+    @State private var previewed = false
+
+    var body: some View {
+        Button {
+            if previewed { previewed = false } else { open(Opened(wallpaper: wallpaper, source: source)) }
+        } label: {
+            CatalogCard(wallpaper: wallpaper, isPreviewing: isPreviewing)
+        }
+        // The button's own press, unlike an added gesture, gives way to scrolling. Stills have nothing to play.
+        .buttonStyle(CardPressStyle(onHold: wallpaper.isLive ? { isPreviewing = $0 } : nil))
+        .zoomSource(id: source, in: zoom, cornerRadius: 24)
+        .sensoryFeedback(.impact(weight: .light), trigger: isPreviewing) { _, isOn in isOn }
+        .onChange(of: isPreviewing) { _, isOn in
+            if isOn {
+                previewed = true
+            } else {
+                // A drag off the card ends the preview without a tap, so the mark can't wait for one.
+                Task {
+                    try? await Task.sleep(for: .milliseconds(300))
+                    previewed = false
+                }
+            }
+        }
+        .accessibilityIdentifier("catalog-card")
+    }
+}
+
+private extension View {
+    /// Lets a horizontal row scroll off the screen edges instead of stopping at the page margin.
+    func fullBleed() -> some View {
+        contentMargins(.horizontal, 16, for: .scrollContent)
+            .padding(.horizontal, -16)
     }
 }
 
@@ -245,22 +362,24 @@ private struct WallpaperThumbnail: View {
 
 /// The loaded page's layout in placeholder form, so nothing jumps when the wallpapers arrive.
 private struct ExploreSkeleton: View {
-    let columns: [GridItem]
-    private let chipWidths: [CGFloat] = [52, 92, 76, 100]
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 8) {
-                ForEach(chipWidths.indices, id: \.self) { index in
-                    Capsule().fill(Theme.placeholder).frame(width: chipWidths[index], height: 40).shimmer()
-                }
-            }
+        VStack(alignment: .leading, spacing: 28) {
             card(cornerRadius: 28, titleWidth: 0.5)
                 .aspectRatio(4 / 5, contentMode: .fit)
-            LazyVGrid(columns: columns, spacing: 12) {
-                ForEach(0..<4, id: \.self) { index in
-                    card(cornerRadius: 24, titleWidth: index.isMultiple(of: 2) ? 0.7 : 0.55)
-                        .aspectRatio(9 / 16, contentMode: .fit)
+            ForEach(0..<2, id: \.self) { row in
+                VStack(alignment: .leading, spacing: 12) {
+                    Capsule().fill(Theme.placeholder).frame(width: row == 0 ? 150 : 120, height: 18).shimmer()
+                    HStack(spacing: 12) {
+                        ForEach(0..<3, id: \.self) { index in
+                            card(cornerRadius: 24, titleWidth: index.isMultiple(of: 2) ? 0.7 : 0.55)
+                                .aspectRatio(9 / 16, contentMode: .fit)
+                                .frame(width: 148)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    // Cards run off the edge, as the loaded rows do.
+                    .padding(.trailing, -16)
+                    .clipped()
                 }
             }
         }
