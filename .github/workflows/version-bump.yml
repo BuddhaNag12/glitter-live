@@ -1,0 +1,59 @@
+name: Version bump
+
+# Opening the dev → main pull request bumps MARKETING_VERSION on dev, so the merge that
+# Xcode Cloud builds already carries the new version. The Release workflow then tags it.
+# Bump: minor by default (1.0.0 → 1.1.0); label the pull request "release: patch" or
+# "release: major" to change it. Reruns are safe: the version is always computed from main's.
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, labeled, unlabeled, synchronize]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: version-bump
+  cancel-in-progress: true
+
+jobs:
+  bump:
+    if: github.head_ref == 'dev' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Set the next version on dev
+        env:
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          current=$(git show origin/main:project.yml | sed -n 's/^ *MARKETING_VERSION: "\(.*\)"/\1/p')
+          if ! echo "$current" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::main's MARKETING_VERSION \"$current\" isn't X.Y.Z"
+            exit 1
+          fi
+          case ",$LABELS," in
+            *",release: major,"*) part=major ;;
+            *",release: patch,"*) part=patch ;;
+            *) part=minor ;;
+          esac
+          IFS=. read -r major minor patch <<< "$current"
+          case $part in
+            major) next="$((major + 1)).0.0" ;;
+            minor) next="$major.$((minor + 1)).0" ;;
+            patch) next="$major.$minor.$((patch + 1))" ;;
+          esac
+          echo "main is $current, $part bump → $next"
+          sed -i "s/^\( *MARKETING_VERSION: \)\".*\"/\1\"$next\"/" project.yml
+          if git diff --quiet; then
+            echo "dev already at $next"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "Version $next"
+          git push origin HEAD:dev

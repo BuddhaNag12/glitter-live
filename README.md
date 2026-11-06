@@ -108,6 +108,7 @@ xcodebuild test -project LiveWall.xcodeproj -scheme LiveWall \
 | Workflow | Runs on | Does |
 | --- | --- | --- |
 | [Deploy Supabase functions](.github/workflows/deploy-functions.yml) | pushes to `main` that change `supabase/functions/`, or by hand | deploys `generate`; needs the `SUPABASE_ACCESS_TOKEN` repository secret |
+| [Version bump](.github/workflows/version-bump.yml) | pull requests from `dev` into `main` | sets `MARKETING_VERSION` on `dev` to the next minor version, or patch / major with a `release: patch` / `release: major` label |
 | [Release](.github/workflows/release.yml) | pushes to `main` that change `project.yml`, or by hand | when `MARKETING_VERSION` is new, tags it `vX.Y.Z` and creates a GitHub release with notes from the merged pull requests |
 | Xcode Cloud | every push to `main` | archives and uploads to TestFlight; [`ci_scripts/ci_post_clone.sh`](ci_scripts/ci_post_clone.sh) generates the project, fetches the depth model and writes the AdMob IDs from the `GAD_APPLICATION_ID` and `GAD_REWARDED_AD_UNIT_ID` secret environment variables |
 
@@ -115,7 +116,7 @@ Database migrations aren't deployed automatically; run `supabase db push` after 
 
 ### Releasing
 
-The App Store version is `MARKETING_VERSION` in `project.yml` (1.0.1 for fixes, 1.1.0 for features); Xcode Cloud sets the build number. Work goes into `dev`: branch from it and open pull requests into it. `main` only receives releases, because every push to `main` makes an Xcode Cloud TestFlight build. To release, bump the version on `dev`, then open a pull request from `dev` into `main` and merge it with a merge commit (not squash). The Release workflow tags the merge `vX.Y.Z` and creates the GitHub release, and Xcode Cloud sends that build to TestFlight for submission. After a release, `dev` already contains everything in `main`. A version with a suffix, such as `1.1.0-beta.1`, makes a pre-release.
+The App Store version is `MARKETING_VERSION` in `project.yml` (1.0.1 for fixes, 1.1.0 for features); Xcode Cloud sets the build number. Work goes into `dev`: branch from it and open pull requests into it. `main` only receives releases, because every push to `main` makes an Xcode Cloud TestFlight build. To release, open a pull request from `dev` into `main`: the [Version bump](.github/workflows/version-bump.yml) workflow sets the next version on `dev` (minor by default; label the pull request `release: patch` or `release: major` to change it). Merge it with a merge commit (not squash). The Release workflow tags the merge `vX.Y.Z` and creates the GitHub release, and Xcode Cloud sends that build to TestFlight for submission. After a release, `dev` already contains everything in `main`. A version with a suffix, such as `1.1.0-beta.1`, makes a pre-release.
 
 ## Project structure
 
