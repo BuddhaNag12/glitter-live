@@ -92,11 +92,19 @@ struct CreateView: View {
                 Button("Surprise Me", systemImage: "dice", action: model.surprise)
                     .buttonStyle(GlassPillButtonStyle(tint: Theme.accent))
             }
-            TextField("Bioluminescent koi in liquid starlight…", text: $model.prompt, axis: .vertical)
+            TextField("", text: $model.prompt, axis: .vertical)
                 .lineLimit(3...6)
                 .typography(.bodyLarge)
                 .foregroundStyle(Theme.textPrimary)
                 .focused($isPromptFocused)
+                .overlay(alignment: .topLeading) {
+                    // Out of the way once the user starts typing, so it never sits beside the real caret.
+                    if model.prompt.isEmpty && !isPromptFocused {
+                        TypingPlaceholder(phrases: SurprisePrompts.all)
+                            .allowsHitTesting(false)
+                            .transition(.opacity)
+                    }
+                }
                 // Prompts are one paragraph, so Return finishes typing instead of starting a new line.
                 .submitLabel(.done)
                 .onChange(of: model.prompt) { _, prompt in
@@ -331,6 +339,58 @@ private struct GenerationProgressView: View {
         .task(id: imageURL) {
             guard let imageURL else { return image = nil }
             image = UIImage(contentsOfFile: imageURL.path(percentEncoded: false))
+        }
+    }
+}
+
+/// The empty prompt's placeholder: example scenes typed out one after another with a blinking caret,
+/// then erased. Reduce Motion shows each whole, fading from one to the next.
+private struct TypingPlaceholder: View {
+    let phrases: [String]
+    @State private var shown = ""
+    @State private var caretOn = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        (Text(shown) + Text(reduceMotion ? "" : "|").foregroundStyle(Theme.accent.opacity(caretOn ? 1 : 0)))
+            .typography(.bodyLarge)
+            .foregroundStyle(Theme.textTertiary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityHidden(true)
+            .task { await play() }
+            .task(id: reduceMotion) {
+                while !reduceMotion, !Task.isCancelled {
+                    try? await Task.sleep(for: .milliseconds(530))
+                    caretOn.toggle()
+                }
+            }
+    }
+
+    private func play() async {
+        var queue: [String] = []
+        do {
+            while true {
+                if queue.isEmpty { queue = phrases.shuffled() }
+                let phrase = queue.removeLast()
+                if reduceMotion {
+                    withAnimation(.easeInOut(duration: 0.4)) { shown = phrase }
+                    try await Task.sleep(for: .seconds(3))
+                    continue
+                }
+                for count in 1...phrase.count {
+                    shown = String(phrase.prefix(count))
+                    // A touch of unevenness reads as typing rather than a ticker.
+                    try await Task.sleep(for: .milliseconds(Int.random(in: 35...70)))
+                }
+                try await Task.sleep(for: .seconds(2.2))
+                while !shown.isEmpty {
+                    shown.removeLast()
+                    try await Task.sleep(for: .milliseconds(16))
+                }
+                try await Task.sleep(for: .milliseconds(350))
+            }
+        } catch {
+            // Cancelled: the view went away or the user started typing.
         }
     }
 }
