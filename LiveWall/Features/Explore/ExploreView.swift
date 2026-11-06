@@ -75,6 +75,9 @@ struct ExploreView: View {
     /// The carousel page in view; only its card plays.
     @State private var featuredPage: Wallpaper.ID?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
+    /// True while a finger is on the carousel, so auto-advance never fights a swipe.
+    @State private var isTouchingCarousel = false
     @State private var isVisible = false
     /// Fast loads skip the placeholders, so they don't flash for a split second.
     @State private var showsPlaceholders = false
@@ -160,7 +163,11 @@ struct ExploreView: View {
     /// Featured wallpapers like albums on a shelf: the centre card is full size, its neighbours peek in
     /// smaller and turned towards it, and swiping hands the size over smoothly. Only the centre card plays.
     private func carousel(_ featured: [Wallpaper]) -> some View {
-        let current = featuredPage ?? featured.first?.id
+        // Opens on the middle card, so there's a neighbour on each side to swipe to.
+        let middle = featured[featured.count / 2].id
+        let current = featuredPage ?? middle
+        // Moving content is hard to follow with VoiceOver and unwanted with Reduce Motion.
+        let autoAdvances = featured.count > 1 && isVisible && opened == nil && !isTouchingCarousel && !reduceMotion && !voiceOver
         return VStack(spacing: 12) {
             ScrollView(.horizontal) {
                 LazyHStack(spacing: 0) {
@@ -204,6 +211,15 @@ struct ExploreView: View {
             .contentMargins(.horizontal, 56, for: .scrollContent)
             .scrollTargetBehavior(.viewAligned)
             .scrollPosition(id: $featuredPage)
+            .onAppear { if featuredPage == nil { featuredPage = middle } }
+            .tracksScrollInteraction($isTouchingCarousel)
+            // Restarts on every page change, so a swipe gets a full 5 s before the next card slides in.
+            .task(id: autoAdvances ? current : nil) {
+                guard autoAdvances, let index = featured.firstIndex(where: { $0.id == current }) else { return }
+                try? await Task.sleep(for: .seconds(5))
+                guard !Task.isCancelled else { return }
+                withAnimation(.smooth(duration: 0.8)) { featuredPage = featured[(index + 1) % featured.count].id }
+            }
             .scrollIndicators(.hidden)
             .fullBleed()
             if featured.count > 1 {
@@ -356,6 +372,16 @@ private struct StaggeredReveal: ViewModifier {
 }
 
 private extension View {
+    /// Reports whether the scroll view is moving under a finger or settling. iOS 17 has no scroll phases,
+    /// so there it never reports touching and auto-advance can't pause mid-swipe.
+    @ViewBuilder func tracksScrollInteraction(_ isInteracting: Binding<Bool>) -> some View {
+        if #available(iOS 18, *) {
+            onScrollPhaseChange { _, phase in isInteracting.wrappedValue = phase != .idle }
+        } else {
+            self
+        }
+    }
+
     func dealtIn(_ index: Int, isDealt: Bool) -> some View {
         modifier(DealtIn(index: index, isDealt: isDealt))
     }
