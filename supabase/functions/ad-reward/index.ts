@@ -17,13 +17,13 @@ let keys: { keyId: number; base64: string }[] = [];
 Deno.serve(async (request) => {
   const query = new URL(request.url).search.slice(1);
   try {
-    if (!(await verified(query))) return new Response("Invalid signature.", { status: 400 });
     const params = new URLSearchParams(query);
     const nonce = params.get("custom_data") ?? "";
     const install = params.get("user_id") ?? "";
     const transaction = params.get("transaction_id") ?? "";
-    // Convert's ads carry no nonce and AdMob's "Verify URL" test has no IDs: nothing to record, but still a 200.
+    // Convert's ads carry no nonce and AdMob's "Verify URL" test may carry no IDs: nothing to record, but still a 200.
     if (!nonce || !install || !transaction) return new Response("OK");
+    if (!(await verified(query))) return new Response("Invalid signature.", { status: 400 });
     if (rewardedAdUnit && params.get("ad_unit") !== rewardedAdUnit) return new Response("OK");
     if (nonce.length > 64 || install.length > 64) return new Response("Unexpected IDs.", { status: 400 });
     await database(
