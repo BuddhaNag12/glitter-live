@@ -38,64 +38,43 @@ struct LibraryView: View {
         }
     }
 
-    private let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
+    /// List or grid; the choice is remembered.
+    @AppStorage("library.layout") private var layout = Layout.list
+
+    enum Layout: String {
+        case list, grid
+    }
+
+    private let gridColumns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
 
     var body: some View {
         Group {
             if creations.isEmpty {
                 LibraryEmptyView(onConvert: onConvert)
             } else {
+                // The header sits above both layouts, so switching never moves it.
                 VStack(spacing: 0) {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 14) {
-                            HStack(alignment: .firstTextBaseline) {
-                                Text(countTitle)
-                                    .typography(.headlineSmall)
-                                    .foregroundStyle(Theme.textPrimary)
-                                    .contentTransition(.numericText())
-                                Spacer()
-                                headerButtons
-                            }
-                            categoryChips
-                            if visibleCreations.isEmpty {
-                                Text(category == .stills
-                                     ? "Wallpapers you save from Create without motion appear here."
-                                     : "Live wallpapers you make appear here.")
-                                    .typography(.bodyMedium)
-                                    .foregroundStyle(Theme.textSecondary)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.top, 40)
-                            }
-                            LazyVGrid(columns: columns, spacing: 12) {
-                                ForEach(visibleCreations) { creation in
-                                    let isSelected = selectedIDs.contains(creation.id)
-                                    Button { tap(creation) } label: {
-                                        CreationCard(creation: creation, selection: isSelecting ? isSelected : nil)
-                                    }
-                                    .buttonStyle(.plain)
-                                    .zoomSource(id: creation.id, in: zoom, cornerRadius: 24)
-                                    .accessibilityIdentifier("creation-card")
-                                    .accessibilityAddTraits(isSelecting && isSelected ? .isSelected : [])
-                                    .contextMenu {
-                                        if !isSelecting {
-                                            Button("Delete", systemImage: "trash", role: .destructive) { pendingDeletion = [creation] }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        .padding(16)
-                        .padding(.bottom, 24)
+                    header
+                        .padding(.horizontal, 16)
+                        .padding(.top, 14)
+                        .padding(.bottom, 10)
+                    switch layout {
+                    case .list: listLayout
+                    case .grid: gridLayout
                     }
-                    .scrollIndicators(.hidden)
                 }
                 .safeAreaInset(edge: .bottom) {
-                    if isSelecting { deleteBar.transition(.move(edge: .bottom).combined(with: .opacity)) }
+                    // Only once something is picked, so the bar never sits there doing nothing.
+                    if isSelecting && !selectedIDs.isEmpty { deleteBar.transition(.move(edge: .bottom).combined(with: .opacity)) }
+                }
+                .overlay(alignment: .bottomTrailing) {
+                    if !isSelecting { newButton.transition(.scale.combined(with: .opacity)) }
                 }
                 .screenHeader("Library")
             }
         }
         .animation(.spring(duration: 0.3), value: isSelecting)
+        .animation(.spring(duration: 0.3), value: selectedIDs.isEmpty)
         .confirmationDialog(
             pendingDeletion.count == 1 ? "Delete this wallpaper from Glitter Live?" : "Delete \(pendingDeletion.count) wallpapers from Glitter Live?",
             isPresented: Binding(get: { !pendingDeletion.isEmpty }, set: { if !$0 { pendingDeletion = [] } }),
@@ -116,36 +95,157 @@ struct LibraryView: View {
         #endif
     }
 
-    @ViewBuilder
-    private var headerButtons: some View {
-        if isSelecting {
-            let visibleIDs = Set(visibleCreations.map(\.id))
-            let allSelected = !visibleIDs.isEmpty && visibleIDs.isSubset(of: selectedIDs)
-            Button(allSelected ? "Deselect All" : "Select All") {
-                if allSelected { selectedIDs.subtract(visibleIDs) } else { selectedIDs.formUnion(visibleIDs) }
+    /// A List rather than a scroll view, for the system's swipe-to-delete.
+    private var listLayout: some View {
+        List {
+            ForEach(Array(visibleCreations.enumerated()), id: \.element.id) { index, creation in
+                item(creation, index: index)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        if !isSelecting {
+                            // Not role .destructive: that removes the row before the confirmation is answered.
+                            Button { pendingDeletion = [creation] } label: { Label("Delete", systemImage: "trash") }
+                                .tint(Theme.danger)
+                        }
+                    }
             }
-            .buttonStyle(GlassPillButtonStyle())
-            Button("Done", action: endSelecting)
-                .buttonStyle(GlassPillButtonStyle(tint: Theme.accent))
-        } else {
-            Button("Select") { isSelecting = true }
-                .buttonStyle(GlassPillButtonStyle())
-            Button(action: onConvert) {
-                Label("New", systemImage: "plus")
-            }
-            .buttonStyle(GlassPillButtonStyle(tint: Theme.accent))
+            countFooter
+                .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 0, trailing: 16))
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .scrollIndicators(.hidden)
+        .contentMargins(.top, 0, for: .scrollContent)
+        .contentMargins(.bottom, 88, for: .scrollContent)
+        .transition(.opacity)
+    }
+
+    private var gridLayout: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                LazyVGrid(columns: gridColumns, spacing: 10) {
+                    ForEach(Array(visibleCreations.enumerated()), id: \.element.id) { index, creation in
+                        item(creation, index: index)
+                    }
+                }
+                countFooter.padding(.top, 6)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 4)
+            .padding(.bottom, 88)
+        }
+        .scrollIndicators(.hidden)
+        .transition(.opacity)
+    }
+
+    /// One toolbar row, every control 40 pt tall: the filter and view controls, or the selection controls.
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 8) {
+                if isSelecting {
+                    Text(selectedIDs.isEmpty ? "Select wallpapers" : "\(selectedIDs.count) selected")
+                        .typography(.titleMedium)
+                        .foregroundStyle(Theme.textPrimary)
+                        .contentTransition(.numericText())
+                    Spacer(minLength: 0)
+                    let visibleIDs = Set(visibleCreations.map(\.id))
+                    let allSelected = !visibleIDs.isEmpty && visibleIDs.isSubset(of: selectedIDs)
+                    Button(allSelected ? "Deselect All" : "Select All") {
+                        if allSelected { selectedIDs.subtract(visibleIDs) } else { selectedIDs.formUnion(visibleIDs) }
+                    }
+                    .buttonStyle(GlassPillButtonStyle())
+                    Button("Done", action: endSelecting)
+                        .buttonStyle(GlassPillButtonStyle(tint: Theme.accent))
+                } else {
+                    CategoryPicker(selection: $category)
+                    Spacer(minLength: 0)
+                    // Selecting one wallpaper is just a swipe or a long-press, so Select needs two or more.
+                    if visibleCreations.count > 1 {
+                        Button("Select") { isSelecting = true }
+                            .buttonStyle(GlassPillButtonStyle())
+                    }
+                    Button {
+                        withAnimation(.spring(duration: 0.4)) { layout = layout == .list ? .grid : .list }
+                    } label: {
+                        Image(systemName: layout == .list ? "square.grid.2x2" : "list.bullet")
+                            .contentTransition(.symbolEffect(.replace))
+                    }
+                    .buttonStyle(CircleIconButtonStyle(size: 40))
+                    .accessibilityLabel(layout == .list ? "Show as Grid" : "Show as List")
+                    .sensoryFeedback(.selection, trigger: layout)
+                }
+            }
+            if visibleCreations.isEmpty {
+                Text(category == .stills
+                     ? "Wallpapers you save from Create without motion appear here."
+                     : "Live wallpapers you make appear here.")
+                    .typography(.bodyMedium)
+                    .foregroundStyle(Theme.textSecondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 40)
+            }
+        }
+    }
+
+    /// How many wallpapers are shown, quietly at the end, like Photos' item count.
+    @ViewBuilder
+    private var countFooter: some View {
+        if !visibleCreations.isEmpty {
+            Text(countTitle)
+                .font(.labelMedium.weight(.regular))
+                .foregroundStyle(Theme.textTertiary)
+                .contentTransition(.numericText())
+                .frame(maxWidth: .infinity)
+        }
+    }
+
+    private func item(_ creation: Creation, index: Int) -> some View {
+        let isSelected = selectedIDs.contains(creation.id)
+        return Button { tap(creation) } label: {
+            switch layout {
+            case .list: CreationRow(creation: creation, selection: isSelecting ? isSelected : nil, zoom: zoom)
+            case .grid: CreationTile(creation: creation, selection: isSelecting ? isSelected : nil, zoom: zoom)
+            }
+        }
+        .buttonStyle(.plain)
+        .appearsIn(index)
+        .accessibilityIdentifier("creation-card")
+        .accessibilityAddTraits(isSelecting && isSelected ? .isSelected : [])
+        .contextMenu {
+            if !isSelecting {
+                Button("Delete", systemImage: "trash", role: .destructive) { pendingDeletion = [creation] }
+            }
+        }
+    }
+
+    /// Floats above the tab bar, like a compose button, so the toolbar row stays about the Library itself.
+    private var newButton: some View {
+        Button(action: onConvert) {
+            Image(systemName: "plus")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(Theme.onAccent)
+                .frame(width: 56, height: 56)
+                .background(Theme.accentFill, in: Circle())
+                .shadow(color: Theme.accentFill.opacity(0.4), radius: 12, y: 4)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("New Wallpaper")
+        .padding(.trailing, 20)
+        .padding(.bottom, 12)
     }
 
     private var deleteBar: some View {
         Button {
             pendingDeletion = creations.filter { selectedIDs.contains($0.id) }
         } label: {
-            Label(selectedIDs.isEmpty ? "Select wallpapers to delete" : "Delete \(selectedIDs.count)", systemImage: "trash")
+            Label("Delete \(selectedIDs.count)", systemImage: "trash")
                 .frame(maxWidth: .infinity)
         }
         .buttonStyle(GlassPillButtonStyle(tint: Theme.danger))
-        .disabled(selectedIDs.isEmpty)
         .padding(.horizontal, 16)
         .padding(.bottom, 8)
     }
@@ -165,21 +265,6 @@ struct LibraryView: View {
         pendingDeletion = []
         try? CreationLibrary(context: modelContext).delete(doomed)
         endSelecting()
-    }
-
-    private var categoryChips: some View {
-        GlassGroup(spacing: 8) {
-            HStack(spacing: 8) {
-                ForEach(Category.allCases) { option in
-                    Button(option.rawValue) {
-                        withAnimation(.spring(duration: 0.3)) { category = option }
-                    }
-                    .buttonStyle(GlassPillButtonStyle(tint: category == option ? Theme.accent : nil))
-                    .accessibilityAddTraits(category == option ? .isSelected : [])
-                }
-            }
-        }
-        .sensoryFeedback(.selection, trigger: category)
     }
 
     #if DEBUG
@@ -202,10 +287,141 @@ struct LibraryView: View {
     #endif
 }
 
-private struct CreationCard: View {
+/// All · Live · Stills styled like the tab bar: one glass capsule, the chosen option in a lighter
+/// pill that slides between them, its label in the accent colour.
+private struct CategoryPicker: View {
+    @Binding var selection: LibraryView.Category
+    @Namespace private var highlight
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(LibraryView.Category.allCases) { option in
+                let isChosen = selection == option
+                Button {
+                    withAnimation(.spring(duration: 0.35, bounce: 0.2)) { selection = option }
+                } label: {
+                    Text(option.rawValue)
+                        .font(.labelMedium.weight(.semibold))
+                        .foregroundStyle(isChosen ? Theme.accent : Theme.textPrimary)
+                        .padding(.horizontal, 14)
+                        .frame(height: 32)
+                        .background {
+                            if isChosen {
+                                Capsule()
+                                    .fill(Theme.fill)
+                                    .overlay(Capsule().fill(Theme.textPrimary.opacity(0.06)))
+                                    .matchedGeometryEffect(id: "chosen", in: highlight)
+                            }
+                        }
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(isChosen ? .isSelected : [])
+            }
+        }
+        .padding(4)
+        .liquidGlass(in: Capsule())
+        .sensoryFeedback(.selection, trigger: selection)
+    }
+}
+
+/// One wallpaper in the Library list: its thumbnail, kind and length, when it was made, and whether it's in Photos.
+private struct CreationRow: View {
     let creation: Creation
-    /// nil outside selection mode; otherwise whether this card is selected.
+    /// nil outside selection mode; otherwise whether this row is selected.
     var selection: Bool? = nil
+    let zoom: Namespace.ID
+    @State private var thumbnail: UIImage?
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Color.black
+                .aspectRatio(9 / 16, contentMode: .fit)
+                .frame(width: 38)
+                .overlay {
+                    if let thumbnail {
+                        Image(uiImage: thumbnail).resizable().scaledToFill()
+                    } else {
+                        AuroraView(isAnimated: false).opacity(0.35)
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.specularRim, lineWidth: 1))
+                // The detail sheet zooms out of the thumbnail.
+                .zoomSource(id: creation.id, in: zoom, cornerRadius: 8)
+
+            // Date on top; the time below it, with the kind and length at the far end of that line.
+            VStack(alignment: .leading, spacing: 10) {
+                Text(creation.createdAt, format: .dateTime.month(.abbreviated).day())
+                    .typography(.titleMedium)
+                    .foregroundStyle(Theme.textPrimary)
+                Text(creation.createdAt, format: .dateTime.hour().minute())
+                    .font(.labelMedium)
+                    .foregroundStyle(Theme.textSecondary)
+            }
+            .lineLimit(1)
+
+            Spacer(minLength: 8)
+
+            if let selection {
+                Image(systemName: selection ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(selection ? Theme.accentFill : Theme.textTertiary)
+                    .accessibilityHidden(true)
+            } else {
+                // Live badge in the corner; the Photos status as a tag below it.
+                VStack(alignment: .trailing) {
+                    if creation.isLive {
+                        Image(systemName: "livephoto")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Theme.accent)
+                            .accessibilityLabel("Live, \(creation.duration.formatted(.number.precision(.fractionLength(1)))) seconds")
+                    }
+                    Spacer(minLength: 0)
+                    PhotosTag(isSaved: creation.savedToPhotos)
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(selection == true ? Theme.accentFill.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .glass(.surface, cornerRadius: 18)
+        .overlay {
+            if selection == true {
+                RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Theme.accentFill, lineWidth: 2)
+            }
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .task(id: creation.id) {
+            thumbnail = await Thumbnail.load(creation.imageURL, maxPixelSize: 240)
+        }
+    }
+
+}
+
+/// Whether a wallpaper is in Photos yet: a blue "In Photos" tag, or a muted "Not saved" one.
+private struct PhotosTag: View {
+    let isSaved: Bool
+
+    var body: some View {
+        Label(isSaved ? "In Photos" : "Not saved", systemImage: isSaved ? "checkmark" : "arrow.down")
+            .labelStyle(.titleAndIcon)
+            .font(.labelSmall)
+            .foregroundStyle(isSaved ? Theme.accent : Theme.textSecondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(isSaved ? Theme.accentFill.opacity(0.18) : Theme.fill, in: Capsule())
+            .overlay(Capsule().strokeBorder(isSaved ? .clear : Theme.border, lineWidth: 1))
+    }
+}
+
+/// One wallpaper in the Library grid: the thumbnail with a live badge, the Photos status and the date.
+private struct CreationTile: View {
+    let creation: Creation
+    /// nil outside selection mode; otherwise whether this tile is selected.
+    var selection: Bool? = nil
+    let zoom: Namespace.ID
     @State private var thumbnail: UIImage?
 
     var body: some View {
@@ -219,57 +435,80 @@ private struct CreationCard: View {
                 }
             }
             .overlay(alignment: .topLeading) {
-                Group {
-                    if creation.isLive {
-                        StatusPill(text: "\(creation.duration.formatted(.number.precision(.fractionLength(1))))s", dot: Theme.signalYellow)
-                    } else {
-                        StatusPill(text: "STILL", dot: Theme.slate, symbol: "photo")
-                    }
-                }
-                .padding(10)
-            }
-            .overlay {
-                if selection == true {
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .strokeBorder(Theme.accentFill, lineWidth: 3)
+                if creation.isLive {
+                    Image(systemName: "livephoto")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.accent)
+                        .padding(6)
+                        .background(.black.opacity(0.45), in: Circle())
+                        .padding(6)
                 }
             }
             .overlay(alignment: .topTrailing) {
                 if let selection {
                     Image(systemName: selection ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 24, weight: .semibold))
+                        .font(.system(size: 22, weight: .semibold))
                         .symbolRenderingMode(.palette)
-                        .foregroundStyle(.white, selection ? Theme.accentFill : .black.opacity(0.25))
-                        .padding(10)
-                        .accessibilityHidden(true)
-                } else if creation.savedToPhotos {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Theme.accent)
-                        .frame(width: 28, height: 28)
-                        .liquidGlass(in: Circle())
-                        .padding(10)
-                        .accessibilityLabel("Saved to Photos")
+                        .foregroundStyle(.white, selection ? Theme.accentFill : .black.opacity(0.3))
+                        .padding(6)
                 }
             }
             .overlay(alignment: .bottom) {
-                VStack(alignment: .leading, spacing: 2) {
+                // The date and, as a bare glyph rather than a button-like circle, whether it's in Photos.
+                HStack {
                     Text(creation.createdAt, format: .dateTime.month(.abbreviated).day())
-                        .typography(.titleMedium)
-                        .foregroundStyle(.white)
-                    Text(creation.createdAt, format: .dateTime.hour().minute())
-                        .font(.labelMedium.weight(.semibold))
-                        .foregroundStyle(Theme.onMediaSecondary)
+                        .font(.labelSmall)
+                    Spacer(minLength: 4)
+                    if selection == nil {
+                        Image(systemName: creation.savedToPhotos ? "checkmark" : "arrow.down")
+                            .font(.system(size: 10, weight: .heavy))
+                            .foregroundStyle(creation.savedToPhotos ? Theme.accent : .white.opacity(0.7))
+                            .accessibilityLabel(creation.savedToPhotos ? "In Photos" : "Not saved")
+                    }
                 }
-                .mediaCaption()
+                .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.6), radius: 4)
+                .padding(8)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Theme.specularRim, lineWidth: 1))
-            .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            // Wallpaper tiles are always dark media, so their glass badges stay dark too.
-            .environment(\.colorScheme, .dark)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(selection == true ? AnyShapeStyle(Theme.accentFill) : AnyShapeStyle(Theme.specularRim), lineWidth: selection == true ? 3 : 1)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .zoomSource(id: creation.id, in: zoom, cornerRadius: 14)
+            .accessibilityElement(children: .combine)
             .task(id: creation.id) {
-                thumbnail = await Thumbnail.load(creation.imageURL, maxPixelSize: 600)
+                thumbnail = await Thumbnail.load(creation.imageURL, maxPixelSize: 400)
+            }
+    }
+}
+
+private extension View {
+    func appearsIn(_ index: Int) -> some View {
+        modifier(AppearsIn(index: index))
+    }
+}
+
+/// Fades and rises into place as it comes into view, the first screenful a beat apart.
+/// Reduce Motion keeps just the fade.
+private struct AppearsIn: ViewModifier {
+    let index: Int
+    @State private var isShown = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        let isMoving = !isShown && !reduceMotion
+        content
+            .opacity(isShown ? 1 : 0)
+            .scaleEffect(isMoving ? 0.94 : 1)
+            .offset(y: isMoving ? 14 : 0)
+            // A task rather than onAppear: a List cell appears before it's drawn, which would skip the animation.
+            .task {
+                guard !isShown else { return }
+                // Later items appear as they're scrolled to, without waiting behind the first screenful.
+                try? await Task.sleep(for: .milliseconds(40 + (index < 12 ? index * 35 : 0)))
+                withAnimation(.spring(duration: 0.45, bounce: 0.15)) { isShown = true }
             }
     }
 }
