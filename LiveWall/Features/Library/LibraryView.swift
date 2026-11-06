@@ -409,29 +409,30 @@ private struct CreationTile: View {
                 }
             }
             .overlay(alignment: .topTrailing) {
-                Group {
-                    if let selection {
-                        Image(systemName: selection ? "checkmark.circle.fill" : "circle")
-                            .font(.system(size: 22, weight: .semibold))
-                            .symbolRenderingMode(.palette)
-                            .foregroundStyle(.white, selection ? Theme.accentFill : .black.opacity(0.3))
-                    } else {
+                if let selection {
+                    Image(systemName: selection ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 22, weight: .semibold))
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(.white, selection ? Theme.accentFill : .black.opacity(0.3))
+                        .padding(6)
+                }
+            }
+            .overlay(alignment: .bottom) {
+                // The date and, as a bare glyph rather than a button-like circle, whether it's in Photos.
+                HStack {
+                    Text(creation.createdAt, format: .dateTime.month(.abbreviated).day())
+                        .font(.labelSmall)
+                    Spacer(minLength: 4)
+                    if selection == nil {
                         Image(systemName: creation.savedToPhotos ? "checkmark" : "arrow.down")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(creation.savedToPhotos ? .white : .white.opacity(0.75))
-                            .frame(width: 24, height: 24)
-                            .background(creation.savedToPhotos ? Theme.accentFill : .black.opacity(0.45), in: Circle())
+                            .font(.system(size: 10, weight: .heavy))
+                            .foregroundStyle(creation.savedToPhotos ? Theme.accent : .white.opacity(0.7))
                             .accessibilityLabel(creation.savedToPhotos ? "In Photos" : "Not saved")
                     }
                 }
-                .padding(6)
-            }
-            .overlay(alignment: .bottomLeading) {
-                Text(creation.createdAt, format: .dateTime.month(.abbreviated).day())
-                    .font(.labelSmall)
-                    .foregroundStyle(.white)
-                    .shadow(color: .black.opacity(0.6), radius: 4)
-                    .padding(8)
+                .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.6), radius: 4)
+                .padding(8)
             }
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay {
