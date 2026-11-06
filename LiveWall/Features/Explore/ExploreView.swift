@@ -241,10 +241,11 @@ struct ExploreView: View {
                 .accessibilityLabel("See all \(section.title)")
             }
             ScrollView(.horizontal) {
-                LazyHStack(spacing: 12) {
+                LazyHStack(spacing: 10) {
                     ForEach(section.wallpapers) { wallpaper in
                         CatalogCardButton(wallpaper: wallpaper, source: "\(section.id)/\(wallpaper.id)", zoom: zoom) { opened = $0 }
-                            .frame(width: 148)
+                            // Three cards and a peek of the fourth, so more of each row and more rows fit on screen.
+                            .containerRelativeFrame(.horizontal, count: 10, span: 3, spacing: 10)
                     }
                 }
                 .scrollTargetLayout()
@@ -256,19 +257,21 @@ struct ExploreView: View {
     }
 }
 
-/// A section's wallpapers in two columns, opened from See all.
+/// A section's wallpapers in three columns, opened from See all. The cards are dealt in from the top.
 private struct SectionGrid: View {
     let section: ExploreModel.Section
     let zoom: Namespace.ID
     let open: (Opened) -> Void
 
-    private let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
+    @State private var isDealt = false
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
 
     var body: some View {
         ScrollView {
-            LazyVGrid(columns: columns, spacing: 12) {
-                ForEach(section.wallpapers) { wallpaper in
+            LazyVGrid(columns: columns, spacing: 10) {
+                ForEach(Array(section.wallpapers.enumerated()), id: \.element.id) { index, wallpaper in
                     CatalogCardButton(wallpaper: wallpaper, source: "grid/\(wallpaper.id)", zoom: zoom, open: open)
+                        .dealtIn(index, isDealt: isDealt)
                 }
             }
             .padding(16)
@@ -278,6 +281,7 @@ private struct SectionGrid: View {
         .background { AppBackground() }
         .navigationTitle(section.title)
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear { isDealt = true }
     }
 }
 
@@ -301,7 +305,7 @@ private struct CatalogCardButton: View {
         }
         // The button's own press, unlike an added gesture, gives way to scrolling. Stills have nothing to play.
         .buttonStyle(CardPressStyle(onHold: wallpaper.isLive ? { isPreviewing = $0 } : nil))
-        .zoomSource(id: source, in: zoom, cornerRadius: 24)
+        .zoomSource(id: source, in: zoom, cornerRadius: 18)
         .sensoryFeedback(.impact(weight: .light), trigger: isPreviewing) { _, isOn in isOn }
         .onChange(of: isPreviewing) { _, isOn in
             if isOn {
@@ -351,6 +355,34 @@ private struct StaggeredReveal: ViewModifier {
     }
 }
 
+private extension View {
+    func dealtIn(_ index: Int, isDealt: Bool) -> some View {
+        modifier(DealtIn(index: index, isDealt: isDealt))
+    }
+}
+
+/// Drops in from above with a slight tilt, one card after another, like a shuffled deck being dealt.
+/// Reduce Motion keeps just the fade, all at once.
+private struct DealtIn: ViewModifier {
+    var index: Int
+    var isDealt: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        let isMoving = !isDealt && !reduceMotion
+        content
+            .opacity(isDealt ? 1 : 0)
+            .offset(y: isMoving ? -120 : 0)
+            .rotationEffect(.degrees(isMoving ? (index.isMultiple(of: 2) ? -7 : 6) : 0))
+            .scaleEffect(isMoving ? 0.9 : 1)
+            .animation(reduceMotion
+                ? .easeOut(duration: 0.25)
+                // Cards past the first screenful arrive together rather than keeping the user waiting.
+                : .spring(duration: 0.55, bounce: 0.22).delay(Double(min(index, 14)) * 0.045),
+                value: isDealt)
+    }
+}
+
 /// Shrinks on touch-down, so a card answers the finger before anything opens.
 private struct CardPressStyle: ButtonStyle {
     /// Holding a card plays its motion until the finger lifts, like a Live Photo in Photos.
@@ -390,14 +422,16 @@ private struct ExploreSkeleton: View {
         VStack(alignment: .leading, spacing: 28) {
             card(cornerRadius: 28, titleWidth: 0.5)
                 .aspectRatio(4 / 5, contentMode: .fit)
+                // The carousel's card sits inside 56 pt margins, 40 more than the page's.
+                .padding(.horizontal, 40)
             ForEach(0..<2, id: \.self) { row in
                 VStack(alignment: .leading, spacing: 12) {
                     Capsule().fill(Theme.placeholder).frame(width: row == 0 ? 150 : 120, height: 18).shimmer()
-                    HStack(spacing: 12) {
-                        ForEach(0..<3, id: \.self) { index in
-                            card(cornerRadius: 24, titleWidth: index.isMultiple(of: 2) ? 0.7 : 0.55)
+                    HStack(spacing: 10) {
+                        ForEach(0..<4, id: \.self) { index in
+                            card(cornerRadius: 18, titleWidth: index.isMultiple(of: 2) ? 0.7 : 0.55)
                                 .aspectRatio(9 / 16, contentMode: .fit)
-                                .frame(width: 148)
+                                .frame(width: 104)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -450,6 +484,9 @@ private struct FeaturedCard: View {
             }
             .overlay(alignment: .topLeading) {
                 StatusPill(text: "FEATURED", dot: Theme.signalYellow, symbol: "star.fill")
+                    // Glass renders flat and ignores the carousel's 3D turn, so it warped; a plain fill turns with the card.
+                    .environment(\.isOnGlass, true)
+                    .background(.black.opacity(0.35), in: Capsule())
                     .padding(14)
             }
             .overlay(alignment: .bottom) {
@@ -489,18 +526,18 @@ private struct CatalogCard: View {
                     }
             }
             .overlay(alignment: .topLeading) {
-                KindPill(wallpaper: wallpaper).padding(10)
+                KindPill(wallpaper: wallpaper).padding(8)
             }
             .overlay(alignment: .bottom) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(wallpaper.title).typography(.titleMedium).foregroundStyle(.white).lineLimit(1)
-                    Text(wallpaper.category).font(.labelMedium.weight(.semibold)).foregroundStyle(Theme.onMediaSecondary).lineLimit(1)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(wallpaper.title).typography(.labelLarge).foregroundStyle(.white).lineLimit(1).minimumScaleFactor(0.8)
+                    Text(wallpaper.category).font(.labelSmall).foregroundStyle(Theme.onMediaSecondary).lineLimit(1)
                 }
                 .mediaCaption()
             }
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Theme.specularRim, lineWidth: 1))
-            .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Theme.specularRim, lineWidth: 1))
+            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             // Wallpaper tiles are dark media, so their glass pills stay dark too.
             .environment(\.colorScheme, .dark)
             .accessibilityElement(children: .ignore)
