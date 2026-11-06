@@ -1,8 +1,12 @@
 name: Release
 
+# Tags and releases each App Store version once its MARKETING_VERSION bump lands on main,
+# so every version has a vX.Y.Z tag and a GitHub release without tagging by hand.
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
+    paths: [project.yml]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -14,20 +18,21 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Check the tag matches the app version
-        run: |
-          version=$(sed -n 's/^ *MARKETING_VERSION: "\(.*\)"/\1/p' project.yml)
-          tag=${GITHUB_REF_NAME#v}
-          # A pre-release tag such as v1.1.0-beta.1 is allowed for version 1.1.0.
-          if [ "$tag" != "$version" ] && [ "${tag%%-*}" != "$version" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME doesn't match MARKETING_VERSION $version in project.yml"
-            exit 1
-          fi
-
-      - name: Create the GitHub release
+      - name: Tag and release the version if it's new
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          version=$(sed -n 's/^ *MARKETING_VERSION: "\(.*\)"/\1/p' project.yml)
+          if [ -z "$version" ]; then
+            echo "::error::MARKETING_VERSION not found in project.yml"
+            exit 1
+          fi
+          tag="v$version"
+          # project.yml also changes for other reasons; only a new version gets a release.
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null; then
+            echo "$tag already exists; nothing to release."
+            exit 0
+          fi
           prerelease=""
-          case "$GITHUB_REF_NAME" in *-*) prerelease="--prerelease" ;; esac
-          gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes --title "Glitter Live ${GITHUB_REF_NAME#v}" $prerelease
+          case "$version" in *-*) prerelease="--prerelease" ;; esac
+          gh release create "$tag" --target "$GITHUB_SHA" --generate-notes --title "Glitter Live $version" $prerelease

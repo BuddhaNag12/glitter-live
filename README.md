@@ -108,21 +108,14 @@ xcodebuild test -project LiveWall.xcodeproj -scheme LiveWall \
 | Workflow | Runs on | Does |
 | --- | --- | --- |
 | [Deploy Supabase functions](.github/workflows/deploy-functions.yml) | pushes to `main` that change `supabase/functions/`, or by hand | deploys `generate`; needs the `SUPABASE_ACCESS_TOKEN` repository secret |
-| [Release](.github/workflows/release.yml) | pushing a `v*` tag | checks the tag matches `MARKETING_VERSION` and creates a GitHub release with notes from the merged pull requests |
+| [Release](.github/workflows/release.yml) | pushes to `main` that change `project.yml`, or by hand | when `MARKETING_VERSION` is new, tags it `vX.Y.Z` and creates a GitHub release with notes from the merged pull requests |
 | Xcode Cloud | every push to `main` | archives and uploads to TestFlight; [`ci_scripts/ci_post_clone.sh`](ci_scripts/ci_post_clone.sh) generates the project, fetches the depth model and writes the AdMob IDs from the `GAD_APPLICATION_ID` and `GAD_REWARDED_AD_UNIT_ID` secret environment variables |
 
 Database migrations aren't deployed automatically; run `supabase db push` after reviewing them.
 
 ### Releasing
 
-The App Store version is `MARKETING_VERSION` in `project.yml` (1.0.1 for fixes, 1.1.0 for features); Xcode Cloud sets the build number. Every merge to `main` goes to TestFlight through Xcode Cloud. To release, bump the version in a pull request, merge it, then tag the merge for the GitHub release:
-
-```bash
-git tag v1.1.0
-git push origin v1.1.0
-```
-
-A tag with a suffix, such as `v1.1.0-beta.1`, makes a pre-release.
+The App Store version is `MARKETING_VERSION` in `project.yml` (1.0.1 for fixes, 1.1.0 for features); Xcode Cloud sets the build number. Every merge to `main` goes to TestFlight through Xcode Cloud. To release, bump the version in a pull request and merge it: the Release workflow tags the merge `vX.Y.Z` and creates the GitHub release, and Xcode Cloud sends that build to TestFlight for submission. A version with a suffix, such as `1.1.0-beta.1`, makes a pre-release.
 
 ## Project structure
 
