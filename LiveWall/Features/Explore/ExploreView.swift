@@ -275,6 +275,14 @@ struct ExploreView: View {
                         CatalogCardButton(wallpaper: wallpaper, source: "\(section.id)/\(wallpaper.id)", zoom: zoom) { opened = $0 }
                             // Three cards and a peek of the fourth, so more of each row and more rows fit on screen.
                             .containerRelativeFrame(.horizontal, count: 10, span: 3, spacing: 10)
+                            // Cards coming in from the right start smaller and faded, so they seem to rise from behind.
+                            // Cards leaving on the left just slide away.
+                            .scrollTransition(.interactive, axis: .horizontal) { card, phase in
+                                let distance = reduceMotion ? 0 : min(max(phase.value, 0), 1)
+                                return card
+                                    .scaleEffect(1 - distance * 0.2, anchor: .leading)
+                                    .opacity(1 - distance * 0.45)
+                            }
                     }
                 }
                 .scrollTargetLayout()
@@ -459,24 +467,37 @@ private struct WallpaperThumbnail: View {
 private struct ExploreSkeleton: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 28) {
-            card(cornerRadius: 28, titleWidth: 0.5)
-                .aspectRatio(4 / 5, contentMode: .fit)
-                // The carousel's card sits inside 56 pt margins, 40 more than the page's.
-                .padding(.horizontal, 40)
+            VStack(spacing: 12) {
+                card(cornerRadius: 28, titleWidth: 0.5)
+                    .aspectRatio(4 / 5, contentMode: .fit)
+                    // The carousel's card sits inside 56 pt margins, 40 more than the page's.
+                    .padding(.horizontal, 40)
+                HStack(spacing: 6) {
+                    ForEach(0..<4, id: \.self) { _ in Circle().fill(Theme.placeholder).frame(width: 6, height: 6) }
+                }
+                .frame(maxWidth: .infinity)
+            }
             ForEach(0..<2, id: \.self) { row in
                 VStack(alignment: .leading, spacing: 12) {
-                    Capsule().fill(Theme.placeholder).frame(width: row == 0 ? 150 : 120, height: 18).shimmer()
-                    HStack(spacing: 10) {
-                        ForEach(0..<4, id: \.self) { index in
-                            card(cornerRadius: 18, titleWidth: index.isMultiple(of: 2) ? 0.7 : 0.55)
-                                .aspectRatio(9 / 16, contentMode: .fit)
-                                .frame(width: 104)
+                    HStack {
+                        Capsule().fill(Theme.placeholder).frame(width: row == 0 ? 150 : 120, height: 18).shimmer()
+                        Spacer()
+                        Capsule().fill(Theme.placeholder).frame(width: 60, height: 14).shimmer()
+                    }
+                    // Sized exactly like a loaded row (three cards and a peek, running off the edge),
+                    // without pushing the page wider than the screen.
+                    ScrollView(.horizontal) {
+                        LazyHStack(spacing: 10) {
+                            ForEach(0..<4, id: \.self) { index in
+                                card(cornerRadius: 18, titleWidth: index.isMultiple(of: 2) ? 0.7 : 0.55)
+                                    .aspectRatio(9 / 16, contentMode: .fit)
+                                    .containerRelativeFrame(.horizontal, count: 10, span: 3, spacing: 10)
+                            }
                         }
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    // Cards run off the edge, as the loaded rows do.
-                    .padding(.trailing, -16)
-                    .clipped()
+                    .scrollDisabled(true)
+                    .scrollIndicators(.hidden)
+                    .fullBleed()
                 }
             }
         }

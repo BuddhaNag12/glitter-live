@@ -53,6 +53,6 @@ private struct Shimmer: ViewModifier {
     }
 
     private var highlight: Color {
-        colorScheme == .dark ? .white.opacity(0.08) : .white.opacity(0.6)
+        colorScheme == .dark ? .white.opacity(0.08) : .white.opacity(0.8)
     }
 }
