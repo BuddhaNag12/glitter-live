@@ -56,7 +56,7 @@ struct LibraryView: View {
                 VStack(spacing: 0) {
                     header
                         .padding(.horizontal, 16)
-                        .padding(.top, 4)
+                        .padding(.top, 14)
                         .padding(.bottom, 10)
                     switch layout {
                     case .list: listLayout
