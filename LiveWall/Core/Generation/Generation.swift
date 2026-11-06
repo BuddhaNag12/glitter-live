@@ -57,6 +57,8 @@ nonisolated struct GenerationRequest: Sendable, Equatable {
 
     var prompt: String
     var style: WallpaperStyle
+    /// The rewarded ad watched for this generation, which the server checks with AdMob.
+    var reward: String?
 
     var fullPrompt: String {
         // Image models don't understand negatives, so "no text" would only invite text.

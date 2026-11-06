@@ -191,7 +191,7 @@ struct CreateView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("To create your wallpaper, your description is sent to a third-party AI service. Glitter Live doesn't store it, so please don't include personal information.")
+            Text("To create your wallpaper, the description you type is sent through our server to Cloudflare Workers AI, which checks it and paints the image. Glitter Live doesn't keep your description, so please don't include personal information.")
         }
     }
 

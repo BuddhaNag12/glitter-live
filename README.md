@@ -107,7 +107,7 @@ xcodebuild test -project LiveWall.xcodeproj -scheme LiveWall \
 
 | Workflow | Runs on | Does |
 | --- | --- | --- |
-| [Deploy Supabase functions](.github/workflows/deploy-functions.yml) | pushes to `main` that change `supabase/functions/`, or by hand | deploys `generate`; needs the `SUPABASE_ACCESS_TOKEN` repository secret |
+| [Deploy Supabase functions](.github/workflows/deploy-functions.yml) | pushes to `main` that change `supabase/functions/`, or by hand | deploys `generate` and `ad-reward`; needs the `SUPABASE_ACCESS_TOKEN` repository secret |
 | [Version bump](.github/workflows/version-bump.yml) | pull requests from `dev` into `main` | sets `MARKETING_VERSION` on `dev` to the next minor version, or patch / major with a `release: patch` / `release: major` label |
 | [Release](.github/workflows/release.yml) | pushes to `main` that change `project.yml`, or by hand | when `MARKETING_VERSION` is new, tags it `vX.Y.Z` and creates a GitHub release with notes from the merged pull requests |
 | Xcode Cloud | every push to `main` | archives and uploads to TestFlight; [`ci_scripts/ci_post_clone.sh`](ci_scripts/ci_post_clone.sh) generates the project, fetches the depth model and writes the AdMob IDs from the `GAD_APPLICATION_ID` and `GAD_REWARDED_AD_UNIT_ID` secret environment variables |
@@ -153,7 +153,7 @@ supabase/         Database migrations
 ### Next
 
 - **Create** (in progress, [plan](docs/create-plan.md)): type a prompt and get a wallpaper image from FLUX.1 schnell, then save it as a still or add motion on the phone (depth parallax) to save it as a Live wallpaper. AI video motion (LTX-Video) is ready on the server for later. Hidden behind `FeatureFlags.aiGeneration` in release builds until it works end to end.
-- **Pricing**: one subscription. The first 5 generations are free, then each generation unlocks with a short rewarded ad (up to 10 a day). **Glitter Live Pro** (₹299 a month) removes ads and allows up to 100 generations a month. Explore stays free with no ads. Convert gives 5 free conversions, then each one unlocks with a short rewarded ad, or a one-time **Unlimited Conversions** purchase removes the limit for good.
+- **Pricing**: each AI generation unlocks with a short rewarded ad, up to 3 a day per install. The server enforces this: it only generates for an ad Google has confirmed through AdMob server-side verification (see [Create's server](docs/create-plan.md#server)). A **Glitter Live Pro** subscription is planned but not built. Explore stays free with no ads. Convert gives 5 free conversions, then each one unlocks with a short rewarded ad, or a one-time **Unlimited Conversions** purchase removes the limit for good.
 - **Explore extras** from the mockup: search, sort by New, and later like counts and Free/VIP badges (likes need backend support; badges need pricing).
 - **Trim Studio**: video stabilization (the mockup's Stabilize toggle).
 - **Smoothness**: profile scrolling with Instruments. 120 Hz on ProMotion and pausing background effects on hidden tabs are done.

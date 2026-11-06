@@ -93,7 +93,16 @@ final class GenerationAllowance {
     }
 }
 
-/// Plays a rewarded ad and reports whether it was watched to the end.
+/// How a rewarded ad went.
+enum AdOutcome: Equatable {
+    case watched
+    /// Closed before the reward.
+    case closedEarly
+    /// None could be shown: offline, no fill, no consent, or no real ad unit in this build.
+    case unavailable
+}
+
+/// Plays a rewarded ad. `rewardID` goes to AdMob's server-side verification, so the server can tell this ad was watched.
 protocol RewardedAdPresenter {
-    func present() async -> Bool
+    func present(rewardID: String?) async -> AdOutcome
 }

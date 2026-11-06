@@ -51,19 +51,25 @@ final class RewardedAds: NSObject, RewardedAdPresenter {
         await gatherConsent()
     }
 
-    /// True once the ad has been watched to the end. Also true when no ad can be had (offline, no fill), so a
-    /// missing ad never blocks anyone; false only when someone closes the ad early.
-    func present() async -> Bool {
-        guard Self.hasRealAdUnit else { return true }
-        guard !isPreparing, dismissal == nil else { return false }
+    /// Whether the ad was watched to the end. Callers decide what a missing ad means: Convert lets the
+    /// conversion through, while Create can't generate without a reward the server has confirmed.
+    func present(rewardID: String?) async -> AdOutcome {
+        guard Self.hasRealAdUnit else { return .unavailable }
+        guard !isPreparing, dismissal == nil else { return .closedEarly }
         isPreparing = true
         await gatherConsent()
         guard ConsentInformation.shared.canRequestAds, let ad = await readyAd() else {
             isPreparing = false
-            return true
+            return .unavailable
         }
         isPreparing = false
         loadedAd = nil
+
+        // AdMob tells the server about the reward with these, signed by Google.
+        let verification = ServerSideVerificationOptions()
+        verification.userIdentifier = InstallID.value
+        verification.customRewardText = rewardID
+        ad.serverSideVerificationOptions = verification
 
         // Google doesn't promise the reward callback a thread, so it only flips a lock-protected flag.
         let earned = OSAllocatedUnfairLock(initialState: false)
@@ -73,7 +79,8 @@ final class RewardedAds: NSObject, RewardedAdPresenter {
             ad.present(from: Self.topViewController) { @Sendable in earned.withLock { $0 = true } }
         }
         Task { _ = await readyAd() }
-        return presented ? earned.withLock { $0 } : true
+        guard presented else { return .unavailable }
+        return earned.withLock { $0 } ? .watched : .closedEarly
     }
 
     func showPrivacyChoices() async {
