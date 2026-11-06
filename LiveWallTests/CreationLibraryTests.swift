@@ -46,6 +46,26 @@ struct CreationLibraryTests {
         // The original stays put; Create may still save it again or animate it.
         #expect(FileManager.default.fileExists(atPath: source.path(percentEncoded: false)))
     }
+
+    @Test func deletingSeveralRemovesOnlyThoseRowsAndFolders() throws {
+        let container = try ModelContainer(for: Creation.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let library = CreationLibrary(context: container.mainContext)
+        let source = URL.temporaryDirectory.appending(path: "still-\(UUID().uuidString).jpg")
+        try Data("jpeg".utf8).write(to: source)
+        let creations = try (0..<3).map { _ in try library.addStill(source) }
+        let kept = creations[1]
+        defer { try? library.delete(kept) }
+        // Read before deleting: a deleted model's properties can't be read afterwards.
+        let deletedIDs = [creations[0].id, creations[2].id]
+
+        try library.delete([creations[0], creations[2]])
+
+        #expect(try container.mainContext.fetch(FetchDescriptor<Creation>()).map(\.id) == [kept.id])
+        for id in deletedIDs {
+            #expect(!FileManager.default.fileExists(atPath: CreationLibrary.directory(for: id).path(percentEncoded: false)))
+        }
+        #expect(FileManager.default.fileExists(atPath: kept.imageURL.path(percentEncoded: false)))
+    }
 }
 
 struct OrphanCleanupTests {
