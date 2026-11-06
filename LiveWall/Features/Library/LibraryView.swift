@@ -62,6 +62,9 @@ struct LibraryView: View {
                     // Only once something is picked, so the bar never sits there doing nothing.
                     if isSelecting && !selectedIDs.isEmpty { deleteBar.transition(.move(edge: .bottom).combined(with: .opacity)) }
                 }
+                .overlay(alignment: .bottomTrailing) {
+                    if !isSelecting { newButton.transition(.scale.combined(with: .opacity)) }
+                }
                 .screenHeader("Library")
             }
         }
@@ -115,7 +118,7 @@ struct LibraryView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .scrollIndicators(.hidden)
-        .contentMargins(.bottom, 24, for: .scrollContent)
+        .contentMargins(.bottom, 88, for: .scrollContent)
         .transition(.opacity)
     }
 
@@ -131,22 +134,33 @@ struct LibraryView: View {
                 countFooter.padding(.top, 6)
             }
             .padding(16)
-            .padding(.bottom, 24)
+            .padding(.bottom, 88)
         }
         .scrollIndicators(.hidden)
         .transition(.opacity)
     }
 
+    /// One toolbar row, every control 40 pt tall: the filter and view controls, or the selection controls.
     private var header: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Spacer()
-                headerButtons
-            }
             HStack(spacing: 8) {
-                categoryChips
-                Spacer(minLength: 0)
-                if !isSelecting {
+                if isSelecting {
+                    Text(selectedIDs.isEmpty ? "Select wallpapers" : "\(selectedIDs.count) selected")
+                        .typography(.titleMedium)
+                        .foregroundStyle(Theme.textPrimary)
+                        .contentTransition(.numericText())
+                    Spacer(minLength: 0)
+                    let visibleIDs = Set(visibleCreations.map(\.id))
+                    let allSelected = !visibleIDs.isEmpty && visibleIDs.isSubset(of: selectedIDs)
+                    Button(allSelected ? "Deselect All" : "Select All") {
+                        if allSelected { selectedIDs.subtract(visibleIDs) } else { selectedIDs.formUnion(visibleIDs) }
+                    }
+                    .buttonStyle(GlassPillButtonStyle())
+                    Button("Done", action: endSelecting)
+                        .buttonStyle(GlassPillButtonStyle(tint: Theme.accent))
+                } else {
+                    CategoryPicker(selection: $category)
+                    Spacer(minLength: 0)
                     // Selecting one wallpaper is just a swipe or a long-press, so Select needs two or more.
                     if visibleCreations.count > 1 {
                         Button("Select") { isSelecting = true }
@@ -206,23 +220,20 @@ struct LibraryView: View {
         }
     }
 
-    @ViewBuilder
-    private var headerButtons: some View {
-        if isSelecting {
-            let visibleIDs = Set(visibleCreations.map(\.id))
-            let allSelected = !visibleIDs.isEmpty && visibleIDs.isSubset(of: selectedIDs)
-            Button(allSelected ? "Deselect All" : "Select All") {
-                if allSelected { selectedIDs.subtract(visibleIDs) } else { selectedIDs.formUnion(visibleIDs) }
-            }
-            .buttonStyle(GlassPillButtonStyle())
-            Button("Done", action: endSelecting)
-                .buttonStyle(GlassPillButtonStyle(tint: Theme.accent))
-        } else {
-            Button(action: onConvert) {
-                Label("New", systemImage: "plus")
-            }
-            .buttonStyle(GlassPillButtonStyle(tint: Theme.accent))
+    /// Floats above the tab bar, like a compose button, so the toolbar row stays about the Library itself.
+    private var newButton: some View {
+        Button(action: onConvert) {
+            Image(systemName: "plus")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(Theme.onAccent)
+                .frame(width: 56, height: 56)
+                .background(Theme.accentFill, in: Circle())
+                .shadow(color: Theme.accentFill.opacity(0.4), radius: 12, y: 4)
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel("New Wallpaper")
+        .padding(.trailing, 20)
+        .padding(.bottom, 12)
     }
 
     private var deleteBar: some View {
@@ -254,21 +265,6 @@ struct LibraryView: View {
         endSelecting()
     }
 
-    private var categoryChips: some View {
-        GlassGroup(spacing: 8) {
-            HStack(spacing: 8) {
-                ForEach(Category.allCases) { option in
-                    Button(option.rawValue) {
-                        withAnimation(.spring(duration: 0.3)) { category = option }
-                    }
-                    .buttonStyle(GlassPillButtonStyle(tint: category == option ? Theme.accent : nil))
-                    .accessibilityAddTraits(category == option ? .isSelected : [])
-                }
-            }
-        }
-        .sensoryFeedback(.selection, trigger: category)
-    }
-
     #if DEBUG
     private func seedDemoLibraryIfRequested() async {
         guard DemoLaunch.seedsLibrary, creations.isEmpty else { return }
@@ -287,6 +283,40 @@ struct LibraryView: View {
         }
     }
     #endif
+}
+
+/// All · Live · Stills as one segmented capsule, the highlight sliding to the chosen one.
+private struct CategoryPicker: View {
+    @Binding var selection: LibraryView.Category
+    @Namespace private var highlight
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(LibraryView.Category.allCases) { option in
+                let isChosen = selection == option
+                Button {
+                    withAnimation(.spring(duration: 0.3)) { selection = option }
+                } label: {
+                    Text(option.rawValue)
+                        .font(.labelMedium.weight(.semibold))
+                        .foregroundStyle(isChosen ? Theme.accent : Theme.textSecondary)
+                        .padding(.horizontal, 14)
+                        .frame(height: 32)
+                        .background {
+                            if isChosen {
+                                Capsule().fill(Theme.accentFill.opacity(0.22)).matchedGeometryEffect(id: "chosen", in: highlight)
+                            }
+                        }
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(isChosen ? .isSelected : [])
+            }
+        }
+        .padding(4)
+        .liquidGlass(in: Capsule())
+        .sensoryFeedback(.selection, trigger: selection)
+    }
 }
 
 /// One wallpaper in the Library list: its thumbnail, kind and length, when it was made, and whether it's in Photos.
