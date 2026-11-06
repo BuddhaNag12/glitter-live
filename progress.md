@@ -41,17 +41,23 @@ The developer website (https://buddhanag12.github.io) and its `app-ads.txt` are 
 
 ## Next
 
-1. **Ship Create**: server-side limits (DeviceCheck for the free generations, AdMob server-side verification, a StoreKit check for Pro), the Pro subscription and paywall, Create's privacy answers, Cloudflare Workers Paid. Then turn on its feature flags.
-2. **App Store metadata in the repo**: listing, "What's New" and screenshots uploaded on each release tag (needs an App Store Connect API key).
-3. **Competitor research**: pricing, ratings and review complaints of similar apps.
-4. **Trim Studio on the iPhone SE**: the preview runs under the tab bar.
-5. **AI video motion**: needs a paid provider (fal, WaveSpeed, Creative Fabrica at about $0.43 per video) or self-hosting.
+1. **Demo video** (from launch-post feedback): one short screen recording that shows the result instead of describing it.
+   - Trim 1–3 seconds of a video in Trim Studio.
+   - Frame it in the Lock Screen preview, around the clock and widgets.
+   - Save, set it as the wallpaper, and show it moving when the iPhone wakes (filmed with a second device or camera).
+   - Show the unlock sheet after the 5 free conversions: a short ad per video, or the one-time unlock.
+
+   Use it in the Reddit launch post and as the App Store app preview (it needs the app preview specs: 15–30 s, real UI, works muted, seamless loop).
+2. **Ship Create**: server-side limits (DeviceCheck for the free generations, AdMob server-side verification, a StoreKit check for Pro), the Pro subscription and paywall, Create's privacy answers, Cloudflare Workers Paid. Then turn on its feature flags.
+3. **App Store metadata in the repo**: listing, "What's New" and screenshots uploaded on each release tag (needs an App Store Connect API key).
+4. **Competitor research**: pricing, ratings and review complaints of similar apps.
+5. **Trim Studio on the iPhone SE**: the preview runs under the tab bar.
+6. **AI video motion**: needs a paid provider (fal, WaveSpeed, Creative Fabrica at about $0.43 per video) or self-hosting.
 
 ## Backlog
 
 - Explore search and sort by newest
 - Refresh the README screenshots
-- App preview video (optional)
 - Warm up the depth model before first use
 - Scroll performance profiling
 - The shared screen header truncates "Convert" at the largest text sizes
