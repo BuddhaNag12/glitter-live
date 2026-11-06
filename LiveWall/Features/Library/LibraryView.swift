@@ -107,6 +107,10 @@ struct LibraryView: View {
                         }
                     }
             }
+            countFooter
+                .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 0, trailing: 16))
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
@@ -124,6 +128,7 @@ struct LibraryView: View {
                         item(creation, index: index)
                     }
                 }
+                countFooter.padding(.top, 6)
             }
             .padding(16)
             .padding(.bottom, 24)
@@ -134,11 +139,7 @@ struct LibraryView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(countTitle)
-                    .typography(.headlineSmall)
-                    .foregroundStyle(Theme.textPrimary)
-                    .contentTransition(.numericText())
+            HStack {
                 Spacer()
                 headerButtons
             }
@@ -171,6 +172,18 @@ struct LibraryView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.top, 40)
             }
+        }
+    }
+
+    /// How many wallpapers are shown, quietly at the end, like Photos' item count.
+    @ViewBuilder
+    private var countFooter: some View {
+        if !visibleCreations.isEmpty {
+            Text(countTitle)
+                .font(.labelMedium.weight(.regular))
+                .foregroundStyle(Theme.textTertiary)
+                .contentTransition(.numericText())
+                .frame(maxWidth: .infinity)
         }
     }
 
