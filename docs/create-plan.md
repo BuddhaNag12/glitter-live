@@ -59,7 +59,7 @@ The app never holds an AI provider key, and it never grants generations itself.
 `supabase/functions/generate` is deployed with `--no-verify-jwt`, because the app sends the publishable key rather than a user JWT. Provider keys are Supabase secrets: `CLOUDFLARE_ACCOUNT_ID` (the 32-character account ID, not the login email), `CLOUDFLARE_AI_TOKEN` and `FAL_KEY`.
 
 ```bash
-supabase functions deploy generate --no-verify-jwt --use-api --project-ref jusrioirjfpaocgmsbbv
+supabase functions deploy generate --no-verify-jwt --use-api --yes --project-ref jusrioirjfpaocgmsbbv
 ```
 
 ### Limits (migration `0003_generation_limits.sql`)

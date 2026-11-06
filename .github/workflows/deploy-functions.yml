@@ -23,5 +23,5 @@ jobs:
           version: latest
       # The app calls generate with the publishable key, not a user JWT; AdMob calls ad-reward with no key at all
       # (its Google signature is checked instead).
-      - run: supabase functions deploy generate --no-verify-jwt --use-api --project-ref jusrioirjfpaocgmsbbv
-      - run: supabase functions deploy ad-reward --no-verify-jwt --use-api --project-ref jusrioirjfpaocgmsbbv
+      - run: supabase functions deploy generate --no-verify-jwt --use-api --yes --project-ref jusrioirjfpaocgmsbbv
+      - run: supabase functions deploy ad-reward --no-verify-jwt --use-api --yes --project-ref jusrioirjfpaocgmsbbv
