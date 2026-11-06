@@ -67,5 +67,5 @@ The developer website (https://buddhanag12.github.io) and its `app-ads.txt` are 
 
 - No CI runs tests now; run the full suite locally before a release (30 tests, about 4 minutes):
   `xcodebuild test -project LiveWall.xcodeproj -scheme LiveWall -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -only-testing:LiveWallTests -collect-test-diagnostics never`
-- Releasing: bump `MARKETING_VERSION` in a pull request and merge it. The Release workflow tags `vX.Y.Z` and creates the GitHub release; Xcode Cloud sends the build to TestFlight.
+- Branches: work goes into `dev` through pull requests. Releasing: bump `MARKETING_VERSION` on `dev`, then merge a pull request from `dev` into `main` with a merge commit. The Release workflow tags `vX.Y.Z` and creates the GitHub release; Xcode Cloud builds `main` for TestFlight.
 - Xcode 27.1 can fail to create Xcode Cloud workflows ("Could not find item", or asking to connect the `googleads` org). Luminux's workflow was created by generating its project without the Google packages just for the setup.
