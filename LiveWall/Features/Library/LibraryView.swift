@@ -66,7 +66,7 @@ struct LibraryView: View {
                             }
                             if !visibleCreations.isEmpty {
                                 // A compact list: a small thumbnail and its details per row, so many fit on one screen.
-                                LazyVStack(spacing: 0) {
+                                LazyVStack(spacing: 8) {
                                     ForEach(visibleCreations) { creation in
                                         let isSelected = selectedIDs.contains(creation.id)
                                         Button { tap(creation) } label: {
@@ -80,14 +80,8 @@ struct LibraryView: View {
                                                 Button("Delete", systemImage: "trash", role: .destructive) { pendingDeletion = [creation] }
                                             }
                                         }
-                                        if creation.id != visibleCreations.last?.id {
-                                            Divider().overlay(Theme.border).padding(.leading, 76)
-                                        }
                                     }
                                 }
-                                // Keeps a selected row's tint inside the panel's rounded corners.
-                                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                                .glass(.surface, cornerRadius: 22)
                             }
                         }
                         .padding(16)
@@ -220,7 +214,7 @@ private struct CreationRow: View {
         HStack(spacing: 12) {
             Color.black
                 .aspectRatio(9 / 16, contentMode: .fit)
-                .frame(width: 50)
+                .frame(width: 38)
                 .overlay {
                     if let thumbnail {
                         Image(uiImage: thumbnail).resizable().scaledToFill()
@@ -228,27 +222,19 @@ private struct CreationRow: View {
                         AuroraView(isAnimated: false).opacity(0.35)
                     }
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Theme.specularRim, lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.specularRim, lineWidth: 1))
                 // The detail sheet zooms out of the thumbnail.
-                .zoomSource(id: creation.id, in: zoom, cornerRadius: 10)
+                .zoomSource(id: creation.id, in: zoom, cornerRadius: 8)
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text(creation.isLive ? "Live wallpaper" : "Still wallpaper")
+            VStack(alignment: .leading, spacing: 5) {
+                Text(creation.createdAt, format: .dateTime.month(.abbreviated).day().hour().minute())
                     .typography(.titleMedium)
                     .foregroundStyle(Theme.textPrimary)
-                Text(details)
+                Label(kind, systemImage: creation.isLive ? "livephoto" : "photo")
                     .font(.labelMedium)
                     .foregroundStyle(Theme.textSecondary)
-                Group {
-                    if creation.savedToPhotos {
-                        Label("Saved to Photos", systemImage: "checkmark.circle.fill").foregroundStyle(Theme.accent)
-                    } else {
-                        Label("Not in Photos", systemImage: "arrow.down.circle").foregroundStyle(Theme.textTertiary)
-                    }
-                }
-                .font(.labelSmall)
-                .labelStyle(.titleAndIcon)
+                    .labelStyle(.titleAndIcon)
             }
             .lineLimit(1)
 
@@ -260,25 +246,33 @@ private struct CreationRow: View {
                     .foregroundStyle(selection ? Theme.accentFill : Theme.textTertiary)
                     .accessibilityHidden(true)
             } else {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Theme.textTertiary)
-                    .accessibilityHidden(true)
+                // Whether this wallpaper is already in Photos, or still needs saving from its detail sheet.
+                Image(systemName: creation.savedToPhotos ? "photo.badge.checkmark" : "photo.badge.arrow.down")
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(creation.savedToPhotos ? Theme.accent : Theme.textTertiary)
+                    .frame(width: 36, height: 36)
+                    .accessibilityLabel(creation.savedToPhotos ? "Saved to Photos" : "Not in Photos")
             }
         }
-        .padding(10)
-        .background(selection == true ? Theme.accentFill.opacity(0.12) : .clear)
-        .contentShape(Rectangle())
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(selection == true ? Theme.accentFill.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .glass(.surface, cornerRadius: 18)
+        .overlay {
+            if selection == true {
+                RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Theme.accentFill, lineWidth: 2)
+            }
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .accessibilityElement(children: .combine)
         .task(id: creation.id) {
-            thumbnail = await Thumbnail.load(creation.imageURL, maxPixelSize: 300)
+            thumbnail = await Thumbnail.load(creation.imageURL, maxPixelSize: 240)
         }
     }
 
-    private var details: String {
-        let made = creation.createdAt.formatted(.dateTime.month(.abbreviated).day().hour().minute())
-        guard creation.isLive else { return made }
-        return "\(creation.duration.formatted(.number.precision(.fractionLength(1))))s · \(made)"
+    private var kind: String {
+        guard creation.isLive else { return "Still" }
+        return "Live · \(creation.duration.formatted(.number.precision(.fractionLength(1))))s"
     }
 }
 
