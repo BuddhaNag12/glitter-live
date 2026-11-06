@@ -74,6 +74,7 @@ struct ExploreView: View {
     @State private var opened: Opened?
     /// The carousel page in view; only its card plays.
     @State private var featuredPage: Wallpaper.ID?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isVisible = false
     /// Fast loads skip the placeholders, so they don't flash for a split second.
     @State private var showsPlaceholders = false
@@ -156,14 +157,22 @@ struct ExploreView: View {
         }
     }
 
-    /// Featured wallpapers, a page at a time, with only the one in view playing.
+    /// Featured wallpapers like albums on a shelf: the centre card is full size, its neighbours peek in
+    /// smaller and turned towards it, and swiping hands the size over smoothly. Only the centre card plays.
     private func carousel(_ featured: [Wallpaper]) -> some View {
         let current = featuredPage ?? featured.first?.id
         return VStack(spacing: 12) {
             ScrollView(.horizontal) {
-                LazyHStack(spacing: 12) {
+                LazyHStack(spacing: 0) {
                     ForEach(featured) { wallpaper in
-                        Button { opened = Opened(wallpaper: wallpaper, source: "featured/\(wallpaper.id)") } label: {
+                        Button {
+                            if wallpaper.id == current {
+                                opened = Opened(wallpaper: wallpaper, source: "featured/\(wallpaper.id)")
+                            } else {
+                                // A side card slides to the centre first, like picking up the next album.
+                                withAnimation(.smooth(duration: 0.45)) { featuredPage = wallpaper.id }
+                            }
+                        } label: {
                             FeaturedCard(
                                 wallpaper: wallpaper,
                                 isPlaying: isVisible && opened == nil && current == wallpaper.id && UIAccessibility.isVideoAutoplayEnabled
@@ -172,12 +181,27 @@ struct ExploreView: View {
                         .buttonStyle(CardPressStyle())
                         .zoomSource(id: "featured/\(wallpaper.id)", in: zoom, cornerRadius: 28)
                         .containerRelativeFrame(.horizontal)
+                        .scrollTransition(.interactive, axis: .horizontal) { card, phase in
+                            // phase.value runs -1 (off to the left) … 0 (centre) … 1 (off to the right).
+                            let distance = min(abs(phase.value), 1)
+                            return card
+                                .scaleEffect(1 - distance * 0.16)
+                                // Pulls a shrunk side card back so it still peeks in beside the centre card, without covering it.
+                                .offset(x: -phase.value * 24)
+                                .rotation3DEffect(
+                                    .degrees(reduceMotion ? 0 : -phase.value * 32),
+                                    axis: (x: 0, y: 1, z: 0),
+                                    perspective: 0.55
+                                )
+                                .opacity(1 - distance * 0.35)
+                        }
                         .accessibilityIdentifier("featured-card")
                     }
                 }
                 .scrollTargetLayout()
             }
-            // View-aligned rather than paging, so each card snaps inside the page margins.
+            // The margins shrink each card and leave room for the neighbours to peek in.
+            .contentMargins(.horizontal, 56, for: .scrollContent)
             .scrollTargetBehavior(.viewAligned)
             .scrollPosition(id: $featuredPage)
             .scrollIndicators(.hidden)
