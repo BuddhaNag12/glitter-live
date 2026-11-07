@@ -25,7 +25,7 @@ final class ScreenshotTests: XCTestCase {
     private func launch(_ appearance: String, _ arguments: [String]) -> XCUIApplication {
         let app = XCUIApplication()
         // Release hides unfinished features; the screenshots show only what ships.
-        app.launchArguments = arguments + ["-appearance", appearance, "-releaseFeatures", "-noPrompts"]
+        app.launchArguments = arguments + ["-appearance", appearance, "-noPrompts"]
         app.launch()
         return app
     }

@@ -16,9 +16,3 @@ if [ -n "$GAD_APPLICATION_ID" ] && [ -n "$GAD_REWARDED_AD_UNIT_ID" ]; then
 else
     echo "warning: GAD_APPLICATION_ID or GAD_REWARDED_AD_UNIT_ID isn't set; this build uses Google's sample ad IDs."
 fi
-
-# Only the "AI beta" workflow sets AI_BETA=1: it turns Create on for internal TestFlight builds, never App Store ones.
-if [ "$AI_BETA" = "1" ]; then
-    echo 'SWIFT_ACTIVE_COMPILATION_CONDITIONS = $(inherited) AI_BETA' >> Config/AdMob.secrets.xcconfig
-    echo "AI beta build: Create is on."
-fi

@@ -40,8 +40,6 @@ The wallpapers in Explore are downloaded from our catalog, which is hosted by [S
 
 ## Create (AI wallpapers)
 
-Create is in testing builds of Glitter Live (TestFlight) and not yet in the App Store version.
-
 - **What's sent.** When you tap Generate, the description you typed and the style you picked are sent to our server, which passes them to [Cloudflare Workers AI](https://www.cloudflare.com/privacypolicy/). Cloudflare checks the description for unsafe content, paints the image, and checks the finished image too, before it comes back to your iPhone. The app asks before the first description is sent.
 - **Ads and limits.** Each AI wallpaper unlocks with a short rewarded ad. When you finish the ad, Google AdMob tells our server so, using a random ID the app makes for itself (an install ID, not linked to you or your device; it changes if you reinstall) and a one-off ID for that ad. Our server keeps these IDs and the time only to allow one wallpaper per ad and a few a day.
 - **Reports.** If you report a generated image, the description, the style and the reason you chose are sent to our server with the install ID, so we can review it and improve the filters. The image isn't sent.
