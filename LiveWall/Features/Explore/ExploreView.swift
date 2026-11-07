@@ -19,22 +19,22 @@ final class ExploreModel {
     }
 
     /// Leads Explore as a carousel: wallpapers flagged as featured, or else the catalog's Featured category.
-    var featured: [Wallpaper] {
-        let flagged = wallpapers.filter(\.isFeatured)
+    func featured(_ kind: KindFilter = .all) -> [Wallpaper] {
+        let shown = wallpapers.filter { kind.includes(isLive: $0.isLive) }
+        let flagged = shown.filter(\.isFeatured)
         guard flagged.isEmpty else { return flagged }
-        return wallpapers.filter { $0.category.localizedCaseInsensitiveCompare("Featured") == .orderedSame }
+        return shown.filter { $0.category.localizedCaseInsensitiveCompare("Featured") == .orderedSame }
     }
 
-    /// New, then live and still, then one row per category in the catalog's order. Empty rows are left out.
-    func sections(now: Date = .now) -> [Section] {
+    /// New, then one row per category in the catalog's order, all of the chosen kind. Empty rows are left out.
+    func sections(_ kind: KindFilter = .all, now: Date = .now) -> [Section] {
+        let wallpapers = wallpapers.filter { kind.includes(isLive: $0.isLive) }
         let cutoff = now.addingTimeInterval(-14 * 24 * 60 * 60)
         var seen = Set<String>()
         let categories = wallpapers.map(\.category).filter { seen.insert($0).inserted }
-        let carousel = featured.map(\.id)
+        let carousel = featured(kind).map(\.id)
         let fixed = [
             Section(id: "new", title: "New this week", wallpapers: wallpapers.filter { ($0.createdDate ?? .distantPast) > cutoff }),
-            Section(id: "live", title: "Live wallpapers", wallpapers: wallpapers.filter(\.isLive)),
-            Section(id: "still", title: "Still wallpapers", wallpapers: wallpapers.filter { !$0.isLive }),
         ]
         let byCategory = categories.map { category in
             Section(id: "category:\(category)", title: category, wallpapers: wallpapers.filter { $0.category == category })
@@ -72,6 +72,8 @@ struct ExploreView: View {
 
     @State private var model = ExploreModel()
     @State private var opened: Opened?
+    /// All, live or still wallpapers, across the carousel and every row.
+    @State private var kind = KindFilter.all
     /// The carousel position in view, counting across the repeated laps; only its card plays.
     @State private var featuredPage: Int?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -144,19 +146,35 @@ struct ExploreView: View {
             ContentUnavailableView("New wallpapers are on the way", systemImage: "sparkles", description: Text("Check back soon."))
                 .padding(.top, 60)
         case .loaded:
-            let featured = model.featured
+            KindFilterPicker(selection: $kind)
+                .staggeredReveal(0, isRevealed: isRevealed)
+            let featured = model.featured(kind)
+            let sections = model.sections(kind)
             if !featured.isEmpty {
                 carousel(featured)
-                    .staggeredReveal(0, isRevealed: isRevealed)
+                    // A fresh carousel per filter, so it opens on that list's middle card.
+                    .id(kind)
+                    .staggeredReveal(1, isRevealed: isRevealed)
             }
-            ForEach(Array(model.sections().enumerated()), id: \.element.id) { index, section in
+            ForEach(Array(sections.enumerated()), id: \.element.id) { index, section in
                 row(section)
-                    .staggeredReveal(1 + index, isRevealed: isRevealed)
+                    .staggeredReveal(2 + index, isRevealed: isRevealed)
             }
-            Label("Touch and hold a wallpaper to preview its motion", systemImage: "hand.tap")
-                .font(.labelMedium)
-                .foregroundStyle(Theme.textSecondary)
-                .frame(maxWidth: .infinity)
+            if featured.isEmpty && sections.isEmpty {
+                ContentUnavailableView(
+                    kind == .stills ? "No still wallpapers yet" : "No live wallpapers yet",
+                    systemImage: kind == .stills ? "photo" : "livephoto",
+                    description: Text("Check back soon.")
+                )
+                .padding(.top, 40)
+            }
+            // Stills have no motion to preview.
+            if kind != .stills {
+                Label("Touch and hold a wallpaper to preview its motion", systemImage: "hand.tap")
+                    .font(.labelMedium)
+                    .foregroundStyle(Theme.textSecondary)
+                    .frame(maxWidth: .infinity)
+            }
         }
     }
 
@@ -216,7 +234,7 @@ struct ExploreView: View {
                 .scrollTargetLayout()
             }
             // The margins shrink each card and leave room for the neighbours to peek in.
-            .contentMargins(.horizontal, 56, for: .scrollContent)
+            .contentMargins(.horizontal, 72, for: .scrollContent)
             .scrollTargetBehavior(.viewAligned)
             .scrollPosition(id: $featuredPage)
             .onAppear { if featuredPage == nil { featuredPage = start } }
@@ -470,8 +488,8 @@ private struct ExploreSkeleton: View {
             VStack(spacing: 12) {
                 card(cornerRadius: 28, titleWidth: 0.5)
                     .aspectRatio(4 / 5, contentMode: .fit)
-                    // The carousel's card sits inside 56 pt margins, 40 more than the page's.
-                    .padding(.horizontal, 40)
+                    // The carousel's card sits inside 72 pt margins, 56 more than the page's.
+                    .padding(.horizontal, 56)
                 HStack(spacing: 6) {
                     ForEach(0..<4, id: \.self) { _ in Circle().fill(Theme.placeholder).frame(width: 6, height: 6) }
                 }

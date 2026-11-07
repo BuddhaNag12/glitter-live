@@ -8,7 +8,7 @@ struct LibraryView: View {
 
     @Query(sort: \Creation.createdAt, order: .reverse) private var creations: [Creation]
     @State private var selection: Creation?
-    @State private var category = Category.all
+    @State private var category = KindFilter.all
     @State private var isSelecting = false
     @State private var selectedIDs: Set<UUID> = []
     /// Waiting for the delete confirmation: from the Delete bar or a card's long-press menu.
@@ -16,17 +16,8 @@ struct LibraryView: View {
     @Namespace private var zoom
     @Environment(\.modelContext) private var modelContext
 
-    enum Category: String, CaseIterable, Identifiable {
-        case all = "All", live = "Live", stills = "Stills"
-        var id: Self { self }
-    }
-
     private var visibleCreations: [Creation] {
-        switch category {
-        case .all: creations
-        case .live: creations.filter(\.isLive)
-        case .stills: creations.filter { !$0.isLive }
-        }
+        creations.filter { category.includes(isLive: $0.isLive) }
     }
 
     private var countTitle: String {
@@ -161,7 +152,7 @@ struct LibraryView: View {
                     Button("Done", action: endSelecting)
                         .buttonStyle(GlassPillButtonStyle(tint: Theme.accent))
                 } else {
-                    CategoryPicker(selection: $category)
+                    KindFilterPicker(selection: $category)
                     Spacer(minLength: 0)
                     // Selecting one wallpaper is just a swipe or a long-press, so Select needs two or more.
                     if visibleCreations.count > 1 {
@@ -285,44 +276,6 @@ struct LibraryView: View {
         }
     }
     #endif
-}
-
-/// All · Live · Stills styled like the tab bar: one glass capsule, the chosen option in a lighter
-/// pill that slides between them, its label in the accent colour.
-private struct CategoryPicker: View {
-    @Binding var selection: LibraryView.Category
-    @Namespace private var highlight
-
-    var body: some View {
-        HStack(spacing: 0) {
-            ForEach(LibraryView.Category.allCases) { option in
-                let isChosen = selection == option
-                Button {
-                    withAnimation(.spring(duration: 0.35, bounce: 0.2)) { selection = option }
-                } label: {
-                    Text(option.rawValue)
-                        .font(.labelMedium.weight(.semibold))
-                        .foregroundStyle(isChosen ? Theme.accent : Theme.textPrimary)
-                        .padding(.horizontal, 14)
-                        .frame(height: 32)
-                        .background {
-                            if isChosen {
-                                Capsule()
-                                    .fill(Theme.fill)
-                                    .overlay(Capsule().fill(Theme.textPrimary.opacity(0.06)))
-                                    .matchedGeometryEffect(id: "chosen", in: highlight)
-                            }
-                        }
-                        .contentShape(Capsule())
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(isChosen ? .isSelected : [])
-            }
-        }
-        .padding(4)
-        .liquidGlass(in: Capsule())
-        .sensoryFeedback(.selection, trigger: selection)
-    }
 }
 
 /// One wallpaper in the Library list: its thumbnail, kind and length, when it was made, and whether it's in Photos.

@@ -21,21 +21,36 @@ struct ExploreModelTests {
             wallpaper("C", category: "Nature"),
         ])
         let sections = model.sections(now: now)
-        #expect(sections.map(\.title) == ["New this week", "Live wallpapers", "Still wallpapers", "Glitter Originals", "Nature"])
+        #expect(sections.map(\.title) == ["New this week", "Glitter Originals", "Nature"])
         #expect(sections[0].wallpapers.map(\.title) == ["B"])
-        #expect(sections[1].wallpapers.map(\.title) == ["A", "C"])
-        #expect(sections[2].wallpapers.map(\.title) == ["B"])
+        #expect(sections[2].wallpapers.map(\.title) == ["B", "C"])
 
-        let liveOnly = ExploreModel(wallpapers: [wallpaper("A")]).sections(now: now)
-        #expect(liveOnly.map(\.title) == ["Live wallpapers", "Glitter Originals"])
+        let oldOnly = ExploreModel(wallpapers: [wallpaper("A")]).sections(now: now)
+        #expect(oldOnly.map(\.title) == ["Glitter Originals"])
+    }
+
+    @Test func filtersEveryRowAndTheCarouselByKind() {
+        let model = ExploreModel(wallpapers: [
+            wallpaper("A", featured: true),
+            wallpaper("B", category: "Nature", still: true, featured: true),
+            wallpaper("C", category: "Nature"),
+            wallpaper("D"),
+            wallpaper("E", category: "Nature", still: true),
+        ])
+        #expect(model.sections(.live, now: now).map(\.title) == ["Glitter Originals", "Nature"])
+        #expect(model.sections(.live, now: now)[1].wallpapers.map(\.title) == ["C"])
+        #expect(model.sections(.stills, now: now).map(\.title) == ["Nature"])
+        #expect(model.featured(.live).map(\.title) == ["A"])
+        #expect(model.featured(.stills).map(\.title) == ["B"])
+        #expect(model.featured().map(\.title) == ["A", "B"])
     }
 
     @Test func featuredPrefersTheFlagThenTheFeaturedCategory() {
         let flagged = ExploreModel(wallpapers: [wallpaper("A", category: "Featured"), wallpaper("B", featured: true)])
-        #expect(flagged.featured.map(\.title) == ["B"])
+        #expect(flagged.featured().map(\.title) == ["B"])
 
         let fallback = ExploreModel(wallpapers: [wallpaper("A", category: "Featured"), wallpaper("B")])
-        #expect(fallback.featured.map(\.title) == ["A"])
+        #expect(fallback.featured().map(\.title) == ["A"])
         // The Featured category already fills the carousel, so it gets no row of its own.
         #expect(!fallback.sections(now: now).contains { $0.title == "Featured" })
     }
