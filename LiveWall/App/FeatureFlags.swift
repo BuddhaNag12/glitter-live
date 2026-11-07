@@ -2,17 +2,9 @@ import Foundation
 
 /// Features that exist in code but aren't ready to ship.
 enum FeatureFlags {
-    /// The Create tab and every mention of AI generation. On only in debug builds until generation works end to end,
-    /// because App Review rejects placeholder screens and advertising features that aren't available.
-    #if DEBUG
-    /// `-releaseFeatures` hides it in debug too, so App Store screenshots match what ships.
-    static let aiGeneration = !ProcessInfo.processInfo.arguments.contains("-releaseFeatures")
-    #elseif AI_BETA
-    /// Internal TestFlight builds from the "AI beta" Xcode Cloud workflow; App Store builds never set AI_BETA.
+    /// The Create tab and every mention of AI generation. Shipped from 1.1: the server enforces the ad and the
+    /// daily limits (`supabase/functions/generate`), so the app no longer has to keep it hidden.
     static let aiGeneration = true
-    #else
-    static let aiGeneration = false
-    #endif
 
     /// AI video for the motion (LTX on fal). Off until the fal account has credit: the image is still made by AI,
     /// and the phone animates it with depth parallax, which costs nothing.

@@ -152,7 +152,7 @@ supabase/         Database migrations
 
 ### Next
 
-- **Create** (in progress, [plan](docs/create-plan.md)): type a prompt and get a wallpaper image from FLUX.1 schnell, then save it as a still or add motion on the phone (depth parallax) to save it as a Live wallpaper. AI video motion (LTX-Video) is ready on the server for later. Hidden behind `FeatureFlags.aiGeneration` in release builds until it works end to end.
+- **Create** ([plan](docs/create-plan.md)): type a prompt and get a wallpaper image from FLUX.1 schnell, then save it as a still or add motion on the phone (depth parallax) to save it as a Live wallpaper. Each generation unlocks with a short rewarded ad, checked on the server. AI video motion (LTX-Video) is ready on the server for later.
 - **Pricing**: each AI generation unlocks with a short rewarded ad, up to 3 a day per install. The server enforces this: it only generates for an ad Google has confirmed through AdMob server-side verification (see [Create's server](docs/create-plan.md#server)). A **Glitter Live Pro** subscription is planned but not built. Explore stays free with no ads. Convert gives 5 free conversions, then each one unlocks with a short rewarded ad, or a one-time **Unlimited Conversions** purchase removes the limit for good.
 - **Explore extras** from the mockup: search, sort by New, and later like counts and Free/VIP badges (likes need backend support; badges need pricing).
 - **Trim Studio**: video stabilization (the mockup's Stabilize toggle).
