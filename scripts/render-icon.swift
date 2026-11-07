@@ -452,23 +452,6 @@ func renderStoreShot(_ capture: CGImage, caption: String, width: Int, height: In
 
 let tagline = "Turn any video into a live wallpaper"
 
-/// 21:9. Logo on the left, four screens fanned in the middle, a short line on the right, all inside x 790–3080:
-/// the App Store crops the header per device, and on iPhone only about the middle 2,500 px across survive.
-func renderHeader(_ screens: [CGImage], name: String) {
-    let size = CGSize(width: 3840, height: 1646)
-    let ctx = storeContext(Int(size.width), Int(size.height))
-    drawStoreBackground(ctx, size)
-    drawLockup(ctx, origin: CGPoint(x: 800, y: 775), height: 96)
-    // Back to front: Explore, Create, the result, then Trim Studio in front.
-    drawPhone(ctx, screens[0], center: CGPoint(x: 1680, y: 790), width: 310, angle: 0.1)
-    drawPhone(ctx, screens[1], center: CGPoint(x: 1875, y: 805), width: 340, angle: 0.05)
-    drawPhone(ctx, screens[3], center: CGPoint(x: 2290, y: 800), width: 340, angle: -0.06)
-    drawPhone(ctx, screens[2], center: CGPoint(x: 2080, y: 823), width: 400)
-    // Fixed breaks, so the line never wraps mid-phrase or loses its end.
-    drawText(ctx, "Bring your\nLock Screen\nto life", in: CGRect(x: 2560, y: 600, width: 540, height: 440), size: 88, color: CGColor(gray: 1, alpha: 1), centered: false)
-    writePNG(ctx, name)
-}
-
 /// 3:2. The brand and line on the left, two screens on the right.
 func renderSearch(_ screens: [CGImage], name: String) {
     let size = CGSize(width: 1920, height: 1280)
@@ -481,9 +464,124 @@ func renderSearch(_ screens: [CGImage], name: String) {
     writePNG(ctx, name)
 }
 
+// MARK: - Product page header
+
+/// An image scaled to fill `rect`, cropped to it, with rounded corners.
+func drawFill(_ ctx: CGContext, _ image: CGImage, in rect: CGRect, radius: CGFloat) {
+    ctx.saveGState()
+    ctx.addPath(CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil))
+    ctx.clip()
+    let scale = max(rect.width / CGFloat(image.width), rect.height / CGFloat(image.height))
+    let w = CGFloat(image.width) * scale, h = CGFloat(image.height) * scale
+    ctx.interpolationQuality = .high
+    ctx.draw(image, in: CGRect(x: rect.midX - w / 2, y: rect.midY - h / 2, width: w, height: h))
+    ctx.restoreGState()
+}
+
+/// 21:9. A tilted wall of real Explore wallpapers, with the brand centred on a dark band. Centred on purpose:
+/// the App Store crops the header per device and only the middle survives everywhere.
+func renderHeader(_ walls: [CGImage], name: String) {
+    let size = CGSize(width: 3840, height: 1646)
+    let ctx = storeContext(Int(size.width), Int(size.height))
+    ctx.setFillColor(rgb(night))
+    ctx.fill(CGRect(origin: .zero, size: size))
+    ctx.saveGState()
+    ctx.translateBy(x: size.width / 2, y: size.height / 2)
+    ctx.rotate(by: -0.2)
+    let tileW: CGFloat = 300, tileH: CGFloat = 650, gap: CGFloat = 36
+    var index = 0
+    for column in -8...8 {
+        let offset = column.isMultiple(of: 2) ? 0 : tileH / 2
+        for row in -2...2 {
+            let rect = CGRect(x: CGFloat(column) * (tileW + gap) - tileW / 2, y: CGFloat(row) * (tileH + gap) - tileH / 2 + offset, width: tileW, height: tileH)
+            drawFill(ctx, walls[index % walls.count], in: rect, radius: 40)
+            index += 1
+        }
+    }
+    ctx.restoreGState()
+    // Darken towards the middle so the brand reads.
+    let band = CGGradient(colorsSpace: space, colors: [rgb(night, 0), rgb(night, 0.86), rgb(night, 0.86), rgb(night, 0)] as CFArray, locations: [0, 0.3, 0.7, 1])!
+    ctx.drawLinearGradient(band, start: CGPoint(x: 0, y: 350), end: CGPoint(x: 0, y: 1296), options: [])
+    let side = CGGradient(colorsSpace: space, colors: [rgb(night, 0.55), rgb(night, 0), rgb(night, 0), rgb(night, 0.55)] as CFArray, locations: [0, 0.25, 0.75, 1])!
+    ctx.drawLinearGradient(side, start: .zero, end: CGPoint(x: size.width, y: 0), options: [])
+    drawLockup(ctx, origin: CGPoint(x: 1920 - 420, y: 880), height: 130)
+    drawText(ctx, "Bring your Lock Screen to life", in: CGRect(x: 960, y: 560, width: 1920, height: 200), size: 100, color: CGColor(gray: 1, alpha: 1))
+    writePNG(ctx, name)
+}
+
+// MARK: - Original abstract wallpapers
+
+/// A small seeded generator, so the same seed always draws the same wallpaper.
+struct Seeded {
+    var state: UInt64
+    mutating func next() -> CGFloat {
+        state = state &* 6364136223846793005 &+ 1442695040888963407
+        return CGFloat(state >> 33) / CGFloat(1 << 31)
+    }
+    mutating func between(_ a: CGFloat, _ b: CGFloat) -> CGFloat { a + (b - a) * next() }
+}
+
+/// Soft colour fields with flowing ribbons on a deep base: original artwork, free of any licence.
+func renderAbstract(palette: [UInt32], seed: UInt64, name: String) {
+    let size = CGSize(width: 1179, height: 2556)
+    let ctx = storeContext(Int(size.width), Int(size.height))
+    var random = Seeded(state: seed)
+    ctx.setFillColor(rgb(palette[2]))
+    ctx.fill(CGRect(origin: .zero, size: size))
+    // Big soft blobs of the two accents.
+    for index in 0..<5 {
+        let hex = palette[index % 2]
+        let center = CGPoint(x: random.between(-0.1, 1.1) * size.width, y: random.between(0, 1) * size.height)
+        let radius = random.between(0.45, 0.9) * size.width
+        let glow = CGGradient(colorsSpace: space, colors: [rgb(hex, random.between(0.55, 0.85)), rgb(hex, 0)] as CFArray, locations: [0, 1])!
+        ctx.drawRadialGradient(glow, startCenter: center, startRadius: 0, endCenter: center, endRadius: radius, options: [])
+    }
+    // Flowing ribbons: wide waves, each a gradient between the accents.
+    for _ in 0..<4 {
+        let baseY = random.between(0.1, 0.9) * size.height
+        let amplitude = random.between(0.08, 0.2) * size.height
+        let thickness = random.between(0.05, 0.14) * size.height
+        let phase = random.between(0, .pi * 2)
+        let path = CGMutablePath()
+        let steps = 60
+        func y(_ t: CGFloat) -> CGFloat { baseY + sin(t * .pi * 1.4 + phase) * amplitude }
+        path.move(to: CGPoint(x: -20, y: y(0)))
+        for step in 1...steps { let t = CGFloat(step) / CGFloat(steps); path.addLine(to: CGPoint(x: t * (size.width + 40) - 20, y: y(t))) }
+        for step in stride(from: steps, through: 0, by: -1) {
+            let t = CGFloat(step) / CGFloat(steps)
+            path.addLine(to: CGPoint(x: t * (size.width + 40) - 20, y: y(t) + thickness * (0.6 + 0.4 * sin(t * .pi))))
+        }
+        path.closeSubpath()
+        ctx.saveGState()
+        ctx.addPath(path)
+        ctx.clip()
+        let ribbon = CGGradient(colorsSpace: space, colors: [rgb(palette[0], 0.75), rgb(palette[1], 0.75)] as CFArray, locations: [0, 1])!
+        ctx.drawLinearGradient(ribbon, start: CGPoint(x: 0, y: baseY), end: CGPoint(x: size.width, y: baseY + amplitude), options: [])
+        // A soft highlight along the top edge gives the ribbon depth.
+        ctx.setBlendMode(.screen)
+        let sheen = CGGradient(colorsSpace: space, colors: [CGColor(gray: 1, alpha: 0.25), CGColor(gray: 1, alpha: 0)] as CFArray, locations: [0, 1])!
+        ctx.drawLinearGradient(sheen, start: CGPoint(x: 0, y: baseY + amplitude), end: CGPoint(x: 0, y: baseY - amplitude), options: [])
+        ctx.restoreGState()
+    }
+    writePNG(ctx, name)
+}
+
+let abstractPalettes: [[UInt32]] = [
+    [0xFF6B6B, 0x845EF7, 0x0B1120], [0x22D3EE, 0x3B82F6, 0x0F172A], [0xF59E0B, 0xEF4444, 0x1F1023],
+    [0x10B981, 0x06B6D4, 0x062023], [0xEC4899, 0x8B5CF6, 0x140B24], [0xF97316, 0xFACC15, 0x1A1206],
+    [0x60A5FA, 0xA78BFA, 0x0B1020], [0x34D399, 0xA3E635, 0x08140D],
+]
+
 let mode = CommandLine.arguments.count > 2 ? CommandLine.arguments[2] : "icon"
-if mode == "store" {
-    // Usage: swift scripts/render-icon.swift <output-dir> store <captures-dir> (dark captures from ScreenshotTests)
+if mode == "abstract" {
+    // Usage: swift scripts/render-icon.swift <output-dir> abstract (eight original 1179 × 2556 wallpapers)
+    for (index, palette) in abstractPalettes.enumerated() {
+        renderAbstract(palette: palette, seed: UInt64(index + 1) * 7919, name: String(format: "abstract-%02d.png", index + 1))
+    }
+} else if mode == "store" {
+    // Usage: swift scripts/render-icon.swift <output-dir> store <captures-dir> [<wallpapers-dir>]
+    // Captures are the dark screenshots from ScreenshotTests. The header needs a folder of Explore wallpaper images
+    // (JPEG or PNG, used in name order), e.g. the original abstract set from the `abstract` mode; without one it's left as it is.
     registerInter()
     let captures = URL(fileURLWithPath: CommandLine.arguments[3], isDirectory: true)
     func capture(_ name: String) -> CGImage { loadImage(captures.appendingPathComponent("\(name)-dark.png")) }
@@ -500,7 +598,11 @@ if mode == "store" {
         renderStoreShot(image, caption: caption, width: 1320, height: 2868, name: "iphone-6.9-\(index + 1)-\(screen).png")
         renderStoreShot(image, caption: caption, width: 1206, height: 2622, name: "iphone-6.3-\(index + 1)-\(screen).png")
     }
-    renderHeader([capture("explore"), capture("create-prompt"), capture("trim-studio"), capture("result")], name: "header-3840x1646.png")
+    if CommandLine.arguments.count > 4 {
+        let walls = URL(fileURLWithPath: CommandLine.arguments[4], isDirectory: true)
+        let images = ((try? FileManager.default.contentsOfDirectory(atPath: walls.path)) ?? []).filter { $0.hasSuffix(".jpg") || $0.hasSuffix(".png") }.sorted()
+        renderHeader(images.map { loadImage(walls.appendingPathComponent($0)) }, name: "header-3840x1646.png")
+    }
     renderSearch([capture("trim-studio"), capture("result")], name: "search-1920x1280.png")
 } else if mode == "logo" {
     registerInter()
