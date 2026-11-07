@@ -19,29 +19,30 @@ final class ExploreModel {
     }
 
     /// Leads Explore as a carousel: wallpapers flagged as featured, or else the catalog's Featured category.
-    func featured(_ kind: KindFilter = .all) -> [Wallpaper] {
-        let shown = wallpapers.filter { kind.includes(isLive: $0.isLive) }
-        let flagged = shown.filter(\.isFeatured)
+    var featured: [Wallpaper] {
+        let flagged = wallpapers.filter(\.isFeatured)
         guard flagged.isEmpty else { return flagged }
-        return shown.filter { $0.category.localizedCaseInsensitiveCompare("Featured") == .orderedSame }
+        return wallpapers.filter { $0.category.localizedCaseInsensitiveCompare("Featured") == .orderedSame }
     }
 
-    /// New, then one row per category in the catalog's order, all of the chosen kind. Empty rows are left out.
-    func sections(_ kind: KindFilter = .all, now: Date = .now) -> [Section] {
-        let wallpapers = wallpapers.filter { kind.includes(isLive: $0.isLive) }
+    /// The last two weeks' wallpapers, as a row; nil when there are none.
+    func newThisWeek(now: Date = .now) -> Section? {
         let cutoff = now.addingTimeInterval(-14 * 24 * 60 * 60)
+        let recent = wallpapers.filter { ($0.createdDate ?? .distantPast) > cutoff }
+        return recent.isEmpty ? nil : Section(id: "new", title: "New this week", wallpapers: recent)
+    }
+
+    /// One tile per category with wallpapers of that kind, in the catalog's order.
+    func categories(live: Bool) -> [Section] {
+        let ofKind = wallpapers.filter { $0.isLive == live }
         var seen = Set<String>()
-        let categories = wallpapers.map(\.category).filter { seen.insert($0).inserted }
-        let carousel = featured(kind).map(\.id)
-        let fixed = [
-            Section(id: "new", title: "New this week", wallpapers: wallpapers.filter { ($0.createdDate ?? .distantPast) > cutoff }),
-        ]
-        let byCategory = categories.map { category in
-            Section(id: "category:\(category)", title: category, wallpapers: wallpapers.filter { $0.category == category })
-        }
-        // A Featured category that already fills the carousel would only repeat it.
-        .filter { $0.wallpapers.map(\.id) != carousel }
-        return (fixed + byCategory).filter { !$0.wallpapers.isEmpty }
+        let carousel = featured.map(\.id)
+        return ofKind.map(\.category).filter { seen.insert($0).inserted }
+            .map { category in
+                Section(id: "\(live ? "live" : "still"):\(category)", title: category, wallpapers: ofKind.filter { $0.category == category })
+            }
+            // A Featured category that already fills the carousel would only repeat it.
+            .filter { $0.wallpapers.map(\.id) != carousel }
     }
 
     func load() async {
@@ -72,8 +73,6 @@ struct ExploreView: View {
 
     @State private var model = ExploreModel()
     @State private var opened: Opened?
-    /// All, live or still wallpapers, across the carousel and every row.
-    @State private var kind = KindFilter.all
     /// The carousel position in view, counting across the repeated laps; only its card plays.
     @State private var featuredPage: Int?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -146,35 +145,23 @@ struct ExploreView: View {
             ContentUnavailableView("New wallpapers are on the way", systemImage: "sparkles", description: Text("Check back soon."))
                 .padding(.top, 60)
         case .loaded:
-            KindFilterPicker(selection: $kind)
-                .staggeredReveal(0, isRevealed: isRevealed)
-            let featured = model.featured(kind)
-            let sections = model.sections(kind)
+            let featured = model.featured
             if !featured.isEmpty {
                 carousel(featured)
-                    // A fresh carousel per filter, so it opens on that list's middle card.
-                    .id(kind)
+                    .staggeredReveal(0, isRevealed: isRevealed)
+            }
+            if let new = model.newThisWeek() {
+                row(new)
                     .staggeredReveal(1, isRevealed: isRevealed)
             }
-            ForEach(Array(sections.enumerated()), id: \.element.id) { index, section in
-                row(section)
-                    .staggeredReveal(2 + index, isRevealed: isRevealed)
-            }
-            if featured.isEmpty && sections.isEmpty {
-                ContentUnavailableView(
-                    kind == .stills ? "No still wallpapers yet" : "No live wallpapers yet",
-                    systemImage: kind == .stills ? "photo" : "livephoto",
-                    description: Text("Check back soon.")
-                )
-                .padding(.top, 40)
-            }
-            // Stills have no motion to preview.
-            if kind != .stills {
-                Label("Touch and hold a wallpaper to preview its motion", systemImage: "hand.tap")
-                    .font(.labelMedium)
-                    .foregroundStyle(Theme.textSecondary)
-                    .frame(maxWidth: .infinity)
-            }
+            categoryShelf("Live categories", symbol: "livephoto", sections: model.categories(live: true))
+                .staggeredReveal(2, isRevealed: isRevealed)
+            categoryShelf("Still categories", symbol: "photo", sections: model.categories(live: false))
+                .staggeredReveal(3, isRevealed: isRevealed)
+            Label("Touch and hold a wallpaper to preview its motion", systemImage: "hand.tap")
+                .font(.labelMedium)
+                .foregroundStyle(Theme.textSecondary)
+                .frame(maxWidth: .infinity)
         }
     }
 
@@ -264,6 +251,35 @@ struct ExploreView: View {
                 .frame(maxWidth: .infinity)
                 .animation(.easeOut(duration: 0.2), value: current)
                 .accessibilityHidden(true)
+            }
+        }
+    }
+
+    /// Live or still categories as tiles; each opens its wallpapers in the See all grid. Hidden when empty.
+    @ViewBuilder
+    private func categoryShelf(_ title: String, symbol: String, sections: [ExploreModel.Section]) -> some View {
+        if !sections.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(title)
+                    .typography(.headlineSmall)
+                    .foregroundStyle(Theme.textPrimary)
+                    .accessibilityAddTraits(.isHeader)
+                ScrollView(.horizontal) {
+                    LazyHStack(spacing: 10) {
+                        ForEach(sections) { section in
+                            NavigationLink(value: section) {
+                                CategoryTile(section: section, symbol: symbol)
+                            }
+                            .buttonStyle(CardPressStyle())
+                            // Two tiles and a peek of the third.
+                            .containerRelativeFrame(.horizontal, count: 5, span: 2, spacing: 10)
+                        }
+                    }
+                    .scrollTargetLayout()
+                }
+                .scrollTargetBehavior(.viewAligned)
+                .scrollIndicators(.hidden)
+                .fullBleed()
             }
         }
     }
@@ -478,6 +494,44 @@ private struct WallpaperThumbnail: View {
                     .shimmer(phase.error == nil)
             }
         }
+    }
+}
+
+/// A category to open: its first wallpaper as the cover, its name, how many there are, and a live or still glyph.
+private struct CategoryTile: View {
+    let section: ExploreModel.Section
+    let symbol: String
+
+    var body: some View {
+        Theme.lockScreen
+            .aspectRatio(4 / 3, contentMode: .fit)
+            .overlay {
+                if let cover = section.wallpapers.first { WallpaperThumbnail(wallpaper: cover) }
+            }
+            .overlay(alignment: .topLeading) {
+                Image(systemName: symbol)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.accent)
+                    .padding(6)
+                    .background(.black.opacity(0.45), in: Circle())
+                    .padding(8)
+            }
+            .overlay(alignment: .bottomLeading) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(section.title).typography(.labelLarge).foregroundStyle(.white).lineLimit(1)
+                    Text(section.wallpapers.count == 1 ? "1 wallpaper" : "\(section.wallpapers.count) wallpapers")
+                        .font(.labelSmall)
+                        .foregroundStyle(Theme.onMediaSecondary)
+                }
+                .mediaCaption()
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Theme.specularRim, lineWidth: 1))
+            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .environment(\.colorScheme, .dark)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(section.title), \(section.wallpapers.count) wallpapers")
+            .accessibilityAddTraits(.isButton)
     }
 }
 
