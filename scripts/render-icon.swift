@@ -452,20 +452,20 @@ func renderStoreShot(_ capture: CGImage, caption: String, width: Int, height: In
 
 let tagline = "Turn any video into a live wallpaper"
 
-/// 21:9. Five screens fanned symmetrically around the centre, and no text: the App Store crops the header
-/// differently on each device and only keeps about the middle 1646 × 661 for sure (Apple's template safe area),
-/// so the focal screen sits dead centre and the outer ones are free to be clipped. The app's name shows below it.
+/// 21:9. Brand and line on the left, four screens fanned on the right, all pulled in towards the middle:
+/// the App Store crops the header per device, and on iPhone only about the middle 2,500 px across survive,
+/// so nothing sits outside x 760–3080.
 func renderHeader(_ screens: [CGImage], name: String) {
     let size = CGSize(width: 3840, height: 1646)
     let ctx = storeContext(Int(size.width), Int(size.height))
     drawStoreBackground(ctx, size)
-    let mid = size.width / 2
-    // Back to front, so the centre screen overlaps its neighbours.
-    drawPhone(ctx, screens[3], center: CGPoint(x: mid - 1060, y: 760), width: 470, angle: 0.11)
-    drawPhone(ctx, screens[4], center: CGPoint(x: mid + 1060, y: 760), width: 470, angle: -0.11)
-    drawPhone(ctx, screens[1], center: CGPoint(x: mid - 560, y: 800), width: 540, angle: 0.06)
-    drawPhone(ctx, screens[2], center: CGPoint(x: mid + 560, y: 800), width: 540, angle: -0.06)
-    drawPhone(ctx, screens[0], center: CGPoint(x: mid, y: 823), width: 620)
+    drawLockup(ctx, origin: CGPoint(x: 820, y: 950), height: 118)
+    drawText(ctx, tagline, in: CGRect(x: 820, y: 400, width: 820, height: 520), size: 104, color: CGColor(gray: 1, alpha: 1), centered: false)
+    // Back to front: Explore, Create, the result, then Trim Studio in front.
+    drawPhone(ctx, screens[0], center: CGPoint(x: 1990, y: 780), width: 400, angle: 0.1)
+    drawPhone(ctx, screens[1], center: CGPoint(x: 2200, y: 800), width: 440, angle: 0.05)
+    drawPhone(ctx, screens[3], center: CGPoint(x: 2830, y: 790), width: 440, angle: -0.06)
+    drawPhone(ctx, screens[2], center: CGPoint(x: 2520, y: 823), width: 500)
     writePNG(ctx, name)
 }
 
@@ -500,7 +500,7 @@ if mode == "store" {
         renderStoreShot(image, caption: caption, width: 1320, height: 2868, name: "iphone-6.9-\(index + 1)-\(screen).png")
         renderStoreShot(image, caption: caption, width: 1206, height: 2622, name: "iphone-6.3-\(index + 1)-\(screen).png")
     }
-    renderHeader([capture("explore"), capture("create-prompt"), capture("result"), capture("library-grid"), capture("trim-studio")], name: "header-3840x1646.png")
+    renderHeader([capture("explore"), capture("create-prompt"), capture("trim-studio"), capture("result")], name: "header-3840x1646.png")
     renderSearch([capture("trim-studio"), capture("result")], name: "search-1920x1280.png")
 } else if mode == "logo" {
     registerInter()
