@@ -5,8 +5,9 @@ import Observation
 /// of truth once it exists, since anything stored here resets with a reinstall.
 @Observable
 final class GenerationAllowance {
-    static let freeGenerations = 5
-    static let dailyAdGenerations = 10
+    /// None free: every generation is unlocked with a rewarded ad, up to the daily limit, which keeps AI costs bounded.
+    static let freeGenerations = 0
+    static let dailyAdGenerations = 3
     static let monthlyProGenerations = 100
 
     enum Access: Equatable {
@@ -92,7 +93,16 @@ final class GenerationAllowance {
     }
 }
 
-/// Plays a rewarded ad and reports whether it was watched to the end.
+/// How a rewarded ad went.
+enum AdOutcome: Equatable {
+    case watched
+    /// Closed before the reward.
+    case closedEarly
+    /// None could be shown: offline, no fill, no consent, or no real ad unit in this build.
+    case unavailable
+}
+
+/// Plays a rewarded ad. `rewardID` goes to AdMob's server-side verification, so the server can tell this ad was watched.
 protocol RewardedAdPresenter {
-    func present() async -> Bool
+    func present(rewardID: String?) async -> AdOutcome
 }

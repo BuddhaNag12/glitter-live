@@ -1,32 +1,42 @@
 import SwiftUI
 
 /// "Silver Shimmer" design tokens: an obsidian dark mode lit by brand blue and silver slate, and a
-/// soft slate light mode. Every color adapts to light and dark mode, and text, borders and accents
+/// two-tone light mode: white cards and pale blue panels on a grouped-grey canvas, with lilac chrome. Every color adapts to light and dark mode, and text, borders and accents
 /// get stronger values when Increase Contrast is on.
 enum Theme {
-    static let background = Color(light: 0xF8FAFC, dark: 0x090C12)
+    static let background = Color(light: 0xF2F2F7, dark: 0x090C12)
     static let surface = Color(light: 0xFFFFFF, dark: 0x121722)
     static let elevated = Color(light: 0xF1F5F9, dark: 0x1A202B)
     /// Loading placeholders. A step deeper than `elevated` in light mode, which would vanish into the background.
-    static let placeholder = Color(light: 0xE2E8F0, lightOpacity: 0.8, dark: 0x1A202B)
-    static let border = Color(light: 0xE2E8F0, dark: 0xFFFFFF, darkOpacity: 0.10,
+    static let placeholder = Color(light: 0xCBD5E1, dark: 0x1A202B)
+    static let border = Color(light: 0xCBD5E1, dark: 0xFFFFFF, darkOpacity: 0.10,
                               increased: .init(light: 0x64748B, dark: 0xFFFFFF, darkOpacity: 0.45))
     /// Controls and rows sitting on a glass panel.
     static let fill = Color(light: 0x0F172A, lightOpacity: 0.05, dark: 0xFFFFFF, darkOpacity: 0.07,
                             increased: .init(light: 0x0F172A, lightOpacity: 0.10, dark: 0xFFFFFF, darkOpacity: 0.14))
 
-    /// Background light leaks: brand blue top-left, silver slate bottom-right.
-    static let glowPrimary = Color(light: 0x3B82F6, lightOpacity: 0.10, dark: 0x3B82F6, darkOpacity: 0.40)
-    static let glowSecondary = Color(light: 0x64748B, lightOpacity: 0.10, dark: 0x94A3B8, darkOpacity: 0.30)
+    /// Background light leaks: brand blue top-left, silver slate (lilac in light mode) bottom-right.
+    static let glowPrimary = Color(light: 0x3B82F6, lightOpacity: 0.14, dark: 0x3B82F6, darkOpacity: 0.40)
+    static let glowSecondary = Color(light: 0xA78BFA, lightOpacity: 0.12, dark: 0x94A3B8, darkOpacity: 0.30)
+    /// A sky glow top-right in light mode. Absent in dark mode.
+    static let glowTertiary = Color(light: 0x38BDF8, lightOpacity: 0.10, dark: 0x000000, darkOpacity: 0)
+
+    /// Glass panel tints. In light mode cards are white and floating panels pale blue, so both stand off the canvas.
+    static let glassSurface = Color(light: 0xFFFFFF, lightOpacity: 0.88, dark: 0x121722, darkOpacity: 0.6)
+    static let glassFloating = Color(light: 0xEFF6FF, lightOpacity: 0.9, dark: 0x1A202B, darkOpacity: 0.6)
+    /// Light mode only: pale lilac for untinted glass chrome (pills, capsules, round buttons) and its hairline.
+    static let chromeTint = Color(light: 0xF5F3FF, lightOpacity: 0.9, dark: 0x000000, darkOpacity: 0)
+    static let chromeRim = Color(light: 0xDDD6FE, dark: 0x000000, darkOpacity: 0,
+                                 increased: .init(light: 0x7C3AED, dark: 0x000000, darkOpacity: 0))
 
     /// Brand blue for text, icons and selection. Lighter in dark mode so small text keeps 4.5:1 contrast.
-    static let accent = Color(light: 0x2563EB, dark: 0x93C5FD, increased: .init(light: 0x1D4ED8, dark: 0xBFDBFE))
+    static let accent = Color(light: 0x1D4ED8, dark: 0x93C5FD, increased: .init(light: 0x1E40AF, dark: 0xBFDBFE))
     /// Brand blue behind white text: badges, switches, selected states.
     static let accentFill = Color(light: 0x2563EB, dark: 0x3B82F6, increased: .init(light: 0x1D4ED8, dark: 0x2563EB))
-    /// Blue fading into slate, like the icon's brush. Both ends keep white text at 3:1 or better for bold labels.
+    /// Blue fading into slate (a lighter blue in light mode). Both ends keep white text at 3:1 or better for bold labels.
     static let accentGradient = LinearGradient(
         colors: [Color(light: 0x2563EB, dark: 0x3B82F6, increased: .init(light: 0x1D4ED8, dark: 0x2563EB)),
-                 Color(light: 0x64748B, dark: 0x7C8BA1, increased: .init(light: 0x475569, dark: 0x64748B))],
+                 Color(light: 0x3B82F6, dark: 0x7C8BA1, increased: .init(light: 0x2563EB, dark: 0x64748B))],
         startPoint: .leading, endPoint: .trailing
     )
     static let onAccent = Color.white
@@ -34,21 +44,30 @@ enum Theme {
     static let onMediaSecondary = Color(light: 0xFFFFFF, lightOpacity: 0.8, dark: 0xFFFFFF, darkOpacity: 0.8,
                                         increased: .init(light: 0xFFFFFF, dark: 0xFFFFFF))
     static let slate = Color(light: 0x64748B, dark: 0x94A3B8, increased: .init(light: 0x475569, dark: 0xCBD5E1))
-    static let danger = Color(light: 0xDC2626, dark: 0xF87171, increased: .init(light: 0xB91C1C, dark: 0xFCA5A5))
+    static let danger = Color(light: 0xB91C1C, dark: 0xF87171, increased: .init(light: 0x991B1B, dark: 0xFCA5A5))
     /// The Live Photo indicator, as in Photos.
-    static let signalYellow = Color(light: 0xCA8A04, dark: 0xFACC15, increased: .init(light: 0xA16207, dark: 0xFDE047))
+    static let signalYellow = Color(light: 0xA16207, dark: 0xFACC15, increased: .init(light: 0x854D0E, dark: 0xFDE047))
     /// Trim handles sit on the filmstrip, so they stay bright in both modes.
     static let trimHandle = Color(hex: 0xFACC15)
 
     static let textPrimary = Color(light: 0x0F172A, dark: 0xF8FAFC)
     static let textSecondary = Color(light: 0x475569, dark: 0xA1A9B8, increased: .init(light: 0x334155, dark: 0xCBD5E1))
-    static let textTertiary = Color(light: 0x64748B, dark: 0x7C8698, increased: .init(light: 0x475569, dark: 0xA1A9B8))
+    static let textTertiary = Color(light: 0x526079, dark: 0x7C8698, increased: .init(light: 0x475569, dark: 0xA1A9B8))
 
     static let stroke = border
     static let specularRim = LinearGradient(
-        colors: [Color(light: 0x0F172A, lightOpacity: 0.08, dark: 0xFFFFFF, darkOpacity: 0.16,
+        colors: [Color(light: 0x0F172A, lightOpacity: 0.12, dark: 0xFFFFFF, darkOpacity: 0.16,
                        increased: .init(light: 0x0F172A, lightOpacity: 0.30, dark: 0xFFFFFF, darkOpacity: 0.45)),
-                 Color(light: 0x0F172A, lightOpacity: 0.04, dark: 0xFFFFFF, darkOpacity: 0.05,
+                 Color(light: 0x0F172A, lightOpacity: 0.06, dark: 0xFFFFFF, darkOpacity: 0.05,
+                       increased: .init(light: 0x0F172A, lightOpacity: 0.30, dark: 0xFFFFFF, darkOpacity: 0.45))],
+        startPoint: .top, endPoint: .bottom
+    )
+
+    /// The rim of floating panels: a pale blue hairline in light mode, the same specular rim as cards in dark.
+    static let panelRim = LinearGradient(
+        colors: [Color(light: 0xBFDBFE, dark: 0xFFFFFF, darkOpacity: 0.16,
+                       increased: .init(light: 0x0F172A, lightOpacity: 0.30, dark: 0xFFFFFF, darkOpacity: 0.45)),
+                 Color(light: 0xBFDBFE, dark: 0xFFFFFF, darkOpacity: 0.05,
                        increased: .init(light: 0x0F172A, lightOpacity: 0.30, dark: 0xFFFFFF, darkOpacity: 0.45))],
         startPoint: .top, endPoint: .bottom
     )
@@ -167,7 +186,7 @@ extension View {
     }
 }
 
-/// Obsidian base with two soft glows and a slow glitter twinkle, shared by every screen.
+/// Obsidian (or daylight) base with soft glows and a slow glitter twinkle, shared by every screen.
 struct AppBackground: View {
     /// Screens with their own motion, such as a playing wallpaper, hold the glitter still so it doesn't compete.
     var twinkles = true
@@ -177,6 +196,7 @@ struct AppBackground: View {
             Theme.background
             RadialGradient(colors: [Theme.glowPrimary, .clear], center: .topLeading, startRadius: 0, endRadius: 520)
             RadialGradient(colors: [Theme.glowSecondary, .clear], center: .bottomTrailing, startRadius: 0, endRadius: 560)
+            RadialGradient(colors: [Theme.glowTertiary, .clear], center: .topTrailing, startRadius: 0, endRadius: 420)
             GlitterField(isAnimated: twinkles)
         }
         .ignoresSafeArea()

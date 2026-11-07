@@ -26,16 +26,21 @@ final class CreateModel {
     /// The still has been saved to Photos, so its button becomes "Set as Wallpaper".
     private(set) var savedStill = false
     var errorMessage: String?
-    let allowance = GenerationAllowance()
+    let allowance: GenerationAllowance
 
     @ObservationIgnored private let service: any GenerationService
     @ObservationIgnored private let ads: any RewardedAdPresenter
     @ObservationIgnored private var imageURL: URL?
     @ObservationIgnored private var surpriseQueue: [String] = []
 
-    init(service: (any GenerationService)? = nil, ads: any RewardedAdPresenter = RewardedAds.shared) {
+    init(
+        service: (any GenerationService)? = nil,
+        ads: any RewardedAdPresenter = RewardedAds.shared,
+        allowance: GenerationAllowance = GenerationAllowance()
+    ) {
         self.service = service ?? Self.defaultService
         self.ads = ads
+        self.allowance = allowance
     }
 
     private static var defaultService: any GenerationService {
@@ -68,12 +73,23 @@ final class CreateModel {
     /// Makes only the still. It's the one step that counts as a generation; motion is added on the phone for free.
     func generate() async {
         guard canGenerate else { return }
-        if case .ad = allowance.access, await !ads.present() { return }
+        var reward: String?
+        if case .ad = allowance.access {
+            // The server only generates for an ad Google has confirmed, so there's no way round a missing one.
+            let id = UUID().uuidString
+            switch await ads.present(rewardID: id) {
+            case .watched: reward = id
+            case .closedEarly: return
+            case .unavailable:
+                errorMessage = "No ad is available right now. Try again in a minute."
+                return
+            }
+        }
         let previous = imageURL
         let returnPhase = phase
         do {
             phase = .makingImage
-            let image = try await service.makeImage(for: GenerationRequest(prompt: prompt, style: style))
+            let image = try await service.makeImage(for: GenerationRequest(prompt: prompt, style: style, reward: reward))
             allowance.recordGeneration()
             if let previous { try? FileManager.default.removeItem(at: previous) }
             imageURL = image
@@ -82,6 +98,17 @@ final class CreateModel {
         } catch {
             errorMessage = error.localizedDescription
             phase = returnPhase
+        }
+    }
+
+    /// Flags the current image for review. Only the description and the reason are sent, never the image.
+    func report(_ reason: GenerationReport.Reason) async -> Bool {
+        do {
+            try await GenerationReport.send(prompt: GenerationRequest(prompt: prompt, style: style).fullPrompt, reason: reason)
+            return true
+        } catch {
+            errorMessage = "The report couldn't be sent. Check your connection and try again."
+            return false
         }
     }
 

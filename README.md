@@ -107,7 +107,8 @@ xcodebuild test -project LiveWall.xcodeproj -scheme LiveWall \
 
 | Workflow | Runs on | Does |
 | --- | --- | --- |
-| [Deploy Supabase functions](.github/workflows/deploy-functions.yml) | pushes to `main` that change `supabase/functions/`, or by hand | deploys `generate`; needs the `SUPABASE_ACCESS_TOKEN` repository secret |
+| [Deploy Supabase functions](.github/workflows/deploy-functions.yml) | pushes to `main` that change `supabase/functions/`, or by hand | deploys `generate` and `ad-reward`; needs the `SUPABASE_ACCESS_TOKEN` repository secret |
+| [Version bump](.github/workflows/version-bump.yml) | pull requests from `dev` into `main` | sets `MARKETING_VERSION` on `dev` to the next minor version, or patch / major with a `release: patch` / `release: major` label |
 | [Release](.github/workflows/release.yml) | pushes to `main` that change `project.yml`, or by hand | when `MARKETING_VERSION` is new, tags it `vX.Y.Z` and creates a GitHub release with notes from the merged pull requests |
 | Xcode Cloud | every push to `main` | archives and uploads to TestFlight; [`ci_scripts/ci_post_clone.sh`](ci_scripts/ci_post_clone.sh) generates the project, fetches the depth model and writes the AdMob IDs from the `GAD_APPLICATION_ID` and `GAD_REWARDED_AD_UNIT_ID` secret environment variables |
 
@@ -115,7 +116,7 @@ Database migrations aren't deployed automatically; run `supabase db push` after 
 
 ### Releasing
 
-The App Store version is `MARKETING_VERSION` in `project.yml` (1.0.1 for fixes, 1.1.0 for features); Xcode Cloud sets the build number. Every merge to `main` goes to TestFlight through Xcode Cloud. To release, bump the version in a pull request and merge it: the Release workflow tags the merge `vX.Y.Z` and creates the GitHub release, and Xcode Cloud sends that build to TestFlight for submission. A version with a suffix, such as `1.1.0-beta.1`, makes a pre-release.
+The App Store version is `MARKETING_VERSION` in `project.yml` (1.0.1 for fixes, 1.1.0 for features); Xcode Cloud sets the build number. Work goes into `dev`: branch from it and open pull requests into it. `main` only receives releases, because every push to `main` makes an Xcode Cloud TestFlight build. To release, open a pull request from `dev` into `main`: the [Version bump](.github/workflows/version-bump.yml) workflow sets the next version on `dev` (minor by default; label the pull request `release: patch` or `release: major` to change it). Merge it with a merge commit (not squash). The Release workflow tags the merge `vX.Y.Z` and creates the GitHub release, and Xcode Cloud sends that build to TestFlight for submission. After a release, `dev` already contains everything in `main`. A version with a suffix, such as `1.1.0-beta.1`, makes a pre-release.
 
 ## Project structure
 
@@ -151,8 +152,8 @@ supabase/         Database migrations
 
 ### Next
 
-- **Create** (in progress, [plan](docs/create-plan.md)): type a prompt and get a wallpaper image from FLUX.1 schnell, then save it as a still or add motion on the phone (depth parallax) to save it as a Live wallpaper. AI video motion (LTX-Video) is ready on the server for later. Hidden behind `FeatureFlags.aiGeneration` in release builds until it works end to end.
-- **Pricing**: one subscription. The first 5 generations are free, then each generation unlocks with a short rewarded ad (up to 10 a day). **Glitter Live Pro** (₹299 a month) removes ads and allows up to 100 generations a month. Explore stays free with no ads. Convert gives 5 free conversions, then each one unlocks with a short rewarded ad, or a one-time **Unlimited Conversions** purchase removes the limit for good.
+- **Create** ([plan](docs/create-plan.md)): type a prompt and get a wallpaper image from FLUX.1 schnell, then save it as a still or add motion on the phone (depth parallax) to save it as a Live wallpaper. Each generation unlocks with a short rewarded ad, checked on the server. AI video motion (LTX-Video) is ready on the server for later.
+- **Pricing**: each AI generation unlocks with a short rewarded ad, up to 3 a day per install. The server enforces this: it only generates for an ad Google has confirmed through AdMob server-side verification (see [Create's server](docs/create-plan.md#server)). A **Glitter Live Pro** subscription is planned but not built. Explore stays free with no ads. Convert gives 5 free conversions, then each one unlocks with a short rewarded ad, or a one-time **Unlimited Conversions** purchase removes the limit for good.
 - **Explore extras** from the mockup: search, sort by New, and later like counts and Free/VIP badges (likes need backend support; badges need pricing).
 - **Trim Studio**: video stabilization (the mockup's Stabilize toggle).
 - **Smoothness**: profile scrolling with Instruments. 120 Hz on ProMotion and pausing background effects on hidden tabs are done.

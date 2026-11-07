@@ -59,10 +59,23 @@ The app never holds an AI provider key, and it never grants generations itself.
 `supabase/functions/generate` is deployed with `--no-verify-jwt`, because the app sends the publishable key rather than a user JWT. Provider keys are Supabase secrets: `CLOUDFLARE_ACCOUNT_ID` (the 32-character account ID, not the login email), `CLOUDFLARE_AI_TOKEN` and `FAL_KEY`.
 
 ```bash
-supabase functions deploy generate --no-verify-jwt --use-api --project-ref jusrioirjfpaocgmsbbv
+supabase functions deploy generate --no-verify-jwt --use-api --yes --project-ref jusrioirjfpaocgmsbbv
 ```
 
-Before release, the function must enforce the limits itself (DeviceCheck for the free generations, ad tokens, Pro status), since today anyone with the publishable key could call it.
+### Limits (migration `0003_generation_limits.sql`)
+
+Every image spends one rewarded ad that Google has confirmed, so nothing the app or a script sends can generate for free:
+
+1. Before showing a rewarded ad, the app sets AdMob's server-side verification options: `user_id` is a random install ID it keeps for itself, `custom_data` a one-off reward ID.
+2. When the ad is watched, AdMob calls the `ad-reward` function, which checks Google's signature and stores the reward in `ad_rewards`.
+3. The app sends the same install and reward IDs with its `generate` request. `redeem_ad_reward` spends the reward, at most `DAILY_GENERATIONS_PER_INSTALL` (default 3) per install and `DAILY_GENERATIONS_TOTAL` (default 60) for everyone per UTC day. `generate` waits up to 10 s for the callback.
+4. If the server or a provider fails, the reward is refunded. A description or image the filters reject keeps the reward spent.
+
+The finished image is checked by Llama 3.2 Vision on Workers AI before it's returned, and the app can report an image (`generation_reports`, description and reason only).
+
+Secrets and settings: `DAILY_GENERATIONS_PER_INSTALL`, `DAILY_GENERATIONS_TOTAL`, `ADMOB_REWARDED_AD_UNIT` (optional; the number after the "/" in the ad unit ID), `REQUIRE_AD_REWARD=false` (development only, for debug builds that show Google's sample ads) and `ALLOW_VIDEO=true` (AI video, off until it has limits of its own). The SSV callback URL to set on the rewarded ad unit in AdMob is `https://jusrioirjfpaocgmsbbv.supabase.co/functions/v1/ad-reward`.
+
+Not yet: a Pro subscription (no server check exists for it), and App Attest or DeviceCheck. Neither is needed while every generation needs a verified ad.
 
 ## Build order
 

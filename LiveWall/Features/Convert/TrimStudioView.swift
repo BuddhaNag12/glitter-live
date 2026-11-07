@@ -221,7 +221,8 @@ struct TrimStudioView: View {
         unlockChoice = nil
         Task {
             if choice == .ad {
-                guard await ads.present() else { return }
+                // A missing ad never blocks a conversion; only closing it early does.
+                guard await ads.present(rewardID: nil) != .closedEarly else { return }
                 editor.adWatched()
             }
             await editor.export()
