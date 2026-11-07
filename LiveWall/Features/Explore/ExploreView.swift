@@ -25,23 +25,16 @@ final class ExploreModel {
         return wallpapers.filter { $0.category.localizedCaseInsensitiveCompare("Featured") == .orderedSame }
     }
 
-    /// New, then live and still, then one row per category in the catalog's order. Empty rows are left out.
-    func sections(now: Date = .now) -> [Section] {
-        let cutoff = now.addingTimeInterval(-14 * 24 * 60 * 60)
+    /// One tile per category, live and still together, in the catalog's order.
+    var categories: [Section] {
         var seen = Set<String>()
-        let categories = wallpapers.map(\.category).filter { seen.insert($0).inserted }
         let carousel = featured.map(\.id)
-        let fixed = [
-            Section(id: "new", title: "New this week", wallpapers: wallpapers.filter { ($0.createdDate ?? .distantPast) > cutoff }),
-            Section(id: "live", title: "Live wallpapers", wallpapers: wallpapers.filter(\.isLive)),
-            Section(id: "still", title: "Still wallpapers", wallpapers: wallpapers.filter { !$0.isLive }),
-        ]
-        let byCategory = categories.map { category in
-            Section(id: "category:\(category)", title: category, wallpapers: wallpapers.filter { $0.category == category })
-        }
-        // A Featured category that already fills the carousel would only repeat it.
-        .filter { $0.wallpapers.map(\.id) != carousel }
-        return (fixed + byCategory).filter { !$0.wallpapers.isEmpty }
+        return wallpapers.map(\.category).filter { seen.insert($0).inserted }
+            .map { category in
+                Section(id: "category:\(category)", title: category, wallpapers: wallpapers.filter { $0.category == category })
+            }
+            // A Featured category that already fills the carousel would only repeat it.
+            .filter { $0.wallpapers.map(\.id) != carousel }
     }
 
     func load() async {
@@ -149,14 +142,8 @@ struct ExploreView: View {
                 carousel(featured)
                     .staggeredReveal(0, isRevealed: isRevealed)
             }
-            ForEach(Array(model.sections().enumerated()), id: \.element.id) { index, section in
-                row(section)
-                    .staggeredReveal(1 + index, isRevealed: isRevealed)
-            }
-            Label("Touch and hold a wallpaper to preview its motion", systemImage: "hand.tap")
-                .font(.labelMedium)
-                .foregroundStyle(Theme.textSecondary)
-                .frame(maxWidth: .infinity)
+            categoryGrid(model.categories)
+                .staggeredReveal(1, isRevealed: isRevealed)
         }
     }
 
@@ -216,7 +203,7 @@ struct ExploreView: View {
                 .scrollTargetLayout()
             }
             // The margins shrink each card and leave room for the neighbours to peek in.
-            .contentMargins(.horizontal, 56, for: .scrollContent)
+            .contentMargins(.horizontal, 72, for: .scrollContent)
             .scrollTargetBehavior(.viewAligned)
             .scrollPosition(id: $featuredPage)
             .onAppear { if featuredPage == nil { featuredPage = start } }
@@ -250,46 +237,24 @@ struct ExploreView: View {
         }
     }
 
-    private func row(_ section: ExploreModel.Section) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(section.title)
+    /// Every category as a tile in two columns; each opens all of its wallpapers in the See all grid.
+    @ViewBuilder
+    private func categoryGrid(_ sections: [ExploreModel.Section]) -> some View {
+        if !sections.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Categories")
                     .typography(.headlineSmall)
                     .foregroundStyle(Theme.textPrimary)
-                    .lineLimit(1)
                     .accessibilityAddTraits(.isHeader)
-                Spacer()
-                NavigationLink(value: section) {
-                    HStack(spacing: 2) {
-                        Text("See all")
-                        Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold))
-                    }
-                    .font(.labelLarge)
-                    .foregroundStyle(Theme.accent)
-                }
-                .accessibilityLabel("See all \(section.title)")
-            }
-            ScrollView(.horizontal) {
-                LazyHStack(spacing: 10) {
-                    ForEach(section.wallpapers) { wallpaper in
-                        CatalogCardButton(wallpaper: wallpaper, source: "\(section.id)/\(wallpaper.id)", zoom: zoom) { opened = $0 }
-                            // Three cards and a peek of the fourth, so more of each row and more rows fit on screen.
-                            .containerRelativeFrame(.horizontal, count: 10, span: 3, spacing: 10)
-                            // Cards coming in from the right start smaller and faded, so they seem to rise from behind.
-                            // Cards leaving on the left just slide away.
-                            .scrollTransition(.interactive, axis: .horizontal) { card, phase in
-                                let distance = reduceMotion ? 0 : min(max(phase.value, 0), 1)
-                                return card
-                                    .scaleEffect(1 - distance * 0.2, anchor: .leading)
-                                    .opacity(1 - distance * 0.45)
-                            }
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                    ForEach(sections) { section in
+                        NavigationLink(value: section) {
+                            CategoryTile(section: section)
+                        }
+                        .buttonStyle(CardPressStyle())
                     }
                 }
-                .scrollTargetLayout()
             }
-            .scrollTargetBehavior(.viewAligned)
-            .scrollIndicators(.hidden)
-            .fullBleed()
         }
     }
 }
@@ -463,6 +428,41 @@ private struct WallpaperThumbnail: View {
     }
 }
 
+/// A category to open: its first wallpaper as the cover, its name and how many wallpapers it has.
+private struct CategoryTile: View {
+    let section: ExploreModel.Section
+
+    var body: some View {
+        Theme.lockScreen
+            .aspectRatio(4 / 3, contentMode: .fit)
+            .overlay {
+                if let cover = section.wallpapers.first { WallpaperThumbnail(wallpaper: cover) }
+            }
+            .overlay(alignment: .bottomLeading) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(section.title).typography(.labelLarge).foregroundStyle(.white).lineLimit(1)
+                    Text(count).font(.labelSmall).foregroundStyle(Theme.onMediaSecondary).lineLimit(1)
+                }
+                .mediaCaption()
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Theme.specularRim, lineWidth: 1))
+            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .environment(\.colorScheme, .dark)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(section.title), \(count)")
+            .accessibilityAddTraits(.isButton)
+    }
+
+    /// "6 wallpapers", or "4 live · 2 still" when a category has both.
+    private var count: String {
+        let live = section.wallpapers.filter(\.isLive).count
+        let still = section.wallpapers.count - live
+        if live > 0 && still > 0 { return "\(live) live · \(still) still" }
+        return section.wallpapers.count == 1 ? "1 wallpaper" : "\(section.wallpapers.count) wallpapers"
+    }
+}
+
 /// The loaded page's layout in placeholder form, so nothing jumps when the wallpapers arrive.
 private struct ExploreSkeleton: View {
     var body: some View {
@@ -470,34 +470,20 @@ private struct ExploreSkeleton: View {
             VStack(spacing: 12) {
                 card(cornerRadius: 28, titleWidth: 0.5)
                     .aspectRatio(4 / 5, contentMode: .fit)
-                    // The carousel's card sits inside 56 pt margins, 40 more than the page's.
-                    .padding(.horizontal, 40)
+                    // The carousel's card sits inside 72 pt margins, 56 more than the page's.
+                    .padding(.horizontal, 56)
                 HStack(spacing: 6) {
                     ForEach(0..<4, id: \.self) { _ in Circle().fill(Theme.placeholder).frame(width: 6, height: 6) }
                 }
                 .frame(maxWidth: .infinity)
             }
-            ForEach(0..<2, id: \.self) { row in
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Capsule().fill(Theme.placeholder).frame(width: row == 0 ? 150 : 120, height: 18).shimmer()
-                        Spacer()
-                        Capsule().fill(Theme.placeholder).frame(width: 60, height: 14).shimmer()
+            VStack(alignment: .leading, spacing: 12) {
+                Capsule().fill(Theme.placeholder).frame(width: 120, height: 18).shimmer()
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                    ForEach(0..<4, id: \.self) { index in
+                        card(cornerRadius: 18, titleWidth: index.isMultiple(of: 2) ? 0.7 : 0.55)
+                            .aspectRatio(4 / 3, contentMode: .fit)
                     }
-                    // Sized exactly like a loaded row (three cards and a peek, running off the edge),
-                    // without pushing the page wider than the screen.
-                    ScrollView(.horizontal) {
-                        LazyHStack(spacing: 10) {
-                            ForEach(0..<4, id: \.self) { index in
-                                card(cornerRadius: 18, titleWidth: index.isMultiple(of: 2) ? 0.7 : 0.55)
-                                    .aspectRatio(9 / 16, contentMode: .fit)
-                                    .containerRelativeFrame(.horizontal, count: 10, span: 3, spacing: 10)
-                            }
-                        }
-                    }
-                    .scrollDisabled(true)
-                    .scrollIndicators(.hidden)
-                    .fullBleed()
                 }
             }
         }

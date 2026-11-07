@@ -14,20 +14,15 @@ struct ExploreModelTests {
         )
     }
 
-    @Test func buildsRowsInOrderAndLeavesOutEmptyOnes() {
+    @Test func groupsLiveAndStillByCategoryInCatalogOrder() {
         let model = ExploreModel(wallpapers: [
             wallpaper("A"),
-            wallpaper("B", category: "Nature", still: true, created: "2026-11-01T09:00:00+00:00"),
+            wallpaper("B", category: "Nature", still: true),
             wallpaper("C", category: "Nature"),
+            wallpaper("D", category: "Abstract", still: true),
         ])
-        let sections = model.sections(now: now)
-        #expect(sections.map(\.title) == ["New this week", "Live wallpapers", "Still wallpapers", "Glitter Originals", "Nature"])
-        #expect(sections[0].wallpapers.map(\.title) == ["B"])
-        #expect(sections[1].wallpapers.map(\.title) == ["A", "C"])
-        #expect(sections[2].wallpapers.map(\.title) == ["B"])
-
-        let liveOnly = ExploreModel(wallpapers: [wallpaper("A")]).sections(now: now)
-        #expect(liveOnly.map(\.title) == ["Live wallpapers", "Glitter Originals"])
+        #expect(model.categories.map(\.title) == ["Glitter Originals", "Nature", "Abstract"])
+        #expect(model.categories[1].wallpapers.map(\.title) == ["B", "C"])
     }
 
     @Test func featuredPrefersTheFlagThenTheFeaturedCategory() {
@@ -37,6 +32,6 @@ struct ExploreModelTests {
         let fallback = ExploreModel(wallpapers: [wallpaper("A", category: "Featured"), wallpaper("B")])
         #expect(fallback.featured.map(\.title) == ["A"])
         // The Featured category already fills the carousel, so it gets no row of its own.
-        #expect(!fallback.sections(now: now).contains { $0.title == "Featured" })
+        #expect(!fallback.categories.contains { $0.title == "Featured" })
     }
 }
