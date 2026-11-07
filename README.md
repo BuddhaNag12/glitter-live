@@ -40,15 +40,32 @@
 
 ## Features
 
-- **Explore**: the first tab, a curated catalog of live wallpapers, served from Supabase, that saves to Photos as a Lock Screen-ready Live Photo in one tap. It opens on a playing Featured wallpaper, and touching and holding any wallpaper previews its motion. While the catalog loads, shimmering placeholders hold the page's shape, and the cards rise into place in a wave when it arrives.
+- **Explore**: the first tab, a curated catalog of live and still wallpapers, served from Supabase.
+  - A Featured carousel keeps the middle card in view, slides like an album shelf and loops on its own.
+  - Below it, a Categories grid opens every wallpaper in a category, dealt in like a shuffled deck.
+  - Saving puts a Lock Screen-ready Live Photo (or a still) in Photos in one tap.
+  - Touching and holding a live wallpaper previews its motion.
+  - While the catalog loads, shimmering placeholders hold the page's shape.
+- **Create**: describe a scene, or tap Surprise Me, pick a style, and get an AI wallpaper image.
+  - Save it as a still, or add depth-parallax motion on the phone to make it a Live wallpaper.
+  - Each image unlocks with a short rewarded ad, up to 3 a day per install.
+  - Prompts and images are checked by safety filters, and any image can be reported.
 - **Video to Live Wallpaper**: pick any video, trim a 1–3 second moment, and save it as a Live Photo that plays on the Lock Screen when the iPhone wakes. Videos can come from Photos, Files, a direct link (Dropbox and Google Drive share links work), or Share → Glitter Live from another app.
 - **Trim Studio**: filmstrip with trim handles that preview the frame under your finger and stretch softly at their limits, a draggable cover-frame marker, pinch-and-drag framing inside a Lock Screen preview (clock, widgets and quick actions) that springs back with your finger's momentum, 0.5×–2× speed and a forward-and-back bounce.
 - **Sharp cover photo**: the still shown while the phone is locked is rendered from the original video at up to 1320 px wide, sharper than the motion clip.
 - **Library**: every wallpaper is kept in the app, so it can be previewed, saved to Photos again or deleted.
-- **Private by design**: videos are processed on the device, and the app only asks to *add* photos, never reading the library. The only data collected is what Google's ad SDK needs when someone chooses to watch an ad (see [privacy](docs/privacy.md)).
+  - It shows as a list or a grid, filtered to All, Live or Stills.
+  - Each wallpaper shows whether it's already in Photos.
+  - Swipe to delete one, or select several and delete them together.
+- **Private by design**: videos are processed on the device, and the app only asks to *add* photos, never reading the library.
+  - Create sends only the scene description and style to the server, with a random install ID used to enforce the daily limit.
+  - Google's ad SDK collects what it needs when someone chooses to watch an ad (see [privacy](docs/privacy.md)).
 - **Silver Shimmer design**: light and dark modes that follow the system, an obsidian dark mode lit by brand blue and silver, softly twinkling glitter, and native Liquid Glass on iOS 26+ with frosted fallbacks on iOS 17–25. A logo reveal plays as the app launches.
 - **Accessible**: Dynamic Type with size-tuned letter-spacing, Reduce Motion, Increase Contrast and Reduce Transparency are all supported.
-- **Free to try**: Explore and the first 5 conversions are free; then each conversion is free with a rewarded ad, or a one-time Unlimited Conversions purchase removes the limit and the ads. Never a watermark.
+- **Free to try**: never a watermark.
+  - Explore is free.
+  - The first 5 conversions are free. After that, each conversion is free with a rewarded ad, or a one-time Unlimited Conversions purchase removes the limit and the ads.
+  - Create unlocks each image with a short rewarded ad.
 
 ## Lock Screen motion
 
@@ -63,14 +80,29 @@ See [`LivePhotoBuilder.swift`](LiveWall/Core/LivePhoto/LivePhotoBuilder.swift) a
 
 ## Catalog backend
 
-Explore reads the `wallpapers` table (read-only for the app's publishable key) and downloads files from a public Supabase Storage bucket. To add a wallpaper:
+Explore reads the `catalog` view, which has the published live and still wallpapers. It downloads files from a public Supabase Storage bucket.
+- Version 1.0 still reads the `wallpapers` table directly, and sees only live rows.
+- Both are read-only for the app's publishable key.
+
+Wallpapers are added, edited, reordered and published in the admin site, which lives in the private `glitter-live-admin` repository. Its database schema lives here.
+
+The upload script still works for live wallpapers:
 
 ```bash
 cp scripts/storage.env.example scripts/storage.env   # fill in the S3 and secret keys; this file is git-ignored
 scripts/upload-wallpaper.sh ~/Movies/loop.mp4 --title "Neon Rain" --category "Abstract" --creator "Your Name"
 ```
 
-The table is created by [`supabase/migrations/0001_wallpapers.sql`](supabase/migrations/0001_wallpapers.sql).
+Database migrations live in [`supabase/migrations`](supabase/migrations):
+- `0001` is the wallpapers table.
+- `0002` adds admin access and still wallpapers.
+- `0003` adds Create's generation limits.
+
+Create's server is two edge functions in [`supabase/functions`](supabase/functions):
+- `generate` checks the prompt, then generates the image with FLUX.1 schnell on Cloudflare Workers AI.
+- `ad-reward` receives AdMob's server-side verification callback.
+
+See [docs/create-plan.md](docs/create-plan.md).
 
 ## Requirements
 
@@ -101,7 +133,9 @@ xcodebuild test -project LiveWall.xcodeproj -scheme LiveWall \
 ```
 
 - `LiveWallTests`: Live Photo pairing, required metadata tracks, output size and length, speed and bounce, cover-photo resolution and frame match, and the Library.
-- `LiveWallUITests`: launches each screen with demo content (`-demoVideo`, `-demoResult`, `-demoLibrary`) and attaches screenshots to the test result.
+- `LiveWallUITests`:
+  - `ScreenshotTests` launches each screen with demo content (`-demoVideo`, `-demoResult`, `-demoLibrary`) and attaches screenshots to the test result.
+  - `TabRoundTripTests` replays reopening the intro from Settings, leaving it from each page and switching tabs straight away. That path once crashed iOS 27's glass renderer.
 
 ## CI and deployment
 
@@ -174,40 +208,45 @@ Fix it the same way:
 ```
 LiveWall/
   App/            App entry point, tab bar and launch intro
-  Core/LivePhoto/ Video → Live Photo pipeline, saving and preview
-  DesignSystem/   Colors, type, glass components, motion, logo artwork, Lock Screen overlay
+  Core/Ads/       Rewarded ads and consent
   Core/Catalog/   Supabase catalog client and downloads
-  Features/       Explore, Convert, Library, Onboarding, Settings
+  Core/Generation/ Create's server client and daily allowance
+  Core/Import/    Videos from links and the share extension
+  Core/LivePhoto/ Video → Live Photo pipeline, saving and preview
+  Core/Store/     Unlimited Conversions purchase and free allowance
+  DesignSystem/   Colors, type, glass components, motion, logo artwork, Lock Screen overlay
+  Features/       Explore, Create, Convert, Library, Onboarding, Settings
   Resources/      Assets, fonts, privacy manifest
+LiveWallShare/    Share extension
 LiveWallTests/    Unit tests
-LiveWallUITests/  On-device screenshot tests
+LiveWallUITests/  Screenshot and tab round-trip UI tests
 Branding/         Logo files, layered SVGs and the Jitter logo reveal
-docs/             Privacy policy, support page, App Store listing, screenshots
-scripts/          Icon, logo and SVG renderer, wallpaper upload tools
-supabase/         Database migrations
+docs/             Privacy policy, support page, App Store listing, Create plan, screenshots
+scripts/          Icon, logo, store-asset and SVG renderer, wallpaper upload tools
+supabase/         Database migrations and edge functions
 ```
 
 ## Roadmap
 
-### 1.0: built, not yet submitted
+### Released
 
-- [x] Video to Live Wallpaper with Trim Studio, Library and Explore
-- [x] Design pass on Apple's fluid-interface guidance: interruptible springs, momentum, rubber-banding, press feedback, card-to-detail zoom transitions and consistent haptics
-- [x] Accessibility: Dynamic Type, Reduce Motion, Increase Contrast and Reduce Transparency
-- [x] Launch logo reveal
-- [x] Explore: playing Featured wallpaper and touch-and-hold motion preview
-- [x] Release prep: version 1.0.0, [privacy policy](docs/privacy.md), [support page](docs/support.md) and [App Store listing](docs/app-store.md)
-- [x] Launch time measured at about 270 ms to first frame on an iPhone 17 Pro
-- [ ] App Store submission: 6.9" screenshots, archive and upload
-- [ ] Refresh the README screenshots for the latest design
+- **1.0** (on the App Store since 6 November 2026):
+  - Video to Live Wallpaper with Trim Studio, Library and Explore.
+  - Fluid-interface design pass, accessibility support and the launch logo reveal.
+- **1.1**:
+  - Create (AI wallpapers, one rewarded ad per image) and still wallpapers in Explore.
+  - Explore redesign: Featured carousel and Categories grid.
+  - Library list and grid, filters and multi-delete.
+  - Light mode redesign and the catalog admin site.
+- **1.1.2**: fixes for a Liquid Glass crash and a grey flash after replaying the intro.
 
 ### Next
 
-- **Create** ([plan](docs/create-plan.md)): type a prompt and get a wallpaper image from FLUX.1 schnell, then save it as a still or add motion on the phone (depth parallax) to save it as a Live wallpaper. Each generation unlocks with a short rewarded ad, checked on the server. AI video motion (LTX-Video) is ready on the server for later.
-- **Pricing**: each AI generation unlocks with a short rewarded ad, up to 3 a day per install. The server enforces this: it only generates for an ad Google has confirmed through AdMob server-side verification (see [Create's server](docs/create-plan.md#server)). A **Glitter Live Pro** subscription is planned but not built. Explore stays free with no ads. Convert gives 5 free conversions, then each one unlocks with a short rewarded ad, or a one-time **Unlimited Conversions** purchase removes the limit for good.
-- **Explore extras** from the mockup: search, sort by New, and later like counts and Free/VIP badges (likes need backend support; badges need pricing).
-- **Trim Studio**: video stabilization (the mockup's Stabilize toggle).
-- **Smoothness**: profile scrolling with Instruments. 120 Hz on ProMotion and pausing background effects on hidden tabs are done.
+- **Glitter Live Pro**: a subscription for more Create generations without ads (see [the plan](docs/create-plan.md)). Explore stays free with no ads.
+- **AI video motion**: the server can already turn an image into video with LTX-Video. The app still uses on-device depth parallax.
+- **Explore extras**: search, sort by New, and later like counts (likes need backend support).
+- **Trim Studio**: video stabilization.
+- **Screenshots**: add Create to the README screenshots.
 
 ## Acknowledgements
 
