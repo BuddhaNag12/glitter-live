@@ -140,12 +140,11 @@ async function checkPrompt(prompt: string) {
 
 /// A vision model looks at the finished image, since a harmless-looking description can still produce one that isn't.
 async function checkImage(image: string) {
+  // `prompt` + `image`, not `messages` + `image`: Workers AI rejects an image beside a messages list
+  // ("Unable to add image when there are no user-supplied nor system-supplied messages").
   const input = {
-    messages: [{
-      role: "user",
-      content: "You review images for a phone wallpaper app rated for all ages. Does this image show nudity, " +
-        "sexual content, graphic violence or gore, hate symbols, or drug use? Answer with one word: SAFE or UNSAFE.",
-    }],
+    prompt: "You review images for a phone wallpaper app rated for all ages. Does this image show nudity, " +
+      "sexual content, graphic violence or gore, hate symbols, or drug use? Answer with one word: SAFE or UNSAFE.",
     image: Array.from(Uint8Array.from(atob(image), (c) => c.charCodeAt(0))),
     max_tokens: 4,
   };
