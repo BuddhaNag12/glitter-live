@@ -68,6 +68,9 @@ private struct LiquidGlass<S: InsettableShape>: ViewModifier {
             content
                 .environment(\.isOnGlass, true)
                 .glassEffect(Glass.regular.tint(surfaceTint).interactive(interactive), in: shape)
+                // No materialize: on a device a tab's glass re-materializes from a pale blur when it comes back after
+                // the intro, flashing the panels grey for a split second.
+                .glassEffectTransition(.identity)
                 .overlay { if isChrome { shape.strokeBorder(Theme.chromeRim, lineWidth: 0.75).allowsHitTesting(false) } }
         } else {
             content

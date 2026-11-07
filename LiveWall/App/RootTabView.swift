@@ -54,12 +54,11 @@ struct RootTabView: View {
         // intro had gone and showed the tabs for a moment first. The intro now fades straight into it.
         .unlockCelebration(count: purchases.unlockCount)
         .accessibilityHidden(!hasCompletedOnboarding)
+        // The intro comes and goes in one frame, never fading over the tabs: with it half transparent, the glass
+        // underneath renders washed out, and iOS 27's glass renderer can crash (RingShadow.distanceRange).
         .overlay {
             if !hasCompletedOnboarding {
-                OnboardingView(holdsReveal: isLaunchIntroPlaying) {
-                    withAnimation(.easeOut(duration: 0.35)) { hasCompletedOnboarding = true }
-                }
-                .transition(.opacity)
+                OnboardingView(holdsReveal: isLaunchIntroPlaying) { hasCompletedOnboarding = true }
             }
         }
     }
@@ -67,7 +66,7 @@ struct RootTabView: View {
     private func showIntroIfRequested() {
         guard showsIntroAfterSettings else { return }
         showsIntroAfterSettings = false
-        withAnimation(.easeOut(duration: 0.35)) { hasCompletedOnboarding = false }
+        hasCompletedOnboarding = false
     }
 
     @ViewBuilder
