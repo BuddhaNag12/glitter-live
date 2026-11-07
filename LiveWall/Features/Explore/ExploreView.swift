@@ -252,6 +252,7 @@ struct ExploreView: View {
                             CategoryTile(section: section)
                         }
                         .buttonStyle(CardPressStyle())
+                        .accessibilityIdentifier("category-tile")
                     }
                 }
             }

@@ -8,6 +8,7 @@ final class ScreenshotTests: XCTestCase {
         for appearance in ["dark", "light"] {
             captureOnboarding(appearance)
             captureExplore(appearance)
+            captureCreate(appearance)
             capture("library", appearance, arguments: ["-tab", "library"])
             captureLibrary(appearance)
             capture("convert-empty", appearance, arguments: ["-tab", "convert"])
@@ -65,21 +66,33 @@ final class ScreenshotTests: XCTestCase {
     @MainActor
     private func captureExplore(_ appearance: String) {
         let app = launch(appearance, ["-tab", "explore", "-hasCompletedOnboarding", "YES"])
-        let card = app.buttons["catalog-card"].firstMatch
-        XCTAssertTrue(card.waitForExistence(timeout: 30), "Catalog didn't load")
+        let tile = app.buttons["category-tile"].firstMatch
+        XCTAssertTrue(tile.waitForExistence(timeout: 30), "Catalog didn't load")
         Thread.sleep(forTimeInterval: 3)
         attach(app, name: "explore-\(appearance)")
         scrollDown(app)
         attach(app, name: "explore-2-\(appearance)")
-        // Back to the top, so the first See all isn't hidden under the header.
-        app.swipeDown()
-        Thread.sleep(forTimeInterval: 1)
-        app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'See all'")).firstMatch.tap()
-        Thread.sleep(forTimeInterval: 2)
+        // The Categories grid's first tile opens that category's wallpapers.
+        app.buttons["category-tile"].firstMatch.tap()
+        Thread.sleep(forTimeInterval: 3)
         attach(app, name: "explore-see-all-\(appearance)")
         app.buttons["catalog-card"].firstMatch.tap()
         Thread.sleep(forTimeInterval: 4)
         attach(app, name: "explore-detail-\(appearance)")
+        app.terminate()
+    }
+
+    /// Create with a prompt filled in by Surprise Me, ready to generate.
+    @MainActor
+    private func captureCreate(_ appearance: String) {
+        let app = launch(appearance, ["-tab", "create", "-hasCompletedOnboarding", "YES"])
+        let surprise = app.buttons["Surprise Me"].firstMatch
+        XCTAssertTrue(surprise.waitForExistence(timeout: 10), "Create didn't open")
+        Thread.sleep(forTimeInterval: 2)
+        attach(app, name: "create-\(appearance)")
+        surprise.tap()
+        Thread.sleep(forTimeInterval: 1)
+        attach(app, name: "create-prompt-\(appearance)")
         app.terminate()
     }
 

@@ -452,17 +452,20 @@ func renderStoreShot(_ capture: CGImage, caption: String, width: Int, height: In
 
 let tagline = "Turn any video into a live wallpaper"
 
-/// 21:9. Brand on the left, three screens fanned on the right.
+/// 21:9. Five screens fanned symmetrically around the centre, and no text: the App Store crops the header
+/// differently on each device and only keeps about the middle 1646 × 661 for sure (Apple's template safe area),
+/// so the focal screen sits dead centre and the outer ones are free to be clipped. The app's name shows below it.
 func renderHeader(_ screens: [CGImage], name: String) {
     let size = CGSize(width: 3840, height: 1646)
     let ctx = storeContext(Int(size.width), Int(size.height))
     drawStoreBackground(ctx, size)
-    drawLockup(ctx, origin: CGPoint(x: 200, y: 930), height: 150)
-    drawText(ctx, tagline, in: CGRect(x: 200, y: 330, width: 1100, height: 520), size: 120, color: CGColor(gray: 1, alpha: 1), centered: false)
-    let center = CGPoint(x: 2440, y: 760)
-    drawPhone(ctx, screens[0], center: CGPoint(x: center.x - 700, y: center.y - 90), width: 600, angle: 0.07)
-    drawPhone(ctx, screens[2], center: CGPoint(x: center.x + 700, y: center.y - 90), width: 600, angle: -0.07)
-    drawPhone(ctx, screens[1], center: center, width: 680)
+    let mid = size.width / 2
+    // Back to front, so the centre screen overlaps its neighbours.
+    drawPhone(ctx, screens[3], center: CGPoint(x: mid - 1060, y: 760), width: 470, angle: 0.11)
+    drawPhone(ctx, screens[4], center: CGPoint(x: mid + 1060, y: 760), width: 470, angle: -0.11)
+    drawPhone(ctx, screens[1], center: CGPoint(x: mid - 560, y: 800), width: 540, angle: 0.06)
+    drawPhone(ctx, screens[2], center: CGPoint(x: mid + 560, y: 800), width: 540, angle: -0.06)
+    drawPhone(ctx, screens[0], center: CGPoint(x: mid, y: 823), width: 620)
     writePNG(ctx, name)
 }
 
@@ -486,10 +489,10 @@ if mode == "store" {
     func capture(_ name: String) -> CGImage { loadImage(captures.appendingPathComponent("\(name)-dark.png")) }
     let shots = [
         ("explore", "Wallpapers that come alive"),
+        ("create-prompt", "Describe a scene. AI makes the wallpaper."),
         ("trim-studio", "Turn any video into a live wallpaper"),
-        ("trim-studio-3", "Pick the perfect moment"),
         ("result", "Moves every time you wake your iPhone"),
-        ("explore-detail", "Hand-picked live wallpapers"),
+        ("explore-detail", "Hand-picked live and still wallpapers"),
         ("library-grid", "Everything you make, kept in one place"),
     ]
     for (index, (screen, caption)) in shots.enumerated() {
@@ -497,7 +500,7 @@ if mode == "store" {
         renderStoreShot(image, caption: caption, width: 1320, height: 2868, name: "iphone-6.9-\(index + 1)-\(screen).png")
         renderStoreShot(image, caption: caption, width: 1206, height: 2622, name: "iphone-6.3-\(index + 1)-\(screen).png")
     }
-    renderHeader([capture("explore"), capture("trim-studio"), capture("result")], name: "header-3840x1646.png")
+    renderHeader([capture("explore"), capture("create-prompt"), capture("result"), capture("library-grid"), capture("trim-studio")], name: "header-3840x1646.png")
     renderSearch([capture("trim-studio"), capture("result")], name: "search-1920x1280.png")
 } else if mode == "logo" {
     registerInter()
