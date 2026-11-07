@@ -1,5 +1,6 @@
 import AppKit
 import CoreGraphics
+import CoreImage
 import ImageIO
 import UniformTypeIdentifiers
 
@@ -521,55 +522,61 @@ struct Seeded {
     mutating func between(_ a: CGFloat, _ b: CGFloat) -> CGFloat { a + (b - a) * next() }
 }
 
-/// Soft colour fields with flowing ribbons on a deep base: original artwork, free of any licence.
+/// Blurred colour fields, Apple-wallpaper style: big soft shapes in the palette melted together by a heavy blur,
+/// then a fine grain so it reads as print rather than flat digital. Original artwork, free of any licence.
 func renderAbstract(palette: [UInt32], seed: UInt64, name: String) {
-    let size = CGSize(width: 1179, height: 2556)
-    let ctx = storeContext(Int(size.width), Int(size.height))
+    let width = 1179, height = 2556
+    let size = CGSize(width: width, height: height)
     var random = Seeded(state: seed)
-    ctx.setFillColor(rgb(palette[2]))
-    ctx.fill(CGRect(origin: .zero, size: size))
-    // Big soft blobs of the two accents.
-    for index in 0..<5 {
-        let hex = palette[index % 2]
-        let center = CGPoint(x: random.between(-0.1, 1.1) * size.width, y: random.between(0, 1) * size.height)
-        let radius = random.between(0.45, 0.9) * size.width
-        let glow = CGGradient(colorsSpace: space, colors: [rgb(hex, random.between(0.55, 0.85)), rgb(hex, 0)] as CFArray, locations: [0, 1])!
-        ctx.drawRadialGradient(glow, startCenter: center, startRadius: 0, endCenter: center, endRadius: radius, options: [])
+    let shapes = storeContext(width, height)
+    shapes.setFillColor(rgb(palette[0]))
+    shapes.fill(CGRect(origin: .zero, size: size))
+    // Large overlapping blobs, each a palette colour, rotated and stretched.
+    for index in 0..<9 {
+        let hex = palette[1 + index % (palette.count - 1)]
+        let w = random.between(0.55, 1.1) * size.width, h = random.between(0.25, 0.55) * size.height
+        shapes.saveGState()
+        shapes.translateBy(x: random.between(0, 1) * size.width, y: random.between(0, 1) * size.height)
+        shapes.rotate(by: random.between(-0.9, 0.9))
+        shapes.setFillColor(rgb(hex, random.between(0.7, 1)))
+        shapes.fillEllipse(in: CGRect(x: -w / 2, y: -h / 2, width: w, height: h))
+        shapes.restoreGState()
     }
-    // Flowing ribbons: wide waves, each a gradient between the accents.
-    for _ in 0..<4 {
-        let baseY = random.between(0.1, 0.9) * size.height
-        let amplitude = random.between(0.08, 0.2) * size.height
-        let thickness = random.between(0.05, 0.14) * size.height
-        let phase = random.between(0, .pi * 2)
-        let path = CGMutablePath()
-        let steps = 60
-        func y(_ t: CGFloat) -> CGFloat { baseY + sin(t * .pi * 1.4 + phase) * amplitude }
-        path.move(to: CGPoint(x: -20, y: y(0)))
-        for step in 1...steps { let t = CGFloat(step) / CGFloat(steps); path.addLine(to: CGPoint(x: t * (size.width + 40) - 20, y: y(t))) }
-        for step in stride(from: steps, through: 0, by: -1) {
-            let t = CGFloat(step) / CGFloat(steps)
-            path.addLine(to: CGPoint(x: t * (size.width + 40) - 20, y: y(t) + thickness * (0.6 + 0.4 * sin(t * .pi))))
+    // A darker pool near the top keeps the Lock Screen clock readable.
+    let pool = CGGradient(colorsSpace: space, colors: [rgb(palette[0], 0.85), rgb(palette[0], 0)] as CFArray, locations: [0, 1])!
+    shapes.drawLinearGradient(pool, start: CGPoint(x: 0, y: size.height), end: CGPoint(x: 0, y: size.height * 0.62), options: [])
+
+    let blurred = CIImage(cgImage: shapes.makeImage()!)
+        .clampedToExtent()
+        .applyingGaussianBlur(sigma: 170)
+        .cropped(to: CGRect(origin: .zero, size: size))
+    let ctx = storeContext(width, height)
+    ctx.draw(CIContext().createCGImage(blurred, from: blurred.extent)!, in: CGRect(origin: .zero, size: size))
+    // Fine film grain, ±7 per channel.
+    let pixels = ctx.data!.assumingMemoryBound(to: UInt8.self)
+    let rowBytes = ctx.bytesPerRow
+    for y in 0..<height {
+        for x in 0..<width {
+            let grain = Int(random.next() * 14) - 7
+            let offset = y * rowBytes + x * 4
+            for channel in 0..<3 {
+                pixels[offset + channel] = UInt8(clamping: Int(pixels[offset + channel]) + grain)
+            }
         }
-        path.closeSubpath()
-        ctx.saveGState()
-        ctx.addPath(path)
-        ctx.clip()
-        let ribbon = CGGradient(colorsSpace: space, colors: [rgb(palette[0], 0.75), rgb(palette[1], 0.75)] as CFArray, locations: [0, 1])!
-        ctx.drawLinearGradient(ribbon, start: CGPoint(x: 0, y: baseY), end: CGPoint(x: size.width, y: baseY + amplitude), options: [])
-        // A soft highlight along the top edge gives the ribbon depth.
-        ctx.setBlendMode(.screen)
-        let sheen = CGGradient(colorsSpace: space, colors: [CGColor(gray: 1, alpha: 0.25), CGColor(gray: 1, alpha: 0)] as CFArray, locations: [0, 1])!
-        ctx.drawLinearGradient(sheen, start: CGPoint(x: 0, y: baseY + amplitude), end: CGPoint(x: 0, y: baseY - amplitude), options: [])
-        ctx.restoreGState()
     }
     writePNG(ctx, name)
 }
 
+/// Base (darkest) first, then the accents.
 let abstractPalettes: [[UInt32]] = [
-    [0xFF6B6B, 0x845EF7, 0x0B1120], [0x22D3EE, 0x3B82F6, 0x0F172A], [0xF59E0B, 0xEF4444, 0x1F1023],
-    [0x10B981, 0x06B6D4, 0x062023], [0xEC4899, 0x8B5CF6, 0x140B24], [0xF97316, 0xFACC15, 0x1A1206],
-    [0x60A5FA, 0xA78BFA, 0x0B1020], [0x34D399, 0xA3E635, 0x08140D],
+    [0x1A0B2E, 0xFF5F6D, 0xFFC371, 0x7B2FF7],  // sunset
+    [0x031B34, 0x00C6FB, 0x005BEA, 0x43E97B],  // ocean
+    [0x050A1F, 0x00F5A0, 0x00D9F5, 0x7F00FF],  // aurora
+    [0x1B0F2A, 0xFF61D2, 0xFE9090, 0x7F7FD5],  // candy
+    [0x1A0505, 0xFF512F, 0xF09819, 0xDD2476],  // ember
+    [0x120E24, 0xA18CD1, 0xFBC2EB, 0x6A82FB],  // lavender
+    [0x04140F, 0xB3FFAB, 0x12FFF7, 0x1D976C],  // lime
+    [0x070B1F, 0x4776E6, 0x8E54E9, 0x00C9FF],  // midnight
 ]
 
 let mode = CommandLine.arguments.count > 2 ? CommandLine.arguments[2] : "icon"
