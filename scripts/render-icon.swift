@@ -452,20 +452,20 @@ func renderStoreShot(_ capture: CGImage, caption: String, width: Int, height: In
 
 let tagline = "Turn any video into a live wallpaper"
 
-/// 21:9. Brand and line on the left, four screens fanned on the right, all pulled in towards the middle:
-/// the App Store crops the header per device, and on iPhone only about the middle 2,500 px across survive,
-/// so nothing sits outside x 760–3080.
+/// 21:9. Logo on the left, four screens fanned in the middle, a short line on the right, all inside x 790–3080:
+/// the App Store crops the header per device, and on iPhone only about the middle 2,500 px across survive.
 func renderHeader(_ screens: [CGImage], name: String) {
     let size = CGSize(width: 3840, height: 1646)
     let ctx = storeContext(Int(size.width), Int(size.height))
     drawStoreBackground(ctx, size)
-    drawLockup(ctx, origin: CGPoint(x: 820, y: 950), height: 118)
-    drawText(ctx, tagline, in: CGRect(x: 820, y: 400, width: 820, height: 520), size: 104, color: CGColor(gray: 1, alpha: 1), centered: false)
+    drawLockup(ctx, origin: CGPoint(x: 800, y: 775), height: 96)
     // Back to front: Explore, Create, the result, then Trim Studio in front.
-    drawPhone(ctx, screens[0], center: CGPoint(x: 1990, y: 780), width: 400, angle: 0.1)
-    drawPhone(ctx, screens[1], center: CGPoint(x: 2200, y: 800), width: 440, angle: 0.05)
-    drawPhone(ctx, screens[3], center: CGPoint(x: 2830, y: 790), width: 440, angle: -0.06)
-    drawPhone(ctx, screens[2], center: CGPoint(x: 2520, y: 823), width: 500)
+    drawPhone(ctx, screens[0], center: CGPoint(x: 1680, y: 790), width: 310, angle: 0.1)
+    drawPhone(ctx, screens[1], center: CGPoint(x: 1875, y: 805), width: 340, angle: 0.05)
+    drawPhone(ctx, screens[3], center: CGPoint(x: 2290, y: 800), width: 340, angle: -0.06)
+    drawPhone(ctx, screens[2], center: CGPoint(x: 2080, y: 823), width: 400)
+    // Fixed breaks, so the line never wraps mid-phrase or loses its end.
+    drawText(ctx, "Bring your\nLock Screen\nto life", in: CGRect(x: 2560, y: 600, width: 540, height: 440), size: 88, color: CGColor(gray: 1, alpha: 1), centered: false)
     writePNG(ctx, name)
 }
 
