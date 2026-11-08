@@ -67,3 +67,13 @@ ok((await as('anon', null, `select title from catalog where is_category_cover`))
 await fails(as('authenticated', admin, `update wallpapers set is_category_cover = true where title = 'W4'`), 'a second cover in the same category is rejected');
 await fails(as('authenticated', other, `update wallpapers set is_category_cover = false where title = 'W3'`).then(r => { if (!r.affectedRows) throw new Error('no rows changed') }), 'non-admin cannot change covers');
 
+await db.exec(readFileSync(repo + '/supabase/migrations/0005_category_cover_images.sql', 'utf8'));
+const coverRow = `insert into category_covers (category, image_path) values ('Glitter Originals', 'covers/a.jpg')`;
+await fails(as('anon', null, coverRow), 'anon cannot add a category cover');
+await fails(as('authenticated', other, coverRow), 'non-admin cannot add a category cover');
+await as('authenticated', admin, coverRow);
+ok((await as('anon', null, 'select image_path from category_covers')).rows[0]?.image_path === 'covers/a.jpg', 'admin can add a category cover, and everyone can read it');
+await fails(as('authenticated', admin, `insert into category_covers (category, image_path) values ('X', 'videos/x.mp4')`), 'a cover outside covers/ is rejected');
+ok((await as('authenticated', other, `delete from category_covers`)).affectedRows === 0, 'non-admin cannot delete category covers');
+await as('authenticated', admin, `delete from category_covers`);
+ok((await as('anon', null, 'select * from category_covers')).rows.length === 0, 'admin can delete category covers');

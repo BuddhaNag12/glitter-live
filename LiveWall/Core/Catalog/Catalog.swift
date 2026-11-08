@@ -65,6 +65,17 @@ nonisolated struct Wallpaper: Codable, Identifiable, Hashable, Sendable {
     }
 }
 
+/// An image uploaded in the admin site for a category's tile.
+nonisolated struct CategoryCover: Decodable, Sendable {
+    let category: String
+    let imagePath: String
+
+    enum CodingKeys: String, CodingKey {
+        case category
+        case imagePath = "image_path"
+    }
+}
+
 nonisolated enum CatalogError: LocalizedError {
     case badResponse(Int)
 
@@ -76,6 +87,20 @@ nonisolated enum CatalogError: LocalizedError {
 }
 
 nonisolated enum CatalogService {
+    /// Category name to cover image. Optional extras: any failure, including a database without the
+    /// table, returns none, and the tiles show a wallpaper as before.
+    static func fetchCategoryCovers() async -> [String: URL] {
+        var components = URLComponents(url: CatalogConfig.projectURL.appending(path: "rest/v1/category_covers"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "select", value: "category,image_path")]
+        var request = URLRequest(url: components.url!)
+        request.setValue(CatalogConfig.publishableKey, forHTTPHeaderField: "apikey")
+        request.cachePolicy = .reloadRevalidatingCacheData
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              (response as? HTTPURLResponse)?.statusCode == 200,
+              let covers = try? JSONDecoder().decode([CategoryCover].self, from: data) else { return [:] }
+        return Dictionary(covers.map { ($0.category, CatalogConfig.publicFileURL($0.imagePath)) }) { first, _ in first }
+    }
+
     static func fetchWallpapers() async throws -> [Wallpaper] {
         // 1.0 reads `wallpapers`, which only returns live rows; `catalog` has stills too.
         // A change that would break this decoder needs a new view (`catalog_v2`), not an edit to this one.
