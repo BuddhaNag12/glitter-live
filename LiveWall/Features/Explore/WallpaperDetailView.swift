@@ -106,7 +106,7 @@ struct WallpaperDetailView: View {
                 }
             }
         }
-        .onAppear(perform: startPreview)
+        .task { await startPreview() }
         .onDisappear { player.pause() }
         .sheet(isPresented: $showsGuide) {
             SetWallpaperGuideView()
@@ -172,11 +172,13 @@ struct WallpaperDetailView: View {
         }
     }
 
-    private func startPreview() {
-        guard let videoURL = wallpaper.videoURL else { return }
+    /// Plays the cached download, which Save then reuses, instead of streaming the file a second time.
+    private func startPreview() async {
+        guard wallpaper.isLive else { return }
         guard looper == nil else { return player.play() }
+        guard let file = try? await CatalogService.downloadMedia(wallpaper) else { return }
         player.isMuted = true
-        looper = AVPlayerLooper(player: player, templateItem: AVPlayerItem(url: videoURL))
+        looper = AVPlayerLooper(player: player, templateItem: AVPlayerItem(url: file))
         player.play()
     }
 }

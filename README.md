@@ -116,7 +116,58 @@ Database migrations aren't deployed automatically; run `supabase db push` after 
 
 ### Releasing
 
-The App Store version is `MARKETING_VERSION` in `project.yml` (1.0.1 for fixes, 1.1.0 for features); Xcode Cloud sets the build number. Work goes into `dev`: branch from it and open pull requests into it. `main` only receives releases, because every push to `main` makes an Xcode Cloud TestFlight build. To release, open a pull request from `dev` into `main`: the [Version bump](.github/workflows/version-bump.yml) workflow sets the next version on `dev` (minor by default; label the pull request `release: patch` or `release: major` to change it). Merge it with a merge commit (not squash). The Release workflow tags the merge `vX.Y.Z` and creates the GitHub release, and Xcode Cloud sends that build to TestFlight for submission. After a release, `dev` already contains everything in `main`. A version with a suffix, such as `1.1.0-beta.1`, makes a pre-release.
+`main` only receives releases, because every push to `main` makes an Xcode Cloud TestFlight build.
+
+**Branches**
+- `dev` is where work goes. Branch from it, and open pull requests into it.
+- `main` changes only through a release pull request from `dev`.
+
+**Versions**
+- The App Store version is `MARKETING_VERSION` in [`project.yml`](project.yml). Xcode Cloud sets the build number.
+- Bump the patch (1.1.1 → 1.1.2) for fixes and the minor (1.1.x → 1.2.0) for features.
+- A version with a suffix, such as `1.2.0-beta.1`, becomes a GitHub pre-release.
+
+#### 1. Get `dev` ready
+- Merge every pull request meant for the release into `dev`.
+- Run the tests (see [Tests](#tests)).
+- Check a device build of `dev`, especially Liquid Glass screens: some glass bugs only show on hardware.
+
+#### 2. Open the release pull request
+Open a pull request from `dev` into `main`. To bump anything other than the minor version, add the label as you open it:
+
+```bash
+gh pr create --base main --head dev --label "release: patch" --title "Release X.Y.Z"
+```
+
+| Label | Bump |
+| --- | --- |
+| none | minor: 1.1.2 → 1.2.0 |
+| `release: patch` | patch: 1.1.2 → 1.1.3 |
+| `release: major` | major: 1.1.2 → 2.0.0 |
+
+[Version bump](.github/workflows/version-bump.yml) then commits `Version X.Y.Z` to `dev`, so the pull request carries the new version.
+- It always computes the version from `main`'s, so changing the label or running it again is safe.
+- The run started by its own commit may show **action required** in Actions. That run has nothing left to do, and the version commit is already on `dev`.
+
+#### 3. Merge
+Merge with a **merge commit**, not squash, so `dev` and `main` keep the same history. Then:
+- [Release](.github/workflows/release.yml) tags the merge `vX.Y.Z` and creates a GitHub release with notes from the merged pull requests.
+- Xcode Cloud archives `main` and uploads the build to TestFlight.
+- If the release touches `supabase/functions/`, [Deploy Supabase functions](.github/workflows/deploy-functions.yml) deploys them.
+- Database migrations are not deployed for you: review them, then run `supabase db push`.
+
+#### 4. App Store Connect
+1. Create the version `X.Y.Z`.
+   - If an earlier version was never submitted, change its number instead: its notes and screenshots stay.
+2. Fill in What's New, then update screenshots, App Privacy and review notes if the release changes them (see [docs/app-store.md](docs/app-store.md)).
+3. Once the TestFlight build has processed, test it on a device.
+4. Choose the build for the version, then **Add for Review**.
+
+#### Fixing a release that hasn't shipped
+Fix it the same way:
+- Open a pull request into `dev`.
+- Open a new `dev` → `main` pull request with `release: patch`.
+- Choose the new build for the version in App Store Connect, renaming the version to match.
 
 ## Project structure
 

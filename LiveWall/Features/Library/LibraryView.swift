@@ -300,8 +300,6 @@ private struct CreationRow: View {
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.specularRim, lineWidth: 1))
-                // The detail sheet zooms out of the thumbnail.
-                .zoomSource(id: creation.id, in: zoom, cornerRadius: 8)
 
             // Date on top; the time below it, with the kind and length at the far end of that line.
             VStack(alignment: .leading, spacing: 10) {
@@ -345,6 +343,9 @@ private struct CreationRow: View {
             }
         }
         .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        // The detail sheet zooms out of the whole row, not the 38 pt thumbnail: squeezing its glass panel down to
+        // the thumbnail's size crashes iOS 27's glass renderer (RingShadow.distanceRange).
+        .zoomSource(id: creation.id, in: zoom, cornerRadius: 18)
         .accessibilityElement(children: .combine)
         .task(id: creation.id) {
             thumbnail = await Thumbnail.load(creation.imageURL, maxPixelSize: 240)

@@ -262,6 +262,7 @@ struct ExploreView: View {
                             CategoryTile(section: section)
                         }
                         .buttonStyle(CardPressStyle())
+                        .accessibilityIdentifier("category-tile")
                     }
                 }
             }
@@ -542,7 +543,7 @@ private struct FeaturedCard: View {
             .overlay {
                 WallpaperThumbnail(wallpaper: wallpaper)
                     .overlay {
-                        if let videoURL = wallpaper.videoURL { LoopingVideoView(url: videoURL, isPlaying: isPlaying) }
+                        if wallpaper.isLive { LoopingVideoView(wallpaper: wallpaper, isPlaying: isPlaying) }
                     }
             }
             .overlay(alignment: .topLeading) {
@@ -585,7 +586,7 @@ private struct CatalogCard: View {
             .overlay {
                 WallpaperThumbnail(wallpaper: wallpaper)
                     .overlay {
-                        if let videoURL = wallpaper.videoURL { LoopingVideoView(url: videoURL, isPlaying: isPreviewing) }
+                        if wallpaper.isLive { LoopingVideoView(wallpaper: wallpaper, isPlaying: isPreviewing) }
                     }
             }
             .overlay(alignment: .topLeading) {
