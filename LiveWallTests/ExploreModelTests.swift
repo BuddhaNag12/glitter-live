@@ -32,6 +32,12 @@ struct ExploreModelTests {
         #expect(model.categories.map { $0.cover?.title } == ["B", "C"])
     }
 
+    @Test func categoriesCarryTheirUploadedCoverImage() {
+        let image = URL(string: "https://example.com/covers/n.jpg")!
+        let model = ExploreModel(wallpapers: [wallpaper("A", category: "Nature"), wallpaper("B", category: "Abstract")], categoryCovers: ["Nature": image])
+        #expect(model.categories.map(\.coverImageURL) == [image, nil])
+    }
+
     @Test func featuredPrefersTheFlagThenTheFeaturedCategory() {
         let flagged = ExploreModel(wallpapers: [wallpaper("A", category: "Featured"), wallpaper("B", featured: true)])
         #expect(flagged.featured.map(\.title) == ["B"])

@@ -9,6 +9,8 @@ final class ExploreModel {
         let id: String
         let title: String
         let wallpapers: [Wallpaper]
+        /// An image uploaded for the category in the admin site; it wins over `cover`.
+        var coverImageURL: URL? = nil
 
         /// The wallpaper picked as the cover in the admin site, else the first.
         var cover: Wallpaper? { wallpapers.first { $0.isCategoryCover == true } ?? wallpapers.first }
@@ -16,9 +18,11 @@ final class ExploreModel {
 
     private(set) var state: State = .loading
     private(set) var wallpapers: [Wallpaper]
+    private(set) var categoryCovers: [String: URL]
 
-    init(wallpapers: [Wallpaper] = []) {
+    init(wallpapers: [Wallpaper] = [], categoryCovers: [String: URL] = [:]) {
         self.wallpapers = wallpapers
+        self.categoryCovers = categoryCovers
     }
 
     /// Leads Explore as a carousel: wallpapers flagged as featured, or else the catalog's Featured category.
@@ -34,7 +38,8 @@ final class ExploreModel {
         let carousel = featured.map(\.id)
         return wallpapers.map(\.category).filter { seen.insert($0).inserted }
             .map { category in
-                Section(id: "category:\(category)", title: category, wallpapers: wallpapers.filter { $0.category == category })
+                Section(id: "category:\(category)", title: category, wallpapers: wallpapers.filter { $0.category == category },
+                        coverImageURL: categoryCovers[category])
             }
             // A Featured category that already fills the carousel would only repeat it.
             .filter { $0.wallpapers.map(\.id) != carousel }
@@ -46,7 +51,9 @@ final class ExploreModel {
         #endif
         if wallpapers.isEmpty { state = .loading }
         do {
+            async let covers = CatalogService.fetchCategoryCovers()
             wallpapers = try await CatalogService.fetchWallpapers()
+            categoryCovers = await covers
             state = .loaded
         } catch {
             if wallpapers.isEmpty { state = .failed(error.localizedDescription) }
@@ -417,10 +424,13 @@ private struct CardPressStyle: ButtonStyle {
 }
 
 private struct WallpaperThumbnail: View {
-    let wallpaper: Wallpaper
+    let url: URL
+
+    init(wallpaper: Wallpaper) { url = wallpaper.thumbnailURL }
+    init(url: URL) { self.url = url }
 
     var body: some View {
-        AsyncImage(url: wallpaper.thumbnailURL, transaction: Transaction(animation: .easeOut(duration: 0.25))) { phase in
+        AsyncImage(url: url, transaction: Transaction(animation: .easeOut(duration: 0.25))) { phase in
             if let image = phase.image {
                 image.resizable().scaledToFill()
             } else {
@@ -431,7 +441,7 @@ private struct WallpaperThumbnail: View {
     }
 }
 
-/// A category to open: its cover wallpaper, its name and how many wallpapers it has.
+/// A category to open: its cover image or wallpaper, its name and how many wallpapers it has.
 private struct CategoryTile: View {
     let section: ExploreModel.Section
 
@@ -439,7 +449,11 @@ private struct CategoryTile: View {
         Theme.lockScreen
             .aspectRatio(4 / 3, contentMode: .fit)
             .overlay {
-                if let cover = section.cover { WallpaperThumbnail(wallpaper: cover) }
+                if let url = section.coverImageURL {
+                    WallpaperThumbnail(url: url)
+                } else if let cover = section.cover {
+                    WallpaperThumbnail(wallpaper: cover)
+                }
             }
             .overlay(alignment: .bottomLeading) {
                 VStack(alignment: .leading, spacing: 1) {
