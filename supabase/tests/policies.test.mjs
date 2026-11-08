@@ -59,3 +59,11 @@ await as('authenticated', admin, `insert into storage.objects (bucket_id, name) 
 await fails(as('authenticated', admin, `insert into storage.objects (bucket_id, name) values ('other', 'x')`), 'admin cannot write other buckets');
 await as('authenticated', admin, `delete from wallpapers where kind = 'still'`);
 ok((await as('anon', null, 'select * from catalog')).rows.length === 6, 'admin can delete');
+const before0004 = JSON.stringify((await as('anon', null, SEL)).rows);
+await db.exec(readFileSync(repo + '/supabase/migrations/0004_category_covers.sql', 'utf8'));
+ok(JSON.stringify((await as('anon', null, SEL)).rows) === before0004, '1.0 request unchanged after 0004');
+await as('authenticated', admin, `update wallpapers set is_category_cover = true where title = 'W3'`);
+ok((await as('anon', null, `select title from catalog where is_category_cover`)).rows[0]?.title === 'W3', 'admin can set a cover, and catalog shows it');
+await fails(as('authenticated', admin, `update wallpapers set is_category_cover = true where title = 'W4'`), 'a second cover in the same category is rejected');
+await fails(as('authenticated', other, `update wallpapers set is_category_cover = false where title = 'W3'`).then(r => { if (!r.affectedRows) throw new Error('no rows changed') }), 'non-admin cannot change covers');
+

@@ -9,6 +9,9 @@ final class ExploreModel {
         let id: String
         let title: String
         let wallpapers: [Wallpaper]
+
+        /// The wallpaper picked as the cover in the admin site, else the first.
+        var cover: Wallpaper? { wallpapers.first { $0.isCategoryCover == true } ?? wallpapers.first }
     }
 
     private(set) var state: State = .loading
@@ -428,7 +431,7 @@ private struct WallpaperThumbnail: View {
     }
 }
 
-/// A category to open: its first wallpaper as the cover, its name and how many wallpapers it has.
+/// A category to open: its cover wallpaper, its name and how many wallpapers it has.
 private struct CategoryTile: View {
     let section: ExploreModel.Section
 
@@ -436,7 +439,7 @@ private struct CategoryTile: View {
         Theme.lockScreen
             .aspectRatio(4 / 3, contentMode: .fit)
             .overlay {
-                if let cover = section.wallpapers.first { WallpaperThumbnail(wallpaper: cover) }
+                if let cover = section.cover { WallpaperThumbnail(wallpaper: cover) }
             }
             .overlay(alignment: .bottomLeading) {
                 VStack(alignment: .leading, spacing: 1) {
