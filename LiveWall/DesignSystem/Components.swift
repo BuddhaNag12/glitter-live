@@ -35,6 +35,13 @@ extension EnvironmentValues {
     @Entry var isOnGlass = false
     /// False on tabs that aren't selected, so their background effects stop redrawing.
     @Entry var isTabSelected = true
+    /// True while the launch intro's logo is on its way to the header, which shows it only once it lands.
+    @Entry var hidesBrandLogo = false
+}
+
+/// Where the header logo sits on screen, so the launch intro can land its logo on it.
+@Observable final class BrandLogoTarget {
+    var frame: CGRect?
 }
 
 private struct LiquidGlass<S: InsettableShape>: ViewModifier {
@@ -319,6 +326,9 @@ private struct ScreenHeaderBar: ViewModifier {
 private struct ScreenHeader: View {
     let title: String
     @Environment(\.showSettings) private var showSettings
+    @Environment(\.hidesBrandLogo) private var hidesBrandLogo
+    @Environment(\.isTabSelected) private var isTabSelected
+    @Environment(BrandLogoTarget.self) private var logoTarget: BrandLogoTarget?
 
     var body: some View {
         // Equal side columns keep the logo centred and stop the title from running into it.
@@ -334,6 +344,10 @@ private struct ScreenHeader: View {
                 .resizable()
                 .scaledToFit()
                 .frame(height: 30)
+                .opacity(hidesBrandLogo ? 0 : 1)
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
+                    if hidesBrandLogo, isTabSelected { logoTarget?.frame = frame }
+                }
                 .accessibilityLabel("Glitter Live")
             Button(action: showSettings.callAsFunction) {
                 Image(systemName: "gearshape.fill")
