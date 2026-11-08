@@ -25,6 +25,13 @@ struct ExploreModelTests {
         #expect(model.categories[1].wallpapers.map(\.title) == ["B", "C"])
     }
 
+    @Test func categoryCoverPrefersThePickThenTheFirst() {
+        var picked = wallpaper("B", category: "Nature")
+        picked.isCategoryCover = true
+        let model = ExploreModel(wallpapers: [wallpaper("A", category: "Nature"), picked, wallpaper("C", category: "Abstract")])
+        #expect(model.categories.map { $0.cover?.title } == ["B", "C"])
+    }
+
     @Test func featuredPrefersTheFlagThenTheFeaturedCategory() {
         let flagged = ExploreModel(wallpapers: [wallpaper("A", category: "Featured"), wallpaper("B", featured: true)])
         #expect(flagged.featured.map(\.title) == ["B"])

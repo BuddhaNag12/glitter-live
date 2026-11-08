@@ -33,6 +33,8 @@ nonisolated struct Wallpaper: Codable, Identifiable, Hashable, Sendable {
     let creatorName: String?
     let creatorURL: URL?
     let isFeatured: Bool
+    /// Picked in the admin site as its category's cover. Optional so a catalog without the column still decodes.
+    var isCategoryCover: Bool? = nil
     /// Kept as text, so a timestamp format change can't fail the whole catalog's decoding.
     let createdAt: String?
 
@@ -45,6 +47,7 @@ nonisolated struct Wallpaper: Codable, Identifiable, Hashable, Sendable {
         case creatorName = "creator_name"
         case creatorURL = "creator_url"
         case isFeatured = "is_featured"
+        case isCategoryCover = "is_category_cover"
         case createdAt = "created_at"
     }
 
@@ -78,7 +81,7 @@ nonisolated enum CatalogService {
         // A change that would break this decoder needs a new view (`catalog_v2`), not an edit to this one.
         var components = URLComponents(url: CatalogConfig.projectURL.appending(path: "rest/v1/catalog"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
-            URLQueryItem(name: "select", value: "id,kind,title,category,video_path,image_path,thumbnail_path,duration_seconds,width,height,creator_name,creator_url,is_featured,created_at"),
+            URLQueryItem(name: "select", value: "id,kind,title,category,video_path,image_path,thumbnail_path,duration_seconds,width,height,creator_name,creator_url,is_featured,is_category_cover,created_at"),
             URLQueryItem(name: "order", value: "sort_order.asc,created_at.desc"),
         ]
         var request = URLRequest(url: components.url!)
