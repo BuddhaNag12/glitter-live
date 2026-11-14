@@ -52,6 +52,7 @@ private struct LiquidGlass<S: InsettableShape>: ViewModifier {
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.isTabSelected) private var isTabSelected
 
     func body(content: Content) -> some View {
         let increasedContrast = contrast == .increased
@@ -74,10 +75,9 @@ private struct LiquidGlass<S: InsettableShape>: ViewModifier {
         } else if #available(iOS 26, *) {
             content
                 .environment(\.isOnGlass, true)
-                .glassEffect(Glass.regular.tint(surfaceTint).interactive(interactive), in: shape)
-                // No materialize: on a device a tab's glass re-materializes from a pale blur when it comes back after
-                // the intro, flashing the panels grey for a split second.
-                .glassEffectTransition(.identity)
+                // Off while the tab is hidden, so it's drawn fresh each time the tab comes back: iOS 27 stops drawing a
+                // hidden tab's glass, and everything inside it, after a sheet has been shown over the tabs.
+                .glassEffect(isTabSelected ? Glass.regular.tint(surfaceTint).interactive(interactive) : .identity, in: shape)
                 .overlay { if isChrome { shape.strokeBorder(Theme.chromeRim, lineWidth: 0.75).allowsHitTesting(false) } }
         } else {
             content
