@@ -66,6 +66,8 @@ final class ExploreModel {
 private struct Opened: Identifiable {
     let wallpaper: Wallpaper
     let source: String
+    /// The wallpapers it was opened among, which the detail view swipes through.
+    var wallpapers: [Wallpaper] = []
     var id: String { source }
 }
 
@@ -106,7 +108,9 @@ struct ExploreView: View {
             // A navigation stack paints over the tab's background, so it carries its own.
             .background { AppBackground() }
             .navigationDestination(for: ExploreModel.Section.self) { section in
-                SectionGrid(section: section, zoom: zoom) { opened = $0 }
+                SectionGrid(section: section, zoom: zoom) { card in
+                    opened = Opened(wallpaper: card.wallpaper, source: card.source, wallpapers: section.wallpapers)
+                }
             }
         }
         .task { await model.load() }
@@ -118,8 +122,9 @@ struct ExploreView: View {
         .onChange(of: holdsReveal, revealIfReady)
         .onAppear { isVisible = true }
         .onDisappear { isVisible = false }
-        .sheet(item: $opened) { opened in
-            WallpaperDetailView(wallpaper: opened.wallpaper)
+        // Full screen, like the Lock Screen itself; the zoom lets it be swiped down to close.
+        .fullScreenCover(item: $opened) { opened in
+            WallpaperDetailView(wallpapers: opened.wallpapers, startingAt: opened.wallpaper)
                 .zoomTransition(from: opened.source, in: zoom)
         }
     }
@@ -178,7 +183,7 @@ struct ExploreView: View {
                         let wallpaper = featured[position % count]
                         Button {
                             if position == current {
-                                opened = Opened(wallpaper: wallpaper, source: "featured/\(position)")
+                                opened = Opened(wallpaper: wallpaper, source: "featured/\(position)", wallpapers: featured)
                             } else {
                                 // A side card slides to the centre first, like picking up the next album.
                                 withAnimation(.smooth(duration: 0.45)) { featuredPage = position }
