@@ -125,40 +125,40 @@ struct WallpaperDetailView: View {
         .padding(.top, 4)
     }
 
+    /// The details in a glass card, and beside it, on its own, the download button.
     private var panel: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 6) {
+        HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
                     Text(current.title).typography(.titleMedium).foregroundStyle(Theme.textPrimary).lineLimit(1)
-                    HStack(spacing: 8) {
-                        kindChip
-                        if let creator = current.creatorName {
-                            Text("by \(creator)").font(.labelMedium).foregroundStyle(Theme.textSecondary).lineLimit(1)
-                        }
-                    }
-                    if current.isLive {
-                        Text("Touch and hold to replay the motion")
-                            .font(.labelSmall)
-                            .foregroundStyle(Theme.textTertiary)
-                            .lineLimit(1)
-                    }
+                    Spacer(minLength: 0)
+                    kindChip
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentTransition(.opacity)
-                .animation(.easeOut(duration: 0.2), value: current.id)
-                saveButton
+                if let creator = current.creatorName {
+                    Text("by \(creator)").font(.labelMedium).foregroundStyle(Theme.textSecondary).lineLimit(1)
+                }
+                if current.isLive {
+                    Text("Touch and hold to replay the motion")
+                        .font(.labelSmall)
+                        .foregroundStyle(Theme.textTertiary)
+                        .lineLimit(1)
+                }
+                if case .failed(let message) = saver.phase {
+                    Label(message, systemImage: "exclamationmark.triangle")
+                        .font(.labelMedium)
+                        .foregroundStyle(Theme.danger)
+                }
             }
-            if case .failed(let message) = saver.phase {
-                Label(message, systemImage: "exclamationmark.triangle")
-                    .font(.labelMedium)
-                    .foregroundStyle(Theme.danger)
-            }
+            .contentTransition(.opacity)
+            .animation(.easeOut(duration: 0.2), value: current.id)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .glass(.floating, cornerRadius: 24)
+
+            saveButton
         }
-        .padding(.leading, 18)
-        .padding(.trailing, 12)
-        .padding(.vertical, 12)
-        .glass(.floating, cornerRadius: 26)
-        .padding(.horizontal, 28)
+        .padding(.horizontal, 20)
         // Above the Lock Screen's flashlight and camera, which stay visible below it.
         .padding(.bottom, 72)
     }
@@ -209,7 +209,7 @@ struct WallpaperDetailView: View {
                 .font(.system(size: 19, weight: .bold))
                 .foregroundStyle(.white)
                 .contentTransition(.symbolEffect(.replace))
-                .frame(width: 50, height: 50)
+                .frame(width: 58, height: 58)
                 .overlay {
                     if saver.isWorking { SpinningRing().padding(3) }
                 }
@@ -217,10 +217,9 @@ struct WallpaperDetailView: View {
                 .animation(.snappy, value: saver.phase)
         }
         .buttonStyle(PressScaleButtonStyle())
-        // Liquid Glass tinted blue, like the tab bar, sitting on the panel's own glass. On the Button rather than its
-        // label, which is where glass inside buttons has crashed iOS 27's renderer.
-        .liquidGlass(in: Circle(), tint: Theme.accent.opacity(0.65), interactive: true)
-        .environment(\.isOnGlass, false)
+        // Clear Liquid Glass, like the tab bar. On the Button rather than its label, which is where glass inside
+        // buttons has crashed iOS 27's renderer.
+        .liquidGlass(in: Circle(), interactive: true)
         .accessibilityLabel(saveLabel)
         .accessibilityValue(progressTitle)
     }
