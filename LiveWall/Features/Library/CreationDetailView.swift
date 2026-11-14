@@ -42,23 +42,31 @@ private struct CreationActions: View {
     var body: some View {
         HStack(spacing: 10) {
             Menu {
-                if !creation.isLive {
-                    Button("Add Motion", systemImage: "sparkles") { addsMotion = true }
-                }
+                // Once saved, its state and what to do next sit here, under a heading, instead of a tick in the corner.
                 if creation.savedToPhotos {
-                    Button("Save Again", systemImage: "square.and.arrow.down", action: save)
+                    Section("Saved to Photos") {
+                        Button("How to Set as Wallpaper", systemImage: "iphone.gen3") { showsGuide = true }
+                        Button("Save Again", systemImage: "square.and.arrow.down", action: save)
+                    }
                 }
-                Button("Delete", systemImage: "trash", role: .destructive) { confirmsDelete = true }
+                Section {
+                    if !creation.isLive {
+                        Button("Add Motion", systemImage: "sparkles") { addsMotion = true }
+                    }
+                    Button("Delete", systemImage: "trash", role: .destructive) { confirmsDelete = true }
+                }
             } label: {
                 Image(systemName: "ellipsis")
             }
             .buttonStyle(CircleIconButtonStyle(size: 40))
-            .accessibilityLabel("More")
+            .accessibilityLabel(creation.savedToPhotos ? "More, saved to Photos" : "More")
 
-            SaveIconButton(phase: phase, label: creation.savedToPhotos ? "Saved to Photos. How to set it as your wallpaper" : "Save to Photos") {
-                if creation.savedToPhotos { showsGuide = true } else { save() }
+            if !creation.savedToPhotos || isSaving {
+                SaveIconButton(phase: phase, label: "Save to Photos", action: save)
+                    .transition(.scale.combined(with: .opacity))
             }
         }
+        .animation(.snappy, value: creation.savedToPhotos)
         .sheet(isPresented: $showsGuide) { SetWallpaperGuideView(isLive: creation.isLive) }
         .fullScreenCover(isPresented: $addsMotion) { AddMotionView(imageURL: creation.imageURL) }
         .confirmationDialog("Delete this wallpaper from Glitter Live?", isPresented: $confirmsDelete, titleVisibility: .visible) {

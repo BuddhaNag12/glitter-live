@@ -243,12 +243,14 @@ struct ConvertFlowView: View {
     let editor: ConvertEditor
     var labels = LivePhotoResultView.Labels()
     var onClose: () -> Void
+    /// The result's "new" button; closing Trim Studio still calls `onClose`.
+    var onNew: (() -> Void)?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         switch editor.phase {
         case .finished(let result, let saved):
-            LivePhotoResultView(editor: editor, result: result, saved: saved, labels: labels, onNewVideo: onClose)
+            LivePhotoResultView(editor: editor, result: result, saved: saved, labels: labels, onNewVideo: onNew ?? onClose)
                 .transition(.screen(reduceMotion: reduceMotion))
         case .unavailable(let message):
             ContentUnavailableView {

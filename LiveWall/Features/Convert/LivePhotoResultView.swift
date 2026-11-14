@@ -20,6 +20,9 @@ struct LivePhotoResultView: View {
     @State private var showsGuide = false
     /// Height of everything except the phone, so the phone can take what's left of the screen.
     @State private var chromeHeight: CGFloat = 0
+    @State private var showsFullScreen = false
+    @State private var viewerID = UUID()
+    @Namespace private var zoom
 
     var body: some View {
         GeometryReader { geometry in
@@ -36,10 +39,34 @@ struct LivePhotoResultView: View {
         .sheet(isPresented: $showsGuide) {
             SetWallpaperGuideView()
         }
+        .fullScreenCover(isPresented: $showsFullScreen) {
+            let video = result.videoURL
+            LockScreenViewer(
+                items: [ViewerItem(id: viewerID, title: "Your live wallpaper", isLive: true, image: result.imageURL, video: { @Sendable in video })],
+                startingAt: viewerID
+            ) { _ in
+                SaveIconButton(
+                    phase: isSaving ? .working : saved ? .saved : .ready,
+                    label: saved ? "Saved to Photos. How to set it as your wallpaper" : labels.save
+                ) {
+                    if saved { showsGuide = true } else { save() }
+                }
+            }
+            .sheet(isPresented: $showsGuide) { SetWallpaperGuideView() }
+            .zoomTransition(from: viewerID, in: zoom)
+        }
         .alert("Couldn't save", isPresented: .constant(editor.errorMessage != nil)) {
             Button("OK") { editor.errorMessage = nil }
         } message: {
             Text(editor.errorMessage ?? "")
+        }
+    }
+
+    private func save() {
+        Task {
+            isSaving = true
+            await editor.save(result)
+            isSaving = false
         }
     }
 
@@ -71,6 +98,11 @@ struct LivePhotoResultView: View {
                     }
             }
             .frame(width: phoneWidth)
+            .zoomSource(id: viewerID, in: zoom, cornerRadius: 24)
+            // A tap opens the full-screen Lock Screen view; touch and hold still plays the Live Photo here.
+            .onTapGesture { showsFullScreen = true }
+            .accessibilityAddTraits(.isButton)
+            .accessibilityHint("Shows it full screen")
 
             Label("Touch and hold the preview to play it", systemImage: "hand.tap")
                 .font(.labelMedium)
@@ -85,13 +117,7 @@ struct LivePhotoResultView: View {
                     }
                     .buttonStyle(KineticButtonStyle())
                 } else {
-                    Button {
-                        Task {
-                            isSaving = true
-                            await editor.save(result)
-                            isSaving = false
-                        }
-                    } label: {
+                    Button(action: save) {
                         Label(isSaving ? "Saving…" : labels.save, systemImage: "square.and.arrow.down")
                     }
                     .buttonStyle(KineticButtonStyle())
