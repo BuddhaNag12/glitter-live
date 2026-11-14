@@ -29,8 +29,8 @@ struct LibraryView: View {
         }
     }
 
-    /// List or grid; the choice is remembered.
-    @AppStorage("library.layout") private var layout = Layout.list
+    /// Grid or list; the choice is remembered.
+    @AppStorage("library.layout.v2") private var layout = Layout.grid
 
     enum Layout: String {
         case list, grid
@@ -58,9 +58,6 @@ struct LibraryView: View {
                     // Only once something is picked, so the bar never sits there doing nothing.
                     if isSelecting && !selectedIDs.isEmpty { deleteBar.transition(.move(edge: .bottom).combined(with: .opacity)) }
                 }
-                .overlay(alignment: .bottomTrailing) {
-                    if !isSelecting { newButton.transition(.scale.combined(with: .opacity)) }
-                }
                 .screenHeader("Library")
             }
         }
@@ -77,8 +74,9 @@ struct LibraryView: View {
         }
         .sensoryFeedback(.success, trigger: creations.count) { old, new in new < old }
         .onChange(of: creations.isEmpty) { _, isEmpty in if isEmpty { endSelecting() } }
-        .sheet(item: $selection) { creation in
-            CreationDetailView(creation: creation)
+        // Full screen, like Explore; swipes through what the filter shows.
+        .fullScreenCover(item: $selection) { creation in
+            CreationDetailView(creations: visibleCreations, start: creation)
                 .zoomTransition(from: creation.id, in: zoom)
         }
         #if DEBUG
@@ -211,22 +209,6 @@ struct LibraryView: View {
                 Button("Delete", systemImage: "trash", role: .destructive) { pendingDeletion = [creation] }
             }
         }
-    }
-
-    /// Floats above the tab bar, like a compose button, so the toolbar row stays about the Library itself.
-    private var newButton: some View {
-        Button(action: onConvert) {
-            Image(systemName: "plus")
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(Theme.onAccent)
-                .frame(width: 56, height: 56)
-                .background(Theme.accentFill, in: Circle())
-                .shadow(color: Theme.accentFill.opacity(0.4), radius: 12, y: 4)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("New Wallpaper")
-        .padding(.trailing, 20)
-        .padding(.bottom, 12)
     }
 
     private var deleteBar: some View {
