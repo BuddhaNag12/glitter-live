@@ -35,6 +35,13 @@ extension EnvironmentValues {
     @Entry var isOnGlass = false
     /// False on tabs that aren't selected, so their background effects stop redrawing.
     @Entry var isTabSelected = true
+    /// True while the launch intro's logo is on its way to the header, which shows it only once it lands.
+    @Entry var hidesBrandLogo = false
+}
+
+/// Where the header logo sits on screen, so the launch intro can land its logo on it.
+@Observable final class BrandLogoTarget {
+    var frame: CGRect?
 }
 
 private struct LiquidGlass<S: InsettableShape>: ViewModifier {
@@ -45,6 +52,7 @@ private struct LiquidGlass<S: InsettableShape>: ViewModifier {
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.isTabSelected) private var isTabSelected
 
     func body(content: Content) -> some View {
         let increasedContrast = contrast == .increased
@@ -67,10 +75,9 @@ private struct LiquidGlass<S: InsettableShape>: ViewModifier {
         } else if #available(iOS 26, *) {
             content
                 .environment(\.isOnGlass, true)
-                .glassEffect(Glass.regular.tint(surfaceTint).interactive(interactive), in: shape)
-                // No materialize: on a device a tab's glass re-materializes from a pale blur when it comes back after
-                // the intro, flashing the panels grey for a split second.
-                .glassEffectTransition(.identity)
+                // Off while the tab is hidden, so it's drawn fresh each time the tab comes back: iOS 27 stops drawing a
+                // hidden tab's glass, and everything inside it, after a sheet has been shown over the tabs.
+                .glassEffect(isTabSelected ? Glass.regular.tint(surfaceTint).interactive(interactive) : .identity, in: shape)
                 .overlay { if isChrome { shape.strokeBorder(Theme.chromeRim, lineWidth: 0.75).allowsHitTesting(false) } }
         } else {
             content
@@ -180,29 +187,6 @@ struct PressScaleButtonStyle: ButtonStyle {
             .scaleEffect(configuration.isPressed ? 0.88 : 1)
             .opacity(configuration.isPressed ? 0.7 : 1)
             .animation(.spring(duration: 0.2), value: configuration.isPressed)
-    }
-}
-
-/// Compact blue capsule, as used for "Save" in the Trim Studio toolbar.
-struct AccentCapsuleButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        AccentCapsule(configuration: configuration)
-    }
-
-    private struct AccentCapsule: View {
-        let configuration: Configuration
-        @Environment(\.isEnabled) private var isEnabled
-
-        var body: some View {
-            configuration.label
-                .typography(.titleMedium)
-                .foregroundStyle(isEnabled ? Theme.onAccent : Theme.accent.opacity(0.55))
-                .padding(.horizontal, 18)
-                .frame(height: 44)
-                .background { if isEnabled { Capsule().fill(Theme.accentGradient) } else { DisabledFill(shape: Capsule()) } }
-                .scaleEffect(configuration.isPressed ? 0.95 : 1)
-                .animation(.spring(duration: 0.2), value: configuration.isPressed)
-        }
     }
 }
 
@@ -319,6 +303,9 @@ private struct ScreenHeaderBar: ViewModifier {
 private struct ScreenHeader: View {
     let title: String
     @Environment(\.showSettings) private var showSettings
+    @Environment(\.hidesBrandLogo) private var hidesBrandLogo
+    @Environment(\.isTabSelected) private var isTabSelected
+    @Environment(BrandLogoTarget.self) private var logoTarget: BrandLogoTarget?
 
     var body: some View {
         // Equal side columns keep the logo centred and stop the title from running into it.
@@ -334,6 +321,10 @@ private struct ScreenHeader: View {
                 .resizable()
                 .scaledToFit()
                 .frame(height: 30)
+                .opacity(hidesBrandLogo ? 0 : 1)
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
+                    if hidesBrandLogo, isTabSelected { logoTarget?.frame = frame }
+                }
                 .accessibilityLabel("Glitter Live")
             Button(action: showSettings.callAsFunction) {
                 Image(systemName: "gearshape.fill")

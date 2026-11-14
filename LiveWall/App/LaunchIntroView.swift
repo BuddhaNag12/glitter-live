@@ -11,16 +11,22 @@ enum LaunchIntro {
 }
 
 /// The logo reveal designed in Jitter (`Branding/logo-animated.json`): the ensō paints on, the mark glides left
-/// and "Glitter Live" emerges from behind it. It starts on the plain launch screen and fades into the app.
+/// and "Glitter Live" emerges from behind it. It starts on the plain launch screen, then the logo flies up into the
+/// header as the app appears beneath it. When there's no header to land on (the onboarding is showing, or Reduce
+/// Motion is on), it fades instead.
 struct LaunchIntroView: View {
     var onFinish: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(BrandLogoTarget.self) private var logoTarget: BrandLogoTarget?
+    @AppStorage(OnboardingState.completedKey) private var hasCompletedOnboarding = false
     /// Set when the intro first appears, not when it's created: app startup can take a moment, and the
     /// animation shouldn't have run by the time it's on screen.
     @State private var start: Date?
     @State private var skippedAt: Date?
+    /// Where the logo lands, fixed when the exit begins: the header is only laid out once the app is underneath.
+    @State private var landing: CGRect?
 
     private let art = LogoArtwork.shared
 
@@ -29,29 +35,47 @@ struct LaunchIntroView: View {
     private static let hold = 200.0
     private static let fade = 350.0
     private static let skipFade = 200.0
+    private static let flight = 650.0
+    private static let skipFlight = 350.0
+
+    /// The header logo (`renderAppBarLogo` in `scripts/render-icon.swift`) is the same artwork with the same type size,
+    /// but its mark is smaller: 384 units tall, words starting at 448, against the intro's words at 950.
+    private static let headerLogoSize = CGSize(width: 2131.519, height: 384)
+    private static let headerWords = CGPoint(x: 448, y: 192)
+    private static let introWords = CGPoint(x: 120 + 760 + 70, y: LogoArtwork.height / 2)
+    /// The header's mark against the intro's (0.405 vs 0.742 of the 1024-unit artwork), and how far right its
+    /// centre sits, in intro units, once the words line up.
+    private static let landedMarkScale: CGFloat = (384.0 / 1024 * 1.08) / (760.0 / 1024)
+    private static let landedMarkShift: CGFloat = 950 - (448 - 192) - LogoArtwork.markCenter.x
 
     var body: some View {
         TimelineView(.animation) { context in
             let elapsed = start.map { context.date.timeIntervalSince($0) * 1000 } ?? 0
+            let exit = exitProgress(at: context.date, flying: landing != nil)
             ZStack {
                 Color("LaunchBackground").ignoresSafeArea()
+                    .opacity(landing == nil ? 1 : 1 - exit)
                 GeometryReader { geometry in
-                    lockup(at: reduceMotion ? .infinity : elapsed)
+                    let place = placement(in: geometry, landing: landing, progress: exit)
+                    lockup(at: reduceMotion ? .infinity : elapsed, landing: landing == nil ? 0 : exit)
                         .frame(width: art.width, height: LogoArtwork.height, alignment: .topLeading)
-                        .scaleEffect(min(geometry.size.width * 0.84 / art.width, 1))
+                        .scaleEffect(place.scale)
+                        .offset(place.offset)
                         .frame(width: geometry.size.width, height: geometry.size.height)
                 }
                 .opacity(reduceMotion ? Self.eased(progress(elapsed, 0, 250), .standard) : 1)
             }
-            .opacity(1 - fadeOut(at: context.date))
+            .opacity(landing == nil ? 1 - exit : 1)
         }
         .contentShape(Rectangle())
         // Nobody should have to sit through it.
-        .onTapGesture { if skippedAt == nil { skippedAt = .now } }
+        .onTapGesture { if skippedAt == nil, start != nil, Date.now < fadeStart { skippedAt = .now } }
         .task(id: skippedAt) {
             if start == nil { start = .now }
-            let remaining = finishDate.timeIntervalSinceNow
-            try? await Task.sleep(for: .seconds(max(remaining, 0)))
+            try? await Task.sleep(for: .seconds(max(fadeStart.timeIntervalSinceNow, 0)))
+            guard !Task.isCancelled else { return }
+            landing = headerLogoFrame
+            try? await Task.sleep(for: .seconds(max(finishDate.timeIntervalSinceNow, 0)))
             if !Task.isCancelled { onFinish() }
         }
         .accessibilityElement()
@@ -67,13 +91,45 @@ struct LaunchIntroView: View {
         return (start ?? .now).addingTimeInterval(reveal / 1000)
     }
 
-    private var finishDate: Date {
-        fadeStart.addingTimeInterval((skippedAt == nil ? Self.fade : Self.skipFade) / 1000)
+    /// The header logo as drawn, when the logo can fly there. The image fits inside its frame, so a narrow header
+    /// draws it shorter than the frame, centred.
+    private var headerLogoFrame: CGRect? {
+        guard !reduceMotion, hasCompletedOnboarding, let frame = logoTarget?.frame, frame.width > 0, frame.height > 0 else { return nil }
+        let unit = min(frame.width / Self.headerLogoSize.width, frame.height / Self.headerLogoSize.height)
+        let size = CGSize(width: Self.headerLogoSize.width * unit, height: Self.headerLogoSize.height * unit)
+        return CGRect(x: frame.midX - size.width / 2, y: frame.midY - size.height / 2, width: size.width, height: size.height)
     }
 
-    private func fadeOut(at date: Date) -> Double {
-        let duration = (skippedAt == nil ? Self.fade : Self.skipFade) / 1000
-        return Self.eased(min(max(date.timeIntervalSince(fadeStart) / duration, 0), 1), .slowdown)
+    private func exitDuration(flying: Bool) -> Double {
+        (flying ? (skippedAt == nil ? Self.flight : Self.skipFlight) : (skippedAt == nil ? Self.fade : Self.skipFade)) / 1000
+    }
+
+    private var finishDate: Date {
+        fadeStart.addingTimeInterval(exitDuration(flying: landing != nil))
+    }
+
+    private func exitProgress(at date: Date, flying: Bool) -> Double {
+        let t = min(max(date.timeIntervalSince(fadeStart) / exitDuration(flying: flying), 0), 1)
+        return Self.eased(t, flying ? .standard : .slowdown)
+    }
+
+    /// Centred on the launch screen, then (as `progress` runs to 1) scaled and moved so the words sit exactly on
+    /// the header logo's words.
+    private func placement(in geometry: GeometryProxy, landing: CGRect?, progress p: Double) -> (scale: CGFloat, offset: CGSize) {
+        let start = min(geometry.size.width * 0.84 / art.width, 1)
+        guard let landing, p > 0 else { return (start, .zero) }
+        let end = landing.height / Self.headerLogoSize.height
+        let scale = start + (end - start) * p
+        let box = geometry.frame(in: .global)
+        // Where the words begin when the lockup is centred at scale `s` with no offset.
+        func centred(_ s: CGFloat) -> CGPoint {
+            CGPoint(x: box.width / 2 + (Self.introWords.x - art.width / 2) * s,
+                    y: box.height / 2 + (Self.introWords.y - LogoArtwork.height / 2) * s)
+        }
+        let from = centred(start)
+        let to = CGPoint(x: landing.minX - box.minX + Self.headerWords.x * end, y: landing.minY - box.minY + Self.headerWords.y * end)
+        let natural = centred(scale)
+        return (scale, CGSize(width: from.x + (to.x - from.x) * p - natural.x, height: from.y + (to.y - from.y) * p - natural.y))
     }
 
     private func progress(_ elapsed: Double, _ from: Double, _ to: Double) -> Double {
@@ -92,7 +148,8 @@ struct LaunchIntroView: View {
 
     // MARK: Lockup
 
-    private func lockup(at t: Double) -> some View {
+    /// `landing` runs from 0 to 1 as the logo flies to the header, shrinking the mark to the header's proportions.
+    private func lockup(at t: Double, landing: Double) -> some View {
         let ink = colorScheme == .dark ? Color.white : Color(hex: 0x0F172A)
         let blue = Color(hex: 0x3B82F6)
         let slate = Color(hex: 0x64748B)
@@ -110,7 +167,8 @@ struct LaunchIntroView: View {
             shine(at: t)
             pop(art.iSparkle, color: blue, around: art.iSparkleCenter, at: t, from: 950, to: 1100, scale: 0.2, turn: -45)
             mark(at: t, ink: ink, blue: blue, slate: slate)
-                .offset(x: shift)
+                .scaleEffect(1 - (1 - Self.landedMarkScale) * landing, anchor: art.anchor(LogoArtwork.markCenter))
+                .offset(x: shift + Self.landedMarkShift * landing)
         }
     }
 

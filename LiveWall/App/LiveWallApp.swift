@@ -23,6 +23,7 @@ struct LiveWallApp: App {
     @State private var conversions: ConversionAllowance
     @State private var purchases: Purchases
     @State private var incoming = IncomingVideo()
+    @State private var logoTarget = BrandLogoTarget()
 
     init() {
         let conversions = ConversionAllowance()
@@ -36,6 +37,7 @@ struct LiveWallApp: App {
         WindowGroup {
             ZStack {
                 RootTabView(isLaunchIntroPlaying: playsLaunchIntro)
+                    .environment(\.hidesBrandLogo, playsLaunchIntro)
                 if playsLaunchIntro {
                     LaunchIntroView { playsLaunchIntro = false }
                 }
@@ -45,6 +47,7 @@ struct LiveWallApp: App {
             .environment(conversions)
             .environment(purchases)
             .environment(incoming)
+            .environment(logoTarget)
             .task { await purchases.load() }
             .task { if FeatureFlags.showsAds { await RewardedAds.shared.warmUp() } }
         }

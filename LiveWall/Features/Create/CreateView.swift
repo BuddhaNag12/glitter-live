@@ -40,8 +40,9 @@ struct CreateView: View {
                 if let editor = model.editor {
                     ConvertFlowView(
                         editor: editor,
-                        labels: .init(save: "Save Live Wallpaper", edit: "Edit Motion", new: "Back to Still", newSymbol: "photo"),
-                        onClose: model.backToStill
+                        labels: .init(save: "Save Live Wallpaper", edit: "Edit Motion", new: "New Image", newSymbol: "square.and.pencil"),
+                        onClose: model.backToStill,
+                        onNew: model.editPrompt
                     )
                 }
             }

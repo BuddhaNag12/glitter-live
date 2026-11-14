@@ -13,16 +13,19 @@ struct TrimStudioView: View {
     private let ads = RewardedAds.shared
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 18) {
-                toolbar
-                CropPreview(editor: editor, isFraming: $isFraming)
-                    .containerRelativeFrame(.horizontal) { width, _ in width * 0.74 }
-                timelinePanel
+        GeometryReader { geometry in
+            ScrollView {
+                VStack(spacing: 18) {
+                    toolbar
+                    CropPreview(editor: editor, isFraming: $isFraming)
+                        .frame(width: previewWidth(in: geometry.size))
+                    // The motion settings sit below the fold; scrolling brings them up.
+                    timelinePanel
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 24)
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-            .padding(.bottom, 24)
         }
         .scrollIndicators(.hidden)
         .scrollDisabled(isFraming)
@@ -55,6 +58,14 @@ struct TrimStudioView: View {
         }
     }
 
+    /// The whole phone fits on screen under the toolbar, with the top of the settings peeking up beneath it.
+    private func previewWidth(in size: CGSize) -> CGFloat {
+        let toolbarAndGaps: CGFloat = 12 + 44 + 18 + 18
+        let peek: CGFloat = 36
+        let fittingWidth = (size.height - toolbarAndGaps - peek) * WallpaperFormat.aspectRatio
+        return max(min(size.width - 32, fittingWidth), 140)
+    }
+
     private var toolbar: some View {
         HStack {
             // Only asks when there's work to lose.
@@ -64,12 +75,10 @@ struct TrimStudioView: View {
             Spacer()
             StatusPill(text: "TRIM STUDIO")
             Spacer()
-            Button(action: convert) {
-                Label("Save", systemImage: "arrow.right")
-                    .labelStyle(TrailingIconLabelStyle())
+            // The same download button as the full-screen viewer.
+            SaveIconButton(phase: editor.phase == .exporting ? .working : .ready, label: "Save Live Photo") {
+                if editor.phase == .editing { convert() }
             }
-            .buttonStyle(AccentCapsuleButtonStyle())
-            .disabled(editor.phase != .editing)
         }
     }
 
@@ -284,15 +293,6 @@ private struct ValueChip: View {
             .padding(.horizontal, 9)
             .frame(height: 26)
             .background(tint.opacity(0.16), in: Capsule())
-    }
-}
-
-private struct TrailingIconLabelStyle: LabelStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: 6) {
-            configuration.title
-            configuration.icon
-        }
     }
 }
 
