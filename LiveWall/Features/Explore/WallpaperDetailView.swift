@@ -59,7 +59,8 @@ struct WallpaperDetailView: View {
     /// The title card shows for a moment, then fades away so the wallpaper is seen whole; a tap brings it back.
     @State private var showsDetails = true
     @State private var detailsShownAt = Date.now
-    @State private var showsLockScreen = true
+    /// While a finger holds the wallpaper, the app's controls step aside so it's seen as it really is.
+    @State private var isHolding = false
     @State private var showsGuide = false
 
     init(wallpapers: [Wallpaper], startingAt wallpaper: Wallpaper) {
@@ -73,7 +74,9 @@ struct WallpaperDetailView: View {
         ScrollView(.horizontal) {
             LazyHStack(spacing: 0) {
                 ForEach(wallpapers) { wallpaper in
-                    LockScreenPage(wallpaper: wallpaper, isCurrent: wallpaper.id == currentID, showsLockScreen: showsLockScreen)
+                    LockScreenPage(wallpaper: wallpaper, isCurrent: wallpaper.id == currentID) { holding in
+                        withAnimation(.easeOut(duration: 0.2)) { isHolding = holding }
+                    }
                         .containerRelativeFrame([.horizontal, .vertical])
                 }
             }
@@ -101,14 +104,14 @@ struct WallpaperDetailView: View {
             withAnimation(.easeInOut(duration: 0.5)) { showsDetails = false }
         }
         .overlay(alignment: .top) {
-            if showsControls { topBar.transition(.opacity) }
+            if showsControls && !isHolding { topBar.transition(.opacity) }
         }
         .overlay(alignment: .bottom) {
-            if showsControls { panel.transition(.opacity.combined(with: .move(edge: .bottom))) }
+            if showsControls && !isHolding { panel.transition(.opacity.combined(with: .move(edge: .bottom))) }
         }
         .overlay(alignment: .bottom) {
             // Level with the Lock Screen's flashlight and camera.
-            if showsControls, wallpapers.count > 1 { position.padding(.bottom, 12).transition(.opacity) }
+            if showsControls, !isHolding, wallpapers.count > 1 { position.padding(.bottom, 12).transition(.opacity) }
         }
         // Each wallpaper starts with its own Save button.
         .onChange(of: currentID) {
@@ -134,55 +137,44 @@ struct WallpaperDetailView: View {
                 .buttonStyle(CircleIconButtonStyle(size: 40))
                 .accessibilityLabel("Close")
             Spacer()
-            Button {
-                withAnimation(.easeOut(duration: 0.25)) { showsLockScreen.toggle() }
-            } label: {
-                Image(systemName: showsLockScreen ? "lock.rectangle.on.rectangle" : "photo")
-            }
-            .buttonStyle(CircleIconButtonStyle(size: 40))
-            .accessibilityLabel(showsLockScreen ? "Show the wallpaper only" : "Show the Lock Screen")
+            saveButton
         }
         .padding(.horizontal, 16)
         .padding(.top, 4)
     }
 
     /// The details in a glass card, and beside it, on its own, the download button.
+    /// The title and how to see the wallpaper whole, centred above the Lock Screen's flashlight and camera.
     private var panel: some View {
-        HStack(alignment: .center, spacing: 10) {
-            VStack(alignment: .leading, spacing: 8) {
-                // A long title wraps to a second line, then truncates.
-                Text(current.title)
-                    .typography(.titleMedium)
-                    .foregroundStyle(Theme.textPrimary)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.9)
-                if current.isLive {
-                    Label("Touch and hold to replay the motion", systemImage: "hand.tap.fill")
-                        .font(.labelMedium)
-                        .foregroundStyle(Theme.textSecondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.85)
-                }
-                if case .failed(let message) = saver.phase {
-                    Label(message, systemImage: "exclamationmark.triangle")
-                        .font(.labelMedium)
-                        .foregroundStyle(Theme.danger)
-                }
+        VStack(spacing: 8) {
+            // A long title wraps to a second line, then truncates.
+            Text(current.title)
+                .typography(.titleMedium)
+                .foregroundStyle(Theme.textPrimary)
+                .lineLimit(2)
+                .minimumScaleFactor(0.9)
+            Label(current.isLive ? "Hold to see it live" : "Hold to see the full image", systemImage: "hand.tap.fill")
+                .font(.labelMedium)
+                .foregroundStyle(Theme.textSecondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+            if case .failed(let message) = saver.phase {
+                Label(message, systemImage: "exclamationmark.triangle")
+                    .font(.labelMedium)
+                    .foregroundStyle(Theme.danger)
             }
-            .contentTransition(.opacity)
-            .animation(.easeOut(duration: 0.2), value: current.id)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .glass(.floating, cornerRadius: 24)
-            .opacity(showsDetails || saver.phase != .idle ? 1 : 0)
-            .blur(radius: showsDetails || saver.phase != .idle ? 0 : 8)
-            .offset(y: showsDetails || saver.phase != .idle ? 0 : 10)
-            .allowsHitTesting(showsDetails)
-
-            saveButton
         }
-        .padding(.horizontal, 20)
+        .multilineTextAlignment(.center)
+        .contentTransition(.opacity)
+        .animation(.easeOut(duration: 0.2), value: current.id)
+        .padding(.horizontal, 22)
+        .padding(.vertical, 12)
+        .glass(.floating, cornerRadius: 24)
+        .opacity(showsDetails || saver.phase != .idle ? 1 : 0)
+        .blur(radius: showsDetails || saver.phase != .idle ? 0 : 8)
+        .offset(y: showsDetails || saver.phase != .idle ? 0 : 10)
+        .allowsHitTesting(showsDetails)
+        .padding(.horizontal, 32)
         // Above the Lock Screen's flashlight and camera, which stay visible below it.
         .padding(.bottom, 72)
     }
@@ -225,10 +217,10 @@ struct WallpaperDetailView: View {
             }
         } label: {
             Image(systemName: symbol)
-                .font(.system(size: 19, weight: .bold))
+                .font(.system(size: 16, weight: .bold))
                 .foregroundStyle(.white)
                 .contentTransition(.symbolEffect(.replace))
-                .frame(width: 58, height: 58)
+                .frame(width: 44, height: 44)
                 .overlay {
                     if saver.isWorking { SpinningRing().padding(3) }
                 }
@@ -266,7 +258,9 @@ struct WallpaperDetailView: View {
 private struct LockScreenPage: View {
     let wallpaper: Wallpaper
     let isCurrent: Bool
-    let showsLockScreen: Bool
+    var onHold: (Bool) -> Void = { _ in }
+
+    @State private var isHolding = false
 
     @State private var player: AVPlayer?
     @State private var cover: UIImage?
@@ -296,16 +290,26 @@ private struct LockScreenPage: View {
             }
             .clipped()
             .overlay {
-                if showsLockScreen { LockScreenOverlay().transition(.opacity) }
+                // Holding a still shows the full image, without the clock and widgets over it.
+                if !(isHolding && !wallpaper.isLive) { LockScreenOverlay().transition(.opacity) }
             }
         .contentShape(Rectangle())
-        .onLongPressGesture(minimumDuration: 0.3) { if wallpaper.isLive { wakes += 1 } }
+        // Hold: a live wallpaper plays its motion again, a still drops the Lock Screen; letting go puts it back.
+        .onLongPressGesture(minimumDuration: 0.3) {
+            if wallpaper.isLive { wakes += 1 }
+            withAnimation(.easeOut(duration: 0.2)) { isHolding = true }
+            onHold(true)
+        } onPressingChanged: { pressing in
+            guard !pressing, isHolding else { return }
+            withAnimation(.easeOut(duration: 0.2)) { isHolding = false }
+            onHold(false)
+        }
         .task(id: WakeKey(isCurrent: isCurrent, wakes: wakes)) {
             if isCurrent { await wake() } else { player?.pause() }
         }
         .accessibilityElement()
         .accessibilityLabel(wallpaper.title)
-        .accessibilityHint(wallpaper.isLive ? "Touch and hold to play its motion again." : "")
+        .accessibilityHint(wallpaper.isLive ? "Touch and hold to see it live." : "Touch and hold to see the full image.")
     }
 
     private struct WakeKey: Equatable { let isCurrent: Bool; let wakes: Int }
