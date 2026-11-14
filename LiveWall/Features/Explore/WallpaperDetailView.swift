@@ -88,6 +88,10 @@ struct WallpaperDetailView: View {
         .overlay(alignment: .bottom) {
             if showsControls { panel.transition(.opacity.combined(with: .move(edge: .bottom))) }
         }
+        .overlay(alignment: .bottom) {
+            // Level with the Lock Screen's flashlight and camera.
+            if showsControls, wallpapers.count > 1 { position.padding(.bottom, 12).transition(.opacity) }
+        }
         // Each wallpaper starts with its own Save button.
         .onChange(of: currentID) { if !saver.isWorking { saver = WallpaperSaver() } }
         .sheet(isPresented: $showsGuide) { SetWallpaperGuideView() }
@@ -124,9 +128,14 @@ struct WallpaperDetailView: View {
     private var panel: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 6) {
                     Text(current.title).typography(.titleMedium).foregroundStyle(Theme.textPrimary).lineLimit(1)
-                    Text(subtitle).font(.labelMedium).foregroundStyle(Theme.textSecondary).lineLimit(1)
+                    HStack(spacing: 8) {
+                        kindChip
+                        if let creator = current.creatorName {
+                            Text("by \(creator)").font(.labelMedium).foregroundStyle(Theme.textSecondary).lineLimit(1)
+                        }
+                    }
                     if current.isLive {
                         Text("Touch and hold to replay the motion")
                             .font(.labelSmall)
@@ -149,9 +158,34 @@ struct WallpaperDetailView: View {
         .padding(.trailing, 12)
         .padding(.vertical, 12)
         .glass(.floating, cornerRadius: 26)
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 28)
         // Above the Lock Screen's flashlight and camera, which stay visible below it.
         .padding(.bottom, 72)
+    }
+
+    /// "LIVE · 4.0s" or "STILL", like the badges on the cards.
+    @ViewBuilder
+    private var kindChip: some View {
+        if let seconds = current.durationSeconds {
+            StatusPill(text: "LIVE · \(seconds.formatted(.number.precision(.fractionLength(1))))s", symbol: "livephoto")
+        } else {
+            StatusPill(text: "STILL", symbol: "photo")
+        }
+    }
+
+    /// Which wallpaper this is, between the Lock Screen's flashlight and camera.
+    private var position: some View {
+        let index = (wallpapers.firstIndex { $0.id == current.id } ?? 0) + 1
+        return Text("\(index) / \(wallpapers.count)")
+            .font(.labelMedium.weight(.semibold))
+            .monospacedDigit()
+            .foregroundStyle(.white)
+            .contentTransition(.numericText())
+            .animation(.snappy, value: index)
+            .padding(.horizontal, 12)
+            .frame(height: 28)
+            .background(.black.opacity(0.35), in: Capsule())
+            .accessibilityLabel("Wallpaper \(index) of \(wallpapers.count)")
     }
 
     /// One round button through the whole save: a download arrow, a spinning ring while it works, then a tick
@@ -172,17 +206,21 @@ struct WallpaperDetailView: View {
             }
         } label: {
             Image(systemName: symbol)
-                .font(.system(size: 20, weight: .bold))
+                .font(.system(size: 19, weight: .bold))
                 .foregroundStyle(.white)
                 .contentTransition(.symbolEffect(.replace))
-                .frame(width: 52, height: 52)
-                .background(Theme.accentGradient, in: Circle())
+                .frame(width: 50, height: 50)
                 .overlay {
                     if saver.isWorking { SpinningRing().padding(3) }
                 }
+                .contentShape(Circle())
                 .animation(.snappy, value: saver.phase)
         }
         .buttonStyle(PressScaleButtonStyle())
+        // Liquid Glass tinted blue, like the tab bar, sitting on the panel's own glass. On the Button rather than its
+        // label, which is where glass inside buttons has crashed iOS 27's renderer.
+        .liquidGlass(in: Circle(), tint: Theme.accent.opacity(0.65), interactive: true)
+        .environment(\.isOnGlass, false)
         .accessibilityLabel(saveLabel)
         .accessibilityValue(progressTitle)
     }
@@ -193,16 +231,6 @@ struct WallpaperDetailView: View {
         case .failed: "Couldn't save. Try again"
         default: current.isLive ? "Save as Live Wallpaper" : "Save as Wallpaper"
         }
-    }
-
-    /// "Live · 4.0s · by Glitter Live · 2 of 6", or "Still · by …"; the clock's corners stay clear for the buttons.
-    private var subtitle: String {
-        var parts = [current.durationSeconds.map { "Live · \($0.formatted(.number.precision(.fractionLength(1))))s" } ?? "Still"]
-        if let creator = current.creatorName { parts.append("by \(creator)") }
-        if wallpapers.count > 1, let index = wallpapers.firstIndex(where: { $0.id == current.id }) {
-            parts.append("\(index + 1) of \(wallpapers.count)")
-        }
-        return parts.joined(separator: " · ")
     }
 
     private var progressTitle: String {
