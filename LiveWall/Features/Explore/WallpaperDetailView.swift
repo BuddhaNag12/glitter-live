@@ -1,4 +1,3 @@
-import AVFoundation
 import SwiftData
 import SwiftUI
 
@@ -45,140 +44,92 @@ final class WallpaperSaver {
     }
 }
 
+/// Catalog wallpapers in the full-screen Lock Screen viewer, with a download button for each.
 struct WallpaperDetailView: View {
+    let wallpapers: [Wallpaper]
+    let start: Wallpaper
+
+    init(wallpapers: [Wallpaper], startingAt wallpaper: Wallpaper) {
+        self.wallpapers = wallpapers.contains { $0.id == wallpaper.id } ? wallpapers : [wallpaper]
+        start = wallpaper
+    }
+
+    var body: some View {
+        LockScreenViewer(items: wallpapers.map(\.viewerItem), startingAt: start.id) { item in
+            if let wallpaper = wallpapers.first(where: { $0.id == item.id }) {
+                // One saver per wallpaper, so each page starts with its own button.
+                // shortcut: swiping away mid-save drops the button's progress (the save itself finishes).
+                CatalogSaveButton(wallpaper: wallpaper).id(wallpaper.id)
+            }
+        }
+    }
+}
+
+private extension Wallpaper {
+    var viewerItem: ViewerItem {
+        ViewerItem(
+            id: id,
+            title: title,
+            isLive: isLive,
+            image: isLive ? thumbnailURL : mediaURL,
+            placeholder: isLive ? nil : thumbnailURL,
+            video: isLive ? { @Sendable [self] in try? await CatalogService.downloadMedia(self) } : nil
+        )
+    }
+}
+
+/// Downloads and saves a catalog wallpaper; once saved, it opens the how-to-set guide.
+private struct CatalogSaveButton: View {
     let wallpaper: Wallpaper
 
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.dismiss) private var dismiss
     @State private var saver = WallpaperSaver()
-    @State private var player = AVQueuePlayer()
-    @State private var looper: AVPlayerLooper?
     @State private var showsGuide = false
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 16) {
-                    DeviceFrame {
-                        Theme.lockScreen
-                            .overlay {
-                                if wallpaper.isLive {
-                                    PlayerLayerView(player: player)
-                                } else {
-                                    AsyncImage(url: wallpaper.mediaURL) { image in
-                                        image.resizable().scaledToFill()
-                                    } placeholder: {
-                                        ProgressView()
-                                    }
-                                }
-                            }
-                            .overlay { LockScreenOverlay(showsMotionBadge: wallpaper.isLive) }
-                    }
-                    .containerRelativeFrame(.horizontal) { width, _ in width * 0.56 }
-
-                    VStack(spacing: 4) {
-                        Text(wallpaper.title).typography(.headlineSmall).foregroundStyle(Theme.textPrimary)
-                        if let creator = wallpaper.creatorName {
-                            Group {
-                                if let url = wallpaper.creatorURL {
-                                    Link("by \(creator)", destination: url)
-                                } else {
-                                    Text("by \(creator)")
-                                }
-                            }
-                            .font(.labelMedium)
-                            .foregroundStyle(Theme.textSecondary)
-                        }
-                    }
-
-                    actions
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 24)
-            }
-            .scrollIndicators(.hidden)
-            .background { AppBackground(twinkles: false) }
-            .navigationTitle(wallpaper.category)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
-                }
-            }
-        }
-        .task { await startPreview() }
-        .onDisappear { player.pause() }
-        .sheet(isPresented: $showsGuide) {
-            SetWallpaperGuideView()
-        }
-        .sensoryFeedback(trigger: saver.phase) { _, phase in
-            switch phase {
-            case .saved: .success
-            case .failed: .error
-            default: nil
-            }
-        }
-    }
-
-    private var actions: some View {
-        VStack(spacing: 12) {
+        SaveIconButton(phase: phase, label: label) {
             if saver.phase == .saved {
-                StatusPill(text: "SAVED TO PHOTOS", highlighted: true, symbol: "checkmark")
-                Button { showsGuide = true } label: {
-                    Label("Set as Wallpaper", systemImage: "iphone.gen3")
-                }
-                .buttonStyle(KineticButtonStyle())
+                showsGuide = true
             } else {
-                Button {
-                    Task { await saver.save(wallpaper, library: CreationLibrary(context: modelContext)) }
-                } label: {
-                    if saver.isWorking {
-                        HStack(spacing: 10) {
-                            ProgressView().tint(.white)
-                            Text(progressTitle)
-                        }
-                    } else {
-                        if wallpaper.isLive {
-                            Label("Save as Live Wallpaper", systemImage: "livephoto")
-                        } else {
-                            Label("Save as Wallpaper", systemImage: "photo")
-                        }
-                    }
-                }
-                .buttonStyle(KineticButtonStyle())
-                .disabled(saver.isWorking)
+                Task { await saver.save(wallpaper, library: CreationLibrary(context: modelContext)) }
             }
-            if case .failed(let message) = saver.phase {
-                Label(message, systemImage: "exclamationmark.triangle")
-                    .font(.labelMedium)
-                    .foregroundStyle(Theme.danger)
-                    .multilineTextAlignment(.center)
-            }
-            Text("Saved to Photos and your Library, ready for the Lock Screen.")
-                .font(.labelMedium)
-                .foregroundStyle(Theme.textSecondary)
-                .multilineTextAlignment(.center)
         }
-        .padding(18)
-        .glass(.floating, cornerRadius: 30)
+        .accessibilityValue(progress)
+        .sheet(isPresented: $showsGuide) { SetWallpaperGuideView() }
+        .alert("Couldn't save", isPresented: Binding(get: { failure != nil }, set: { if !$0 { saver = WallpaperSaver() } })) {
+            Button("OK") {}
+        } message: {
+            Text(failure ?? "")
+        }
     }
 
-    private var progressTitle: String {
+    private var failure: String? {
+        if case .failed(let message) = saver.phase { message } else { nil }
+    }
+
+    private var phase: SaveIconButton.Phase {
+        switch saver.phase {
+        case .idle: .ready
+        case .saved: .saved
+        case .failed: .failed
+        default: .working
+        }
+    }
+
+    private var label: String {
+        switch saver.phase {
+        case .saved: "Saved to Photos. How to set it as your wallpaper"
+        case .failed: "Couldn't save. Try again"
+        default: wallpaper.isLive ? "Save as Live Wallpaper" : "Save as Wallpaper"
+        }
+    }
+
+    private var progress: String {
         switch saver.phase {
         case .downloading: "Downloading…"
         case .creating: wallpaper.isLive ? "Creating Live Photo…" : "Preparing…"
         case .saving: "Saving…"
         default: ""
         }
-    }
-
-    /// Plays the cached download, which Save then reuses, instead of streaming the file a second time.
-    private func startPreview() async {
-        guard wallpaper.isLive else { return }
-        guard looper == nil else { return player.play() }
-        guard let file = try? await CatalogService.downloadMedia(wallpaper) else { return }
-        player.isMuted = true
-        looper = AVPlayerLooper(player: player, templateItem: AVPlayerItem(url: file))
-        player.play()
     }
 }

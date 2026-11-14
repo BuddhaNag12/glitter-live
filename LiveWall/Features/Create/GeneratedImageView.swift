@@ -11,6 +11,9 @@ struct GeneratedImageView: View {
     @State private var showsGuide = false
     @State private var showsReportReasons = false
     @State private var isReported = false
+    @State private var showsFullScreen = false
+    @State private var viewerID = UUID()
+    @Namespace private var zoom
 
     var body: some View {
         ScrollView {
@@ -34,20 +37,15 @@ struct GeneratedImageView: View {
                 }
                 // Small enough that every action fits above the tab bar without scrolling.
                 .containerRelativeFrame(.horizontal) { width, _ in width * 0.4 }
+                .zoomSource(id: viewerID, in: zoom, cornerRadius: 24)
+                // Tap for the full-screen Lock Screen view, as in Explore and the Library.
+                .onTapGesture { showsFullScreen = true }
                 .accessibilityLabel("Generated wallpaper: \(model.prompt)")
+                .accessibilityAddTraits(.isButton)
+                .accessibilityHint("Shows it full screen")
 
                 VStack(spacing: 10) {
-                    Button {
-                        if model.savedStill {
-                            showsGuide = true
-                        } else {
-                            Task {
-                                isSaving = true
-                                await model.saveStill(library: library)
-                                isSaving = false
-                            }
-                        }
-                    } label: {
+                    Button(action: saveOrShowGuide) {
                         Label(saveTitle, systemImage: model.savedStill ? "iphone.gen3" : "square.and.arrow.down")
                     }
                     .buttonStyle(KineticButtonStyle())
@@ -67,8 +65,9 @@ struct GeneratedImageView: View {
                             Label("Try Again", systemImage: "arrow.clockwise").frame(maxWidth: .infinity)
                         }
                         .disabled(!model.canGenerate)
+                        // Back to the description, kept so it can be changed, for a new image.
                         Button(action: model.editPrompt) {
-                            Label("Edit Prompt", systemImage: "pencil").frame(maxWidth: .infinity)
+                            Label("New Image", systemImage: "square.and.pencil").frame(maxWidth: .infinity)
                         }
                     }
                     .buttonStyle(GlassPillButtonStyle())
@@ -104,6 +103,32 @@ struct GeneratedImageView: View {
         }
         .sheet(isPresented: $showsGuide) {
             SetWallpaperGuideView(isLive: false)
+        }
+        .fullScreenCover(isPresented: $showsFullScreen) {
+            LockScreenViewer(
+                items: [ViewerItem(id: viewerID, title: "Your wallpaper", isLive: false, image: imageURL)],
+                startingAt: viewerID
+            ) { _ in
+                SaveIconButton(
+                    phase: isSaving ? .working : model.savedStill ? .saved : .ready,
+                    label: model.savedStill ? "Saved to Photos. How to set it as your wallpaper" : "Save Wallpaper",
+                    action: saveOrShowGuide
+                )
+            }
+            .sheet(isPresented: $showsGuide) { SetWallpaperGuideView(isLive: false) }
+            .zoomTransition(from: viewerID, in: zoom)
+        }
+    }
+
+    private func saveOrShowGuide() {
+        if model.savedStill {
+            showsGuide = true
+        } else {
+            Task {
+                isSaving = true
+                await model.saveStill(library: library)
+                isSaving = false
+            }
         }
     }
 

@@ -190,29 +190,6 @@ struct PressScaleButtonStyle: ButtonStyle {
     }
 }
 
-/// Compact blue capsule, as used for "Save" in the Trim Studio toolbar.
-struct AccentCapsuleButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        AccentCapsule(configuration: configuration)
-    }
-
-    private struct AccentCapsule: View {
-        let configuration: Configuration
-        @Environment(\.isEnabled) private var isEnabled
-
-        var body: some View {
-            configuration.label
-                .typography(.titleMedium)
-                .foregroundStyle(isEnabled ? Theme.onAccent : Theme.accent.opacity(0.55))
-                .padding(.horizontal, 18)
-                .frame(height: 44)
-                .background { if isEnabled { Capsule().fill(Theme.accentGradient) } else { DisabledFill(shape: Capsule()) } }
-                .scaleEffect(configuration.isPressed ? 0.95 : 1)
-                .animation(.spring(duration: 0.2), value: configuration.isPressed)
-        }
-    }
-}
-
 /// Disabled main buttons keep the brand blue but wash it out: a pale fill, a faint outline and a muted label,
 /// so they read as the same button, not ready yet, rather than a grey slab.
 private struct DisabledFill<S: InsettableShape>: View {

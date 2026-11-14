@@ -1,140 +1,90 @@
-import PhotosUI
 import SwiftData
 import SwiftUI
 
+/// Library wallpapers in the full-screen Lock Screen viewer: save to Photos from the corner, and more in its menu.
 struct CreationDetailView: View {
+    let creations: [Creation]
+    let start: Creation
+
+    var body: some View {
+        LockScreenViewer(items: creations.map(\.viewerItem), startingAt: start.id) { item in
+            if let creation = creations.first(where: { $0.id == item.id }) {
+                CreationActions(creation: creation).id(creation.id)
+            }
+        }
+    }
+}
+
+private extension Creation {
+    var viewerItem: ViewerItem {
+        let video = livePhoto.videoURL
+        return ViewerItem(
+            id: id,
+            title: createdAt.formatted(.dateTime.day().month(.abbreviated).hour().minute()),
+            isLive: isLive,
+            image: imageURL,
+            video: isLive ? { @Sendable in video } : nil
+        )
+    }
+}
+
+/// Save (or, once saved, how to set it), and a menu with Add Motion, Save Again and Delete.
+private struct CreationActions: View {
     let creation: Creation
 
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.dismiss) private var dismiss
-    @State private var livePhoto: PHLivePhoto?
-    @State private var still: UIImage?
-    @State private var filesMissing = false
     @State private var isSaving = false
     @State private var errorMessage: String?
     @State private var confirmsDelete = false
     @State private var showsGuide = false
     @State private var addsMotion = false
-    /// Counts successful saves, so "Save Again" confirms with a haptic too.
-    @State private var saves = 0
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 16) {
-                    DeviceFrame {
-                        Group {
-                            if creation.isLive {
-                                LivePhotoView(livePhoto: livePhoto)
-                            } else {
-                                Theme.lockScreen.overlay {
-                                    if let still { Image(uiImage: still).resizable().scaledToFill() }
-                                }
-                                .clipped()
-                            }
-                        }
-                        .overlay { LockScreenOverlay() }
-                        .overlay(alignment: .topLeading) {
-                            StatusPill(text: creation.isLive ? "LIVE" : "STILL", dot: creation.isLive ? Theme.signalYellow : Theme.slate)
-                                .padding(12)
-                        }
+        HStack(spacing: 10) {
+            Menu {
+                // Once saved, its state and what to do next sit here, under a heading, instead of a tick in the corner.
+                if creation.savedToPhotos {
+                    Section("Saved to Photos") {
+                        Button("How to Set as Wallpaper", systemImage: "iphone.gen3") { showsGuide = true }
+                        Button("Save Again", systemImage: "square.and.arrow.down", action: save)
                     }
-                    .containerRelativeFrame(.horizontal) { width, _ in width * 0.5 }
-
-                    if filesMissing {
-                        Label("This wallpaper's files are missing.", systemImage: "exclamationmark.triangle")
-                            .font(.labelMedium)
-                            .foregroundStyle(Theme.signalYellow)
-                    } else if creation.isLive {
-                        Label("Touch and hold the preview to play it", systemImage: "hand.tap")
-                            .font(.labelMedium)
-                            .foregroundStyle(Theme.textSecondary)
+                }
+                Section {
+                    if !creation.isLive {
+                        Button("Add Motion", systemImage: "sparkles") { addsMotion = true }
                     }
+                    Button("Delete", systemImage: "trash", role: .destructive) { confirmsDelete = true }
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+            }
+            .buttonStyle(CircleIconButtonStyle(size: 40))
+            .accessibilityLabel(creation.savedToPhotos ? "More, saved to Photos" : "More")
 
-                    actions
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 24)
-            }
-            .scrollIndicators(.hidden)
-            .background { AppBackground(twinkles: false) }
-            .navigationTitle(Text(creation.createdAt, format: .dateTime.month(.wide).day().hour().minute()))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
-                }
+            if !creation.savedToPhotos || isSaving {
+                SaveIconButton(phase: phase, label: "Save to Photos", action: save)
+                    .transition(.scale.combined(with: .opacity))
             }
         }
-        .task(id: creation.id) {
-            guard creation.isLive else {
-                still = UIImage(contentsOfFile: creation.imageURL.path(percentEncoded: false))
-                filesMissing = still == nil
-                return
-            }
-            do {
-                livePhoto = try await LivePhotoLoader.load(creation.livePhoto)
-            } catch {
-                filesMissing = true
-            }
-        }
-        .sheet(isPresented: $showsGuide) {
-            SetWallpaperGuideView(isLive: creation.isLive)
-        }
-        .fullScreenCover(isPresented: $addsMotion) {
-            AddMotionView(imageURL: creation.imageURL)
-        }
-        .sensoryFeedback(.success, trigger: saves)
-        .sensoryFeedback(.error, trigger: errorMessage) { _, message in message != nil }
+        .animation(.snappy, value: creation.savedToPhotos)
+        .sheet(isPresented: $showsGuide) { SetWallpaperGuideView(isLive: creation.isLive) }
+        .fullScreenCover(isPresented: $addsMotion) { AddMotionView(imageURL: creation.imageURL) }
         .confirmationDialog("Delete this wallpaper from Glitter Live?", isPresented: $confirmsDelete, titleVisibility: .visible) {
             Button("Delete", role: .destructive, action: delete)
         } message: {
             Text("Any copy you saved to Photos stays there.")
         }
-        .alert("Something went wrong", isPresented: .constant(errorMessage != nil)) {
-            Button("OK") { errorMessage = nil }
+        .alert("Something went wrong", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+            Button("OK") {}
         } message: {
             Text(errorMessage ?? "")
         }
     }
 
-    private var actions: some View {
-        VStack(spacing: 14) {
-            if creation.savedToPhotos {
-                Button { showsGuide = true } label: {
-                    Label("Set as Wallpaper", systemImage: "iphone.gen3")
-                }
-                .buttonStyle(KineticButtonStyle())
-            } else {
-                Button(action: save) {
-                    Label(isSaving ? "Saving…" : "Save to Photos", systemImage: "square.and.arrow.down")
-                }
-                .buttonStyle(KineticButtonStyle())
-                .disabled(isSaving || filesMissing)
-            }
-            if !creation.isLive {
-                Button { addsMotion = true } label: {
-                    Label("Add Motion", systemImage: "sparkles").frame(maxWidth: .infinity)
-                }
-                .buttonStyle(GlassPillButtonStyle(tint: Theme.accent))
-                .disabled(filesMissing)
-            }
-            HStack(spacing: 12) {
-                if creation.savedToPhotos {
-                    Button(action: save) {
-                        Label(isSaving ? "Saving…" : "Save Again", systemImage: "square.and.arrow.down").frame(maxWidth: .infinity)
-                    }
-                    .disabled(isSaving || filesMissing)
-                }
-                Button { confirmsDelete = true } label: {
-                    Label("Delete", systemImage: "trash").frame(maxWidth: .infinity)
-                }
-                .buttonStyle(GlassPillButtonStyle(tint: Theme.danger))
-            }
-            .buttonStyle(GlassPillButtonStyle())
-        }
-        .padding(18)
-        .glass(.floating, cornerRadius: 30)
+    private var phase: SaveIconButton.Phase {
+        if isSaving { return .working }
+        if errorMessage != nil { return .failed }
+        return creation.savedToPhotos ? .saved : .ready
     }
 
     private func save() {
@@ -148,7 +98,6 @@ struct CreationDetailView: View {
                     try await LivePhotoSaver.saveStill(creation.imageURL)
                 }
                 creation.savedToPhotos = true
-                saves += 1
                 try? modelContext.save()
             } catch {
                 errorMessage = error.localizedDescription
@@ -156,10 +105,10 @@ struct CreationDetailView: View {
         }
     }
 
+    /// The viewer closes itself once nothing is left to show.
     private func delete() {
         do {
             try CreationLibrary(context: modelContext).delete(creation)
-            dismiss()
         } catch {
             errorMessage = error.localizedDescription
         }
