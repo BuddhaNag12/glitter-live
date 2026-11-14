@@ -122,57 +122,77 @@ struct WallpaperDetailView: View {
     }
 
     private var panel: some View {
-        VStack(spacing: 12) {
-            VStack(spacing: 3) {
-                Text(current.title).typography(.titleMedium).foregroundStyle(Theme.textPrimary).lineLimit(1)
-                Text(subtitle).font(.labelMedium).foregroundStyle(Theme.textSecondary).lineLimit(1)
-                if current.isLive {
-                    Text("Touch and hold the wallpaper to replay its motion")
-                        .font(.labelSmall)
-                        .foregroundStyle(Theme.textTertiary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .contentTransition(.opacity)
-            .animation(.easeOut(duration: 0.2), value: current.id)
-
-            if saver.phase == .saved {
-                Button { showsGuide = true } label: {
-                    Label("Saved to Photos · How to Set It", systemImage: "checkmark.circle.fill")
-                }
-                .buttonStyle(KineticButtonStyle())
-            } else {
-                Button {
-                    Task { await saver.save(current, library: CreationLibrary(context: modelContext)) }
-                } label: {
-                    if saver.isWorking {
-                        HStack(spacing: 10) {
-                            ProgressView().tint(.white)
-                            Text(progressTitle)
-                        }
-                    } else if current.isLive {
-                        Label("Save as Live Wallpaper", systemImage: "livephoto")
-                    } else {
-                        Label("Save as Wallpaper", systemImage: "photo")
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(current.title).typography(.titleMedium).foregroundStyle(Theme.textPrimary).lineLimit(1)
+                    Text(subtitle).font(.labelMedium).foregroundStyle(Theme.textSecondary).lineLimit(1)
+                    if current.isLive {
+                        Text("Touch and hold to replay the motion")
+                            .font(.labelSmall)
+                            .foregroundStyle(Theme.textTertiary)
+                            .lineLimit(1)
                     }
                 }
-                .buttonStyle(KineticButtonStyle())
-                .disabled(saver.isWorking)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentTransition(.opacity)
+                .animation(.easeOut(duration: 0.2), value: current.id)
+                saveButton
             }
             if case .failed(let message) = saver.phase {
                 Label(message, systemImage: "exclamationmark.triangle")
                     .font(.labelMedium)
                     .foregroundStyle(Theme.danger)
-                    .multilineTextAlignment(.center)
             }
         }
-        .padding(16)
-        .glass(.floating, cornerRadius: 28)
+        .padding(.leading, 18)
+        .padding(.trailing, 12)
+        .padding(.vertical, 12)
+        .glass(.floating, cornerRadius: 26)
         .padding(.horizontal, 16)
         // Above the Lock Screen's flashlight and camera, which stay visible below it.
         .padding(.bottom, 72)
+    }
+
+    /// One round button through the whole save: a download arrow, a spinning ring while it works, then a tick
+    /// that opens the how-to-set guide. After a failure it shows "!" and tapping tries again.
+    private var saveButton: some View {
+        let symbol = switch saver.phase {
+        case .saved: "checkmark"
+        case .failed: "exclamationmark"
+        default: "arrow.down.to.line"
+        }
+        return Button {
+            // Not disabled while it works: a disabled button lets taps through to the page, which hides the panel.
+            guard !saver.isWorking else { return }
+            if saver.phase == .saved {
+                showsGuide = true
+            } else {
+                Task { await saver.save(current, library: CreationLibrary(context: modelContext)) }
+            }
+        } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(.white)
+                .contentTransition(.symbolEffect(.replace))
+                .frame(width: 52, height: 52)
+                .background(Theme.accentGradient, in: Circle())
+                .overlay {
+                    if saver.isWorking { SpinningRing().padding(3) }
+                }
+                .animation(.snappy, value: saver.phase)
+        }
+        .buttonStyle(PressScaleButtonStyle())
+        .accessibilityLabel(saveLabel)
+        .accessibilityValue(progressTitle)
+    }
+
+    private var saveLabel: String {
+        switch saver.phase {
+        case .saved: "Saved to Photos. How to set it as your wallpaper"
+        case .failed: "Couldn't save. Try again"
+        default: current.isLive ? "Save as Live Wallpaper" : "Save as Wallpaper"
+        }
     }
 
     /// "Live · 4.0s · by Glitter Live · 2 of 6", or "Still · by …"; the clock's corners stay clear for the buttons.
@@ -269,5 +289,18 @@ private struct LockScreenPage: View {
         guard !Task.isCancelled else { return player.pause() }
         player.pause()
         withAnimation(.easeInOut(duration: 0.35)) { showsCover = true }
+    }
+}
+
+/// A quarter arc turning once a second around the save button while it works.
+private struct SpinningRing: View {
+    var body: some View {
+        TimelineView(.animation) { context in
+            Circle()
+                .trim(from: 0, to: 0.28)
+                .stroke(.white, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                .rotationEffect(.degrees(context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1) * 360))
+        }
+        .accessibilityHidden(true)
     }
 }
