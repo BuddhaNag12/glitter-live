@@ -128,20 +128,23 @@ struct WallpaperDetailView: View {
     /// The details in a glass card, and beside it, on its own, the download button.
     private var panel: some View {
         HStack(alignment: .center, spacing: 10) {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 8) {
-                    Text(current.title).typography(.titleMedium).foregroundStyle(Theme.textPrimary).lineLimit(1)
-                    Spacer(minLength: 0)
-                    kindChip
-                }
-                if let creator = current.creatorName {
-                    Text("by \(creator)").font(.labelMedium).foregroundStyle(Theme.textSecondary).lineLimit(1)
+            VStack(alignment: .leading, spacing: 8) {
+                // A long title wraps to a second line, then truncates; the chip keeps its size and stays top right.
+                HStack(alignment: .top, spacing: 10) {
+                    Text(current.title)
+                        .typography(.titleMedium)
+                        .foregroundStyle(Theme.textPrimary)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.9)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    kindChip.fixedSize()
                 }
                 if current.isLive {
-                    Text("Touch and hold to replay the motion")
-                        .font(.labelSmall)
-                        .foregroundStyle(Theme.textTertiary)
+                    Label("Touch and hold to replay the motion", systemImage: "hand.tap.fill")
+                        .font(.labelMedium)
+                        .foregroundStyle(Theme.textSecondary)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                 }
                 if case .failed(let message) = saver.phase {
                     Label(message, systemImage: "exclamationmark.triangle")
@@ -163,11 +166,12 @@ struct WallpaperDetailView: View {
         .padding(.bottom, 72)
     }
 
-    /// "LIVE · 4.0s" or "STILL", like the badges on the cards.
+    /// The Live Photo symbol with the clip's length ("◉ 4.0s"), or "STILL", like the badges on the cards.
     @ViewBuilder
     private var kindChip: some View {
         if let seconds = current.durationSeconds {
-            StatusPill(text: "LIVE · \(seconds.formatted(.number.precision(.fractionLength(1))))s", symbol: "livephoto")
+            StatusPill(text: "\(seconds.formatted(.number.precision(.fractionLength(1))))s", symbol: "livephoto")
+                .accessibilityLabel("Live, \(seconds.formatted(.number.precision(.fractionLength(1)))) seconds")
         } else {
             StatusPill(text: "STILL", symbol: "photo")
         }
