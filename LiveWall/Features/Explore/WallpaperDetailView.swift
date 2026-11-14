@@ -56,6 +56,9 @@ struct WallpaperDetailView: View {
     @State private var currentID: Wallpaper.ID?
     @State private var saver = WallpaperSaver()
     @State private var showsControls = true
+    /// The title card shows for a moment, then fades away so the wallpaper is seen whole; a tap brings it back.
+    @State private var showsDetails = true
+    @State private var detailsShownAt = Date.now
     @State private var showsLockScreen = true
     @State private var showsGuide = false
 
@@ -81,7 +84,22 @@ struct WallpaperDetailView: View {
         .scrollIndicators(.hidden)
         .ignoresSafeArea()
         .background(.black)
-        .onTapGesture { withAnimation(.easeOut(duration: 0.2)) { showsControls.toggle() } }
+        // A tap brings back whatever is hidden; with everything showing, it hides it all.
+        .onTapGesture {
+            withAnimation(.easeOut(duration: 0.25)) {
+                if showsControls && showsDetails {
+                    showsControls = false
+                } else {
+                    showsControls = true
+                    showDetails()
+                }
+            }
+        }
+        .task(id: detailsShownAt) {
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeInOut(duration: 0.5)) { showsDetails = false }
+        }
         .overlay(alignment: .top) {
             if showsControls { topBar.transition(.opacity) }
         }
@@ -93,7 +111,10 @@ struct WallpaperDetailView: View {
             if showsControls, wallpapers.count > 1 { position.padding(.bottom, 12).transition(.opacity) }
         }
         // Each wallpaper starts with its own Save button.
-        .onChange(of: currentID) { if !saver.isWorking { saver = WallpaperSaver() } }
+        .onChange(of: currentID) {
+            if !saver.isWorking { saver = WallpaperSaver() }
+            withAnimation(.easeOut(duration: 0.25)) { showDetails() }
+        }
         .sheet(isPresented: $showsGuide) { SetWallpaperGuideView() }
         .sensoryFeedback(.selection, trigger: currentID)
         .sensoryFeedback(trigger: saver.phase) { _, phase in
@@ -129,16 +150,12 @@ struct WallpaperDetailView: View {
     private var panel: some View {
         HStack(alignment: .center, spacing: 10) {
             VStack(alignment: .leading, spacing: 8) {
-                // A long title wraps to a second line, then truncates; the chip keeps its size and stays top right.
-                HStack(alignment: .top, spacing: 10) {
-                    Text(current.title)
-                        .typography(.titleMedium)
-                        .foregroundStyle(Theme.textPrimary)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.9)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    kindChip.fixedSize()
-                }
+                // A long title wraps to a second line, then truncates.
+                Text(current.title)
+                    .typography(.titleMedium)
+                    .foregroundStyle(Theme.textPrimary)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.9)
                 if current.isLive {
                     Label("Touch and hold to replay the motion", systemImage: "hand.tap.fill")
                         .font(.labelMedium)
@@ -158,6 +175,10 @@ struct WallpaperDetailView: View {
             .padding(.vertical, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .glass(.floating, cornerRadius: 24)
+            .opacity(showsDetails || saver.phase != .idle ? 1 : 0)
+            .blur(radius: showsDetails || saver.phase != .idle ? 0 : 8)
+            .offset(y: showsDetails || saver.phase != .idle ? 0 : 10)
+            .allowsHitTesting(showsDetails)
 
             saveButton
         }
@@ -166,15 +187,9 @@ struct WallpaperDetailView: View {
         .padding(.bottom, 72)
     }
 
-    /// The Live Photo symbol with the clip's length ("◉ 4.0s"), or "STILL", like the badges on the cards.
-    @ViewBuilder
-    private var kindChip: some View {
-        if let seconds = current.durationSeconds {
-            StatusPill(text: "\(seconds.formatted(.number.precision(.fractionLength(1))))s", symbol: "livephoto")
-                .accessibilityLabel("Live, \(seconds.formatted(.number.precision(.fractionLength(1)))) seconds")
-        } else {
-            StatusPill(text: "STILL", symbol: "photo")
-        }
+    private func showDetails() {
+        showsDetails = true
+        detailsShownAt = .now
     }
 
     /// Which wallpaper this is, between the Lock Screen's flashlight and camera.
