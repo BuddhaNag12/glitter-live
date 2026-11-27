@@ -1,0 +1,28 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "glitter-media",
+  "main": "worker.js",
+  "compatibility_date": "2026-11-27",
+  "compatibility_flags": ["nodejs_compat"],
+  "kv_namespaces": [
+    {
+      "binding": "WALLPAPERS",
+      "id": "c9eddbf693494b4dbf53e47368b3bd6d"
+    }
+  ],
+  "vars": {
+    "ADMIN_ORIGINS": "https://glitter-live-admin.vercel.app,http://localhost:5173"
+  },
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 0.01
+    }
+  }
+  // Secret required via `wrangler secret put ADMIN_JWT_SECRET` (must match glitter-api's ADMIN_JWT_SECRET).
+}

@@ -1,9 +1,9 @@
 import Foundation
 
-/// Generates through the Supabase `generate` function, which holds the AI providers' keys
-/// (`supabase/functions/generate`).
+/// Generates through the Cloudflare `glitter-api` Worker (`cloudflare/api`), which checks prompts
+/// and images with Workers AI and enforces AdMob SSV limits in D1.
 nonisolated struct RemoteGenerationService: GenerationService {
-    private static let endpoint = CatalogConfig.projectURL.appending(path: "functions/v1/generate")
+    private static let endpoint = CatalogConfig.apiURL.appending(path: "generate")
 
     @concurrent
     func makeImage(for request: GenerationRequest) async throws -> URL {
@@ -31,7 +31,6 @@ nonisolated struct RemoteGenerationService: GenerationService {
     static func call<Response: Decodable>(_ body: [String: String], timeout: TimeInterval) async throws -> Response {
         var request = URLRequest(url: Self.endpoint, timeoutInterval: timeout)
         request.httpMethod = "POST"
-        request.setValue(CatalogConfig.publishableKey, forHTTPHeaderField: "apikey")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(body)
         let (data, response) = try await URLSession.shared.data(for: request)

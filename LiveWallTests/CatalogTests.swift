@@ -16,7 +16,7 @@ struct CatalogTests {
         #expect(wallpaper.title == "Silver Shimmer")
         #expect(wallpaper.creatorURL == nil)
         #expect(wallpaper.isLive)
-        #expect(wallpaper.videoURL?.absoluteString == "https://jusrioirjfpaocgmsbbv.supabase.co/storage/v1/object/public/wallpapers/videos/09829bfe.mp4")
+        #expect(wallpaper.videoURL?.absoluteString == "https://glitter-media.buddhanag12.workers.dev/videos/09829bfe.mp4")
         #expect(wallpaper.mediaURL == wallpaper.videoURL)
         let created = try #require(wallpaper.createdDate)
         #expect(abs(created.timeIntervalSince(try Date.ISO8601FormatStyle().parse("2026-09-30T11:00:39Z")) - 0.53) < 0.01)
@@ -33,7 +33,7 @@ struct CatalogTests {
         #expect(wallpaper.isFeatured)
         #expect(wallpaper.videoURL == nil)
         #expect(wallpaper.durationSeconds == nil)
-        #expect(wallpaper.mediaURL.absoluteString == "https://jusrioirjfpaocgmsbbv.supabase.co/storage/v1/object/public/wallpapers/images/5a1d2c3e.png")
+        #expect(wallpaper.mediaURL.absoluteString == "https://glitter-media.buddhanag12.workers.dev/images/5a1d2c3e.png")
     }
 
     /// Hits the live catalog: downloads the first wallpaper and builds a Live Photo from it, without saving.

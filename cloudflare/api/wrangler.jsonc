@@ -1,0 +1,40 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "glitter-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-27",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "glitter-db",
+      "database_id": "dc8dd62b-c1ff-4ac4-a600-d81e057b8ed1",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "ai": {
+    "binding": "AI"
+  },
+  "vars": {
+    "DAILY_GENERATIONS_PER_INSTALL": "3",
+    "DAILY_GENERATIONS_TOTAL": "60",
+    "REQUIRE_AD_REWARD": "true",
+    "ALLOW_VIDEO": "false",
+    "ADMIN_ORIGINS": "https://glitter-live-admin.vercel.app,http://localhost:5173"
+  },
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 0.01
+    }
+  }
+  // Required secrets (set via `wrangler secret put`):
+  //   ADMIN_EMAIL, ADMIN_PASSWORD_HASH, ADMIN_JWT_SECRET
+  // Optional secrets:
+  //   ADMOB_REWARDED_AD_UNIT, FAL_KEY
+}
