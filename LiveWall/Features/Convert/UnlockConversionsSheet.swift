@@ -1,3 +1,4 @@
+import StoreKit
 import SwiftUI
 
 /// Shown once the free conversions are used up: a short ad saves this video, or the one-time purchase removes the limit.
@@ -8,6 +9,7 @@ struct UnlockConversionsSheet: View {
 
     @Environment(Purchases.self) private var purchases
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var isRedeeming = false
 
     var body: some View {
         ScrollView {
@@ -47,18 +49,32 @@ struct UnlockConversionsSheet: View {
                 }
                 .disabled(purchases.isPurchasing)
 
-                Button("Restore Purchase") {
-                    Task {
-                        await purchases.restore()
-                        guard purchases.ownsUnlimitedConversions else { return }
-                        // Going straight on says it worked; an alert would only be in the way.
-                        purchases.message = nil
-                        onChoose(.unlocked)
+                HStack(spacing: 24) {
+                    Button("Restore Purchase") {
+                        Task {
+                            await purchases.restore()
+                            guard purchases.ownsUnlimitedConversions else { return }
+                            // Going straight on says it worked; an alert would only be in the way.
+                            purchases.message = nil
+                            onChoose(.unlocked)
+                        }
+                    }
+                    Button("Redeem Code") {
+                        isRedeeming = true
                     }
                 }
                 .font(.labelMedium.weight(.semibold))
                 .foregroundStyle(Theme.textSecondary)
                 .frame(minHeight: 44)
+                .offerCodeRedemption(isPresented: $isRedeeming) { _ in
+                    isRedeeming = false
+                    Task {
+                        await purchases.load()
+                        guard purchases.ownsUnlimitedConversions else { return }
+                        purchases.message = nil
+                        onChoose(.unlocked)
+                    }
+                }
             }
             .padding(.horizontal, 20)
             .padding(.top, 28)

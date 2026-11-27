@@ -1,3 +1,4 @@
+import StoreKit
 import SwiftUI
 
 /// Public pages for the App Store listing and Settings. They're served from the repository's docs folder.
@@ -13,6 +14,7 @@ struct SettingsView: View {
     @Environment(ConversionAllowance.self) private var conversions
     @Environment(Purchases.self) private var purchases
     @State private var showsGuide = false
+    @State private var isRedeeming = false
 
     private var version: String {
         let info = Bundle.main.infoDictionary
@@ -124,6 +126,16 @@ struct SettingsView: View {
         VStack(spacing: 0) {
             row("Restore purchases", symbol: "arrow.clockwise", tint: WallpaperPalette.teal) {
                 Task { await purchases.restore() }
+            }
+            rowDivider
+            row("Redeem code", symbol: "giftcard.fill", tint: WallpaperPalette.rose) {
+                isRedeeming = true
+            }
+            .offerCodeRedemption(isPresented: $isRedeeming) { _ in
+                // If the sheet couldn't open, this lets the next tap try again.
+                isRedeeming = false
+                // The transaction also arrives through Transaction.updates; this just doesn't wait for it.
+                Task { await purchases.load() }
             }
             if RewardedAds.shared.offersPrivacyChoices {
                 rowDivider
