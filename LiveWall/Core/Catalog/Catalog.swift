@@ -2,15 +2,14 @@ import CoreGraphics
 import CoreMedia
 import Foundation
 
-/// The Supabase project behind Explore. The publishable key is meant to ship in apps; with it,
-/// the `catalog` view and `wallpapers` table only allow reading published rows.
+/// The Cloudflare Workers behind Explore and Create: `glitter-api` (D1 catalog, AdMob SSV, Workers AI)
+/// and `glitter-media` (Workers KV media storage).
 nonisolated enum CatalogConfig {
-    static let projectURL = URL(string: "https://jusrioirjfpaocgmsbbv.supabase.co")!
-    static let publishableKey = "sb_publishable_H8JSLO_Abl7S2ocPsk1LSQ_OT3w-Xny"
-    static let bucket = "wallpapers"
+    static let apiURL = URL(string: "https://glitter-api.buddhanag12.workers.dev")!
+    static let mediaURL = URL(string: "https://glitter-media.buddhanag12.workers.dev")!
 
     static func publicFileURL(_ path: String) -> URL {
-        projectURL.appending(path: "storage/v1/object/public/\(bucket)/\(path)")
+        mediaURL.appending(path: path)
     }
 }
 
@@ -90,10 +89,7 @@ nonisolated enum CatalogService {
     /// Category name to cover image. Optional extras: any failure, including a database without the
     /// table, returns none, and the tiles show a wallpaper as before.
     static func fetchCategoryCovers() async -> [String: URL] {
-        var components = URLComponents(url: CatalogConfig.projectURL.appending(path: "rest/v1/category_covers"), resolvingAgainstBaseURL: false)!
-        components.queryItems = [URLQueryItem(name: "select", value: "category,image_path")]
-        var request = URLRequest(url: components.url!)
-        request.setValue(CatalogConfig.publishableKey, forHTTPHeaderField: "apikey")
+        var request = URLRequest(url: CatalogConfig.apiURL.appending(path: "category-covers"))
         request.cachePolicy = .reloadRevalidatingCacheData
         guard let (data, response) = try? await URLSession.shared.data(for: request),
               (response as? HTTPURLResponse)?.statusCode == 200,
@@ -102,15 +98,7 @@ nonisolated enum CatalogService {
     }
 
     static func fetchWallpapers() async throws -> [Wallpaper] {
-        // 1.0 reads `wallpapers`, which only returns live rows; `catalog` has stills too.
-        // A change that would break this decoder needs a new view (`catalog_v2`), not an edit to this one.
-        var components = URLComponents(url: CatalogConfig.projectURL.appending(path: "rest/v1/catalog"), resolvingAgainstBaseURL: false)!
-        components.queryItems = [
-            URLQueryItem(name: "select", value: "id,kind,title,category,video_path,image_path,thumbnail_path,duration_seconds,width,height,creator_name,creator_url,is_featured,is_category_cover,created_at"),
-            URLQueryItem(name: "order", value: "sort_order.asc,created_at.desc"),
-        ]
-        var request = URLRequest(url: components.url!)
-        request.setValue(CatalogConfig.publishableKey, forHTTPHeaderField: "apikey")
+        var request = URLRequest(url: CatalogConfig.apiURL.appending(path: "catalog"))
         request.cachePolicy = .reloadRevalidatingCacheData
         let (data, response) = try await URLSession.shared.data(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0

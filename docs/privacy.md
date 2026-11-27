@@ -36,7 +36,7 @@ Purchases are handled entirely by Apple. We never see your payment details. Appl
 
 ## Explore
 
-The wallpapers in Explore are downloaded from our catalog, which is hosted by [Supabase](https://supabase.com). As with any download, the request includes technical details such as your IP address, which the hosting provider may log briefly to run the service. We don't use these details to identify you, and nothing about what you browse or save is sent back to us.
+The wallpapers in Explore are downloaded from our catalog, which is hosted by [Cloudflare](https://www.cloudflare.com/privacypolicy/). As with any download, the request includes technical details such as your IP address, which the hosting provider may log briefly to run the service. We don't use these details to identify you, and nothing about what you browse or save is sent back to us.
 
 ## Create (AI wallpapers)
 

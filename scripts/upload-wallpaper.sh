@@ -1,19 +1,20 @@
 #!/bin/bash
-# Uploads a wallpaper video and its thumbnail to Supabase Storage and adds it to the Explore catalog.
+# Uploads a wallpaper video and its thumbnail to Cloudflare Workers KV (`WALLPAPERS`)
+# and inserts the catalog row into Cloudflare D1 (`glitter-db`).
 #
 #   scripts/upload-wallpaper.sh <video> --title "Blue Lagoon" --category "Glitter Originals" \
 #     [--creator "Name"] [--creator-url https://…] [--sort 10] [--unpublished]
 #
-# Reads credentials from scripts/storage.env (see scripts/storage.env.example).
+# Requires `npx wrangler@4 login` once.
 set -euo pipefail
-export PATH=/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:$PATH
+export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.nvm/versions/node/$(ls "$HOME/.nvm/versions/node" 2>/dev/null | tail -n 1)/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 
 here="$(cd "$(dirname "$0")" && pwd)"
-set -a; . "$here/storage.env"; set +a
-export AWS_ACCESS_KEY_ID="$SUPABASE_S3_ACCESS_KEY_ID" AWS_SECRET_ACCESS_KEY="$SUPABASE_S3_SECRET_ACCESS_KEY" AWS_DEFAULT_REGION="$SUPABASE_S3_REGION"
+repo="$(cd "$here/.." && pwd)"
+kv_namespace_id="${KV_NAMESPACE_ID:-c9eddbf693494b4dbf53e47368b3bd6d}"
 
 video="${1:?usage: upload-wallpaper.sh <video> --title … --category …}"; shift
-title="" category="" creator="" creator_url="" sort=0 published=true
+title="" category="" creator="" creator_url="" sort=0 published=1
 while [ $# -gt 0 ]; do
     case "$1" in
         --title) title="$2"; shift 2 ;;
@@ -21,7 +22,7 @@ while [ $# -gt 0 ]; do
         --creator) creator="$2"; shift 2 ;;
         --creator-url) creator_url="$2"; shift 2 ;;
         --sort) sort="$2"; shift 2 ;;
-        --unpublished) published=false; shift ;;
+        --unpublished) published=0; shift ;;
         *) echo "unknown option: $1" >&2; exit 2 ;;
     esac
 done
@@ -29,6 +30,8 @@ done
 
 probe="$(swift "$here/wallpaper-tool.swift" probe "$video")"
 duration="$(echo "$probe" | jq -r .duration)"
+width="$(echo "$probe" | jq -r .width)"
+height="$(echo "$probe" | jq -r .height)"
 # The Lock Screen only plays Live Photos up to 5 s; longer clips are trimmed in the app, but keep uploads short.
 if [ "$(echo "$duration > 5" | bc)" = 1 ]; then
     echo "Video is ${duration}s. Trim it to 5 seconds or less before uploading." >&2
@@ -40,28 +43,44 @@ extension="${video##*.}"; extension="$(echo "$extension" | tr '[:upper:]' '[:low
 video_path="videos/$id.$extension"
 thumbnail_path="thumbnails/$id.jpg"
 thumbnail="$(mktemp -t thumb).jpg"
-trap 'rm -f "$thumbnail"' EXIT
+sql_file="$(mktemp -t insert).sql"
+trap 'rm -f "$thumbnail" "$sql_file"' EXIT
 
 swift "$here/wallpaper-tool.swift" thumbnail "$video" "$thumbnail"
 content_type="video/mp4"; [ "$extension" = "mov" ] && content_type="video/quicktime"
-aws s3 cp "$video" "s3://$SUPABASE_STORAGE_BUCKET/$video_path" --endpoint-url "$SUPABASE_S3_ENDPOINT" \
-    --content-type "$content_type" --cache-control "public, max-age=31536000, immutable" --only-show-errors
-aws s3 cp "$thumbnail" "s3://$SUPABASE_STORAGE_BUCKET/$thumbnail_path" --endpoint-url "$SUPABASE_S3_ENDPOINT" \
-    --content-type image/jpeg --cache-control "public, max-age=31536000, immutable" --only-show-errors
 
-row="$(jq -n \
-    --arg id "$id" --arg title "$title" --arg category "$category" \
-    --arg video_path "$video_path" --arg thumbnail_path "$thumbnail_path" \
-    --argjson probe "$probe" --arg creator "$creator" --arg creator_url "$creator_url" \
-    --argjson sort "$sort" --argjson published "$published" \
-    '{id: $id, title: $title, category: $category, video_path: $video_path, thumbnail_path: $thumbnail_path,
-      duration_seconds: $probe.duration, width: $probe.width, height: $probe.height,
-      creator_name: (if $creator == "" then null else $creator end),
-      creator_url: (if $creator_url == "" then null else $creator_url end),
-      sort_order: $sort, is_published: $published}')"
+kv_put() {
+    local key="$1" file="$2" ctype="$3"
+    local size etag meta
+    size="$(stat -f %z "$file")"
+    etag="\"$(shasum -a 256 "$file" | cut -c1-16)\""
+    meta="$(jq -nc --arg ct "$ctype" --arg cc "public, max-age=31536000, immutable" --argjson sz "$size" --arg et "$etag" \
+        '{contentType: $ct, cacheControl: $cc, size: $sz, etag: $et}')"
+    npx --yes wrangler@4 kv key put --namespace-id="$kv_namespace_id" --remote "$key" --path="$file" --metadata="$meta" >/dev/null
+}
 
-curl -sS --fail-with-body -X POST "https://$SUPABASE_PROJECT_REF.supabase.co/rest/v1/wallpapers" \
-    -H "apikey: $SUPABASE_SECRET_KEY" -H "Content-Type: application/json" -H "Prefer: return=minimal" \
-    -d "$row" >/dev/null
+kv_put "$video_path" "$video" "$content_type"
+kv_put "$thumbnail_path" "$thumbnail" "image/jpeg"
 
+ID="$id" TITLE="$title" CATEGORY="$category" VIDEO_PATH="$video_path" THUMB_PATH="$thumbnail_path" \
+DURATION="$duration" WIDTH="$width" HEIGHT="$height" CREATOR="$creator" CREATOR_URL="$creator_url" \
+SORT="$sort" PUBLISHED="$published" python3 - <<'PY' > "$sql_file"
+import os
+
+def q(v):
+    if v is None or v == "":
+        return "NULL"
+    return "'" + str(v).replace("'", "''") + "'"
+
+print(
+    "INSERT INTO wallpapers (id, kind, title, category, video_path, image_path, thumbnail_path, "
+    "duration_seconds, width, height, creator_name, creator_url, is_published, sort_order) VALUES ("
+    f"{q(os.environ['ID'])}, 'live', {q(os.environ['TITLE'])}, {q(os.environ['CATEGORY'])}, "
+    f"{q(os.environ['VIDEO_PATH'])}, NULL, {q(os.environ['THUMB_PATH'])}, "
+    f"{os.environ['DURATION']}, {os.environ['WIDTH']}, {os.environ['HEIGHT']}, "
+    f"{q(os.environ['CREATOR'])}, {q(os.environ['CREATOR_URL'])}, {os.environ['PUBLISHED']}, {os.environ['SORT']});"
+)
+PY
+
+(cd "$repo/cloudflare/api" && npx --yes wrangler@4 d1 execute glitter-db --remote --file="$sql_file" -y >/dev/null)
 echo "Added \"$title\" ($category, ${duration}s) as $id"
