@@ -30,7 +30,6 @@ struct SettingsView: View {
                     if conversions.access != .unlimited {
                         sectionHeader("Upgrade")
                         upgradeCard
-                        purchaseRows.glass(.surface, cornerRadius: 22).padding(.top, 4)
                     }
 
                     sectionHeader("Help")
@@ -87,47 +86,45 @@ struct SettingsView: View {
         .unlockCelebration(count: purchases.unlockCount)
     }
 
-    /// The unlock offer leads the page as its own panel, with the price on a capsule like a buy button.
-    @ViewBuilder
+    /// Unified Upgrade tile card: purchase hero on top, with Redeem code and Restore purchases below.
     private var upgradeCard: some View {
-        if conversions.access == .unlocked {
-            rowLabel("Unlimited conversions", symbol: "checkmark.seal.fill", tint: WallpaperPalette.amber, detail: "Unlocked")
-                .glass(.surface, cornerRadius: 22)
-        } else {
-            Button {
-                Task { await purchases.buyUnlimitedConversions() }
-            } label: {
-                HStack(spacing: 12) {
-                    tile("lock.open.fill", tint: WallpaperPalette.amber, size: 40)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Unlimited conversions").typography(.titleMedium).foregroundStyle(Theme.textPrimary)
-                        Text("Turn as many videos into wallpapers as you like.").typography(.bodyMedium).foregroundStyle(Theme.textSecondary)
+        VStack(spacing: 0) {
+            if conversions.access == .unlocked {
+                rowLabel("Unlimited conversions", symbol: "checkmark.seal.fill", tint: WallpaperPalette.amber, detail: "Unlocked")
+            } else {
+                Button {
+                    Task { await purchases.buyUnlimitedConversions() }
+                } label: {
+                    HStack(spacing: 12) {
+                        tile("lock.open.fill", tint: WallpaperPalette.amber, size: 40)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Unlimited conversions").typography(.titleMedium).foregroundStyle(Theme.textPrimary)
+                            Text("Turn as many videos into wallpapers as you like.").typography(.bodyMedium).foregroundStyle(Theme.textSecondary)
+                        }
+                        Spacer(minLength: 0)
+                        Text(purchases.unlimitedConversions?.displayPrice ?? "Unlock")
+                            .typography(.labelLarge)
+                            .foregroundStyle(Theme.onAccent)
+                            .padding(.horizontal, 14)
+                            .frame(height: 34)
+                            .background(Theme.accentGradient, in: Capsule())
                     }
-                    Spacer(minLength: 0)
-                    Text(purchases.unlimitedConversions?.displayPrice ?? "Unlock")
-                        .typography(.labelLarge)
-                        .foregroundStyle(Theme.onAccent)
-                        .padding(.horizontal, 14)
-                        .frame(height: 34)
-                        .background(Theme.accentGradient, in: Capsule())
+                    .padding(16)
+                    .contentShape(Rectangle())
                 }
-                .padding(16)
-                .contentShape(Rectangle())
+                .buttonStyle(.plain)
+                .disabled(purchases.isPurchasing)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Unlock unlimited conversions, \(purchases.unlimitedConversions?.displayPrice ?? "")")
             }
-            .buttonStyle(.plain)
-            .disabled(purchases.isPurchasing)
-            .glass(.floating, cornerRadius: 22)
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("Unlock unlimited conversions, \(purchases.unlimitedConversions?.displayPrice ?? "")")
+            rowDivider
+            purchaseRows
         }
+        .glass(.floating, cornerRadius: 22)
     }
 
     private var purchaseRows: some View {
         VStack(spacing: 0) {
-            row("Restore purchases", symbol: "arrow.clockwise", tint: WallpaperPalette.teal) {
-                Task { await purchases.restore() }
-            }
-            rowDivider
             row("Redeem code", symbol: "giftcard.fill", tint: WallpaperPalette.rose) {
                 isRedeeming = true
             }
@@ -136,6 +133,10 @@ struct SettingsView: View {
                 isRedeeming = false
                 // The transaction also arrives through Transaction.updates; this just doesn't wait for it.
                 Task { await purchases.load() }
+            }
+            rowDivider
+            row("Restore purchases", symbol: "arrow.clockwise", tint: WallpaperPalette.teal) {
+                Task { await purchases.restore() }
             }
             if RewardedAds.shared.offersPrivacyChoices {
                 rowDivider
