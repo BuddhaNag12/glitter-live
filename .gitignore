@@ -35,3 +35,10 @@ graphify-out
 # Test dependencies for supabase/tests
 supabase/tests/node_modules/
 supabase/tests/package*.json
+
+# Local Supabase backups and Cloudflare build/test state
+backups/
+.wrangler/
+cloudflare/**/.wrangler/
+cloudflare/**/node_modules/
+cloudflare/**/.dev.vars

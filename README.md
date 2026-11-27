@@ -40,7 +40,7 @@
 
 ## Features
 
-- **Explore**: the first tab, a curated catalog of live wallpapers, served from Supabase, that saves to Photos as a Lock Screen-ready Live Photo in one tap. It opens on a playing Featured wallpaper, and touching and holding any wallpaper previews its motion. While the catalog loads, shimmering placeholders hold the page's shape, and the cards rise into place in a wave when it arrives.
+- **Explore**: the first tab, a curated catalog of live wallpapers, served from Cloudflare (D1 + Workers KV), that saves to Photos as a Lock Screen-ready Live Photo in one tap. It opens on a playing Featured wallpaper, and touching and holding any wallpaper previews its motion. While the catalog loads, shimmering placeholders hold the page's shape, and the cards rise into place in a wave when it arrives.
 - **Video to Live Wallpaper**: pick any video, trim a 1–3 second moment, and save it as a Live Photo that plays on the Lock Screen when the iPhone wakes. Videos can come from Photos, Files, a direct link (Dropbox and Google Drive share links work), or Share → Glitter Live from another app.
 - **Trim Studio**: filmstrip with trim handles that preview the frame under your finger and stretch softly at their limits, a draggable cover-frame marker, pinch-and-drag framing inside a Lock Screen preview (clock, widgets and quick actions) that springs back with your finger's momentum, 0.5×–2× speed and a forward-and-back bounce.
 - **Sharp cover photo**: the still shown while the phone is locked is rendered from the original video at up to 1320 px wide, sharper than the motion clip.
@@ -63,14 +63,14 @@ See [`LivePhotoBuilder.swift`](LiveWall/Core/LivePhoto/LivePhotoBuilder.swift) a
 
 ## Catalog backend
 
-Explore reads the `wallpapers` table (read-only for the app's publishable key) and downloads files from a public Supabase Storage bucket. To add a wallpaper:
+Explore reads the catalog from `glitter-api` (Cloudflare D1) and downloads media files from `glitter-media` (Cloudflare Workers KV). To add a wallpaper:
 
 ```bash
-cp scripts/storage.env.example scripts/storage.env   # fill in the S3 and secret keys; this file is git-ignored
+npx wrangler@4 login   # once
 scripts/upload-wallpaper.sh ~/Movies/loop.mp4 --title "Neon Rain" --category "Abstract" --creator "Your Name"
 ```
 
-The table is created by [`supabase/migrations/0001_wallpapers.sql`](supabase/migrations/0001_wallpapers.sql).
+The schema is created by [`cloudflare/api/migrations/0001_init.sql`](cloudflare/api/migrations/0001_init.sql).
 
 ## Requirements
 
@@ -107,12 +107,12 @@ xcodebuild test -project LiveWall.xcodeproj -scheme LiveWall \
 
 | Workflow | Runs on | Does |
 | --- | --- | --- |
-| [Deploy Supabase functions](.github/workflows/deploy-functions.yml) | pushes to `main` that change `supabase/functions/`, or by hand | deploys `generate` and `ad-reward`; needs the `SUPABASE_ACCESS_TOKEN` repository secret |
+| [Deploy Cloudflare Workers](.github/workflows/deploy-functions.yml) | pushes to `main` that change `cloudflare/`, or by hand | tests and deploys `glitter-media` and `glitter-api`, and applies D1 migrations; needs `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets |
 | [Version bump](.github/workflows/version-bump.yml) | pull requests from `dev` into `main` | sets `MARKETING_VERSION` on `dev` to the next minor version, or patch / major with a `release: patch` / `release: major` label |
 | [Release](.github/workflows/release.yml) | pushes to `main` that change `project.yml`, or by hand | when `MARKETING_VERSION` is new, tags it `vX.Y.Z` and creates a GitHub release with notes from the merged pull requests |
 | Xcode Cloud | every push to `main` | archives and uploads to TestFlight; [`ci_scripts/ci_post_clone.sh`](ci_scripts/ci_post_clone.sh) generates the project, fetches the depth model and writes the AdMob IDs from the `GAD_APPLICATION_ID` and `GAD_REWARDED_AD_UNIT_ID` secret environment variables |
 
-Database migrations aren't deployed automatically; run `supabase db push` after reviewing them.
+Database migrations apply automatically in CI on pushes to `main` that touch `cloudflare/`, or manually with `cd cloudflare/api && npx wrangler@4 d1 migrations apply glitter-db --remote`.
 
 ### Releasing
 
@@ -153,8 +153,7 @@ gh pr create --base main --head dev --label "release: patch" --title "Release X.
 Merge with a **merge commit**, not squash, so `dev` and `main` keep the same history. Then:
 - [Release](.github/workflows/release.yml) tags the merge `vX.Y.Z` and creates a GitHub release with notes from the merged pull requests.
 - Xcode Cloud archives `main` and uploads the build to TestFlight.
-- If the release touches `supabase/functions/`, [Deploy Supabase functions](.github/workflows/deploy-functions.yml) deploys them.
-- Database migrations are not deployed for you: review them, then run `supabase db push`.
+- If the release touches `cloudflare/`, [Deploy Cloudflare Workers](.github/workflows/deploy-functions.yml) tests, applies D1 migrations, and deploys `glitter-media` and `glitter-api`.
 
 #### 4. App Store Connect
 1. Create the version `X.Y.Z`.
@@ -176,7 +175,7 @@ LiveWall/
   App/            App entry point, tab bar and launch intro
   Core/LivePhoto/ Video → Live Photo pipeline, saving and preview
   DesignSystem/   Colors, type, glass components, motion, logo artwork, Lock Screen overlay
-  Core/Catalog/   Supabase catalog client and downloads
+  Core/Catalog/   Cloudflare catalog client and downloads
   Features/       Explore, Convert, Library, Onboarding, Settings
   Resources/      Assets, fonts, privacy manifest
 LiveWallTests/    Unit tests
@@ -184,7 +183,8 @@ LiveWallUITests/  On-device screenshot tests
 Branding/         Logo files, layered SVGs and the Jitter logo reveal
 docs/             Privacy policy, support page, App Store listing, screenshots
 scripts/          Icon, logo and SVG renderer, wallpaper upload tools
-supabase/         Database migrations
+cloudflare/       Cloudflare Workers (glitter-api, glitter-media) and D1 migrations
+supabase/         Legacy Supabase migrations and functions (kept until old builds retire)
 ```
 
 ## Roadmap
