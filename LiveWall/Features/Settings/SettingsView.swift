@@ -125,16 +125,18 @@ struct SettingsView: View {
 
     private var purchaseRows: some View {
         VStack(spacing: 0) {
-            row("Redeem code", symbol: "giftcard.fill", tint: WallpaperPalette.rose) {
-                isRedeeming = true
+            if conversions.access != .unlocked {
+                row("Redeem code", symbol: "giftcard.fill", tint: WallpaperPalette.rose) {
+                    isRedeeming = true
+                }
+                .offerCodeRedemption(isPresented: $isRedeeming) { _ in
+                    // If the sheet couldn't open, this lets the next tap try again.
+                    isRedeeming = false
+                    // The transaction also arrives through Transaction.updates; this just doesn't wait for it.
+                    Task { await purchases.load() }
+                }
+                rowDivider
             }
-            .offerCodeRedemption(isPresented: $isRedeeming) { _ in
-                // If the sheet couldn't open, this lets the next tap try again.
-                isRedeeming = false
-                // The transaction also arrives through Transaction.updates; this just doesn't wait for it.
-                Task { await purchases.load() }
-            }
-            rowDivider
             row("Restore purchases", symbol: "arrow.clockwise", tint: WallpaperPalette.teal) {
                 Task { await purchases.restore() }
             }
