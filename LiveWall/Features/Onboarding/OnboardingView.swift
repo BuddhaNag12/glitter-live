@@ -1,4 +1,5 @@
 import Photos
+import StoreKit
 import SwiftUI
 
 enum OnboardingState {
@@ -11,34 +12,45 @@ struct OnboardingView: View {
     var holdsReveal = false
     var onFinish: () -> Void
 
+    @Environment(ConversionAllowance.self) private var conversions
+    @Environment(Purchases.self) private var purchases
     @State private var page: Int? = 0
+    @State private var showsUpgradePrompt = false
     private static let pageCount = 4
 
     private var step: Int { page ?? 0 }
     private var isLastStep: Bool { step == Self.pageCount - 1 }
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            // A paging scroll view rather than a page-style TabView, which clips its pages at the footer
-            // instead of letting them scroll underneath it. Not lazy: Continue scrolls to a page by id,
-            // which silently fails if that page hasn't been built yet.
-            ScrollView(.horizontal) {
-                HStack(spacing: 0) {
-                    WelcomePage(isActive: step == 0 && !holdsReveal).containerRelativeFrame(.horizontal).id(0)
-                    WaysPage(isActive: step == 1).containerRelativeFrame(.horizontal).id(1)
-                    SetUpPage(isActive: step == 2).containerRelativeFrame(.horizontal).id(2)
-                    ReadyPage(isActive: step == 3).containerRelativeFrame(.horizontal).id(3)
+        Group {
+            if showsUpgradePrompt {
+                IntroUpgradePrompt(onDismiss: onFinish)
+                    .transition(.opacity.combined(with: .scale(scale: 0.97)))
+            } else {
+                VStack(spacing: 0) {
+                    header
+                    // A paging scroll view rather than a page-style TabView, which clips its pages at the footer
+                    // instead of letting them scroll underneath it. Not lazy: Continue scrolls to a page by id,
+                    // which silently fails if that page hasn't been built yet.
+                    ScrollView(.horizontal) {
+                        HStack(spacing: 0) {
+                            WelcomePage(isActive: step == 0 && !holdsReveal).containerRelativeFrame(.horizontal).id(0)
+                            WaysPage(isActive: step == 1).containerRelativeFrame(.horizontal).id(1)
+                            SetUpPage(isActive: step == 2).containerRelativeFrame(.horizontal).id(2)
+                            ReadyPage(isActive: step == 3).containerRelativeFrame(.horizontal).id(3)
+                        }
+                        .scrollTargetLayout()
+                    }
+                    .scrollTargetBehavior(.paging)
+                    .scrollPosition(id: $page)
+                    .scrollIndicators(.hidden)
                 }
-                .scrollTargetLayout()
+                .safeAreaInset(edge: .bottom) { footer }
             }
-            .scrollTargetBehavior(.paging)
-            .scrollPosition(id: $page)
-            .scrollIndicators(.hidden)
         }
-        .safeAreaInset(edge: .bottom) { footer }
         .background { AppBackground(twinkles: false) }
         .sensoryFeedback(.selection, trigger: step)
+        .unlockCelebration(count: purchases.unlockCount)
     }
 
     private func go(to newStep: Int) {
@@ -81,7 +93,15 @@ struct OnboardingView: View {
 
     private var footer: some View {
         Button {
-            if isLastStep { onFinish() } else { go(to: step + 1) }
+            if isLastStep {
+                if conversions.access != .unlimited && !purchases.ownsUnlimitedConversions {
+                    withAnimation(.spring(duration: 0.4)) { showsUpgradePrompt = true }
+                } else {
+                    onFinish()
+                }
+            } else {
+                go(to: step + 1)
+            }
         } label: {
             Label(isLastStep ? "Start Creating" : "Continue", systemImage: isLastStep ? "sparkles" : "arrow.right")
                 .labelStyle(TrailingIcon())
@@ -584,6 +604,119 @@ private struct TrailingIcon: LabelStyle {
         HStack(spacing: 8) {
             configuration.title
             configuration.icon
+        }
+    }
+}
+
+/// Payment prompt shown at the end of onboarding, with a close icon that appears after a short delay.
+private struct IntroUpgradePrompt: View {
+    var onDismiss: () -> Void
+
+    @Environment(Purchases.self) private var purchases
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var showsClose = false
+    @State private var isShown = false
+    @State private var isRedeeming = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Spacer()
+                Button(action: onDismiss) {
+                    Image(systemName: "xmark")
+                }
+                .buttonStyle(CircleIconButtonStyle(size: 40))
+                .opacity(showsClose ? 1 : 0)
+                .scaleEffect(showsClose ? 1 : 0.7)
+                .disabled(!showsClose)
+                .accessibilityLabel("Close")
+                .animation(.spring(duration: 0.35), value: showsClose)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
+
+            OnboardingPage { isShort in
+                if !isShort {
+                    HeroIcon(symbol: "infinity", badge: "sparkles", isShown: isShown)
+                        .reveal(isShown, order: 0)
+                }
+                PageTitle(
+                    "Go Unlimited",
+                    detail: "Convert as many videos as you like with no ads, ever — one simple purchase."
+                )
+                .reveal(isShown, order: 1)
+
+                VStack(alignment: .leading, spacing: 14) {
+                    IncludedRow(symbol: "infinity", title: "Unlimited conversions", detail: "Turn every favourite clip into a Lock Screen Live Photo.")
+                    IncludedRow(symbol: "nosign", title: "No ads on Convert", detail: "Save directly to Photos without watching a rewarded ad.")
+                    IncludedRow(symbol: "checkmark.seal.fill", title: "Pay once, keep forever", detail: "Restores automatically across all your devices.")
+                }
+                .padding(18)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .glass(.floating, cornerRadius: 26)
+                .reveal(isShown, order: 2)
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            VStack(spacing: 10) {
+                Button {
+                    Task {
+                        if await purchases.buyUnlimitedConversions() {
+                            onDismiss()
+                        }
+                    }
+                } label: {
+                    if purchases.isPurchasing {
+                        ProgressView().tint(Theme.onAccent)
+                    } else {
+                        Label(purchases.unlockTitle, systemImage: "lock.open.fill")
+                    }
+                }
+                .buttonStyle(KineticButtonStyle())
+                .disabled(purchases.isPurchasing)
+
+                HStack(spacing: 24) {
+                    Button("Restore Purchase") {
+                        Task {
+                            await purchases.restore()
+                            guard purchases.ownsUnlimitedConversions else { return }
+                            purchases.message = nil
+                            onDismiss()
+                        }
+                    }
+                    Button("Redeem Code") {
+                        isRedeeming = true
+                    }
+                }
+                .font(.labelMedium.weight(.semibold))
+                .foregroundStyle(Theme.textSecondary)
+                .frame(minHeight: 44)
+                .offerCodeRedemption(isPresented: $isRedeeming) { _ in
+                    isRedeeming = false
+                    Task {
+                        await purchases.load()
+                        guard purchases.ownsUnlimitedConversions else { return }
+                        purchases.message = nil
+                        onDismiss()
+                    }
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+            .padding(.bottom, 8)
+            .background {
+                LinearGradient(colors: [Theme.background.opacity(0), Theme.background], startPoint: .top, endPoint: .center)
+                    .ignoresSafeArea()
+            }
+        }
+        .purchaseMessages(purchases)
+        .task {
+            isShown = true
+            if purchases.unlimitedConversions == nil { await purchases.load() }
+            if !reduceMotion {
+                try? await Task.sleep(for: .seconds(1.5))
+            }
+            showsClose = true
         }
     }
 }

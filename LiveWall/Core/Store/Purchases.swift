@@ -20,11 +20,15 @@ final class Purchases {
 
     init(conversions: ConversionAllowance) {
         self.conversions = conversions
-        // Purchases that finish outside the app (Ask to Buy, another device, a refund) arrive here.
+        // Purchases that finish outside the app (Ask to Buy, another device, an offer code, a refund) arrive here.
         updates = Task { [weak self] in
             for await update in Transaction.updates {
                 if case .verified(let transaction) = update { await transaction.finish() }
-                await self?.refreshEntitlements()
+                guard let self else { return }
+                let ownedBefore = self.ownsUnlimitedConversions
+                await self.refreshEntitlements()
+                // An offer code (or Ask to Buy approval) unlocks here rather than through buyUnlimitedConversions().
+                if self.ownsUnlimitedConversions && !ownedBefore { self.unlockCount += 1 }
             }
         }
     }
